@@ -1,11 +1,57 @@
 "use client";
 
+import { useState, useEffect } from 'react';
+import { FileText, Zap, Clock, Activity, Loader2 } from 'lucide-react';
+
 export default function Dashboard() {
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const res = await fetch('/api/dashboard/stats');
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        setStats(data);
+      } catch (err) {
+        console.error('Erro ao carregar stats:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchStats();
+  }, []);
+
   const cards = [
-    { title: 'Total Documentos', value: '1,284', change: '+12%', icon: '📄', color: 'from-[var(--primary)] to-emerald-600' },
-    { title: 'Em Uso Agora', value: '42', change: '+3%', icon: '🔥', color: 'from-orange-500 to-red-600' },
-    { title: 'Últimas 24h', value: '156', change: '-2%', icon: '🕒', color: 'from-emerald-500 to-[var(--primary)]' },
-    { title: 'Tempo Médio', value: '2.4s', change: 'Estável', icon: '⚡', color: 'from-[var(--primary)] to-cyan-600' },
+    { 
+      title: 'Total Documentos', 
+      value: loading ? <Loader2 className="animate-spin text-[var(--primary)]" /> : (stats?.total || '0'), 
+      change: 'Histórico Total', 
+      icon: <FileText size={24} />, 
+      color: 'from-[var(--primary)] to-emerald-600' 
+    },
+    { 
+      title: 'Produção 24h', 
+      value: loading ? <Loader2 className="animate-spin text-orange-500" /> : (stats?.prod24h || '0'), 
+      change: 'Novos registros', 
+      icon: <Activity size={24} />, 
+      color: 'from-orange-500 to-red-600' 
+    },
+    { 
+      title: 'Taxa de Assinatura', 
+      value: loading ? <Loader2 className="animate-spin text-emerald-500" /> : (stats?.assinadosPercent || '0%'), 
+      change: 'Documentos Finalizados', 
+      icon: <Zap size={24} />, 
+      color: 'from-emerald-500 to-[var(--primary)]' 
+    },
+    { 
+      title: 'Status Conexão', 
+      value: loading ? <Loader2 className="animate-spin text-cyan-500" /> : (stats?.status || 'Offline'), 
+      change: stats?.status === 'Online' ? 'Estável' : 'Verificar configs', 
+      icon: <Clock size={24} />, 
+      color: 'from-[var(--primary)] to-cyan-600' 
+    },
   ];
 
   return (

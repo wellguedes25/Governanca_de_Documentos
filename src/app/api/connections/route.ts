@@ -31,6 +31,12 @@ export async function POST(request: Request) {
     data.profileQuery = body.query;
   } else if (body.type === 'SAVE_CLIENT_PATH') {
     data.oracleClientPath = body.path;
+  } else if (body.type === 'SAVE_KPI_TOTAL') {
+    data.kpiQueries.total = body.query;
+  } else if (body.type === 'SAVE_KPI_24H') {
+    data.kpiQueries.prod24h = body.query;
+  } else if (body.type === 'SAVE_KPI_ASSINADOS') {
+    data.kpiQueries.assinados = body.query;
   }
 
   saveData(data);

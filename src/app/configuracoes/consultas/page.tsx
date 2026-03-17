@@ -6,8 +6,14 @@ import { Database, Play, Save, Info, AlertTriangle } from 'lucide-react';
 export default function ConfigConsultasPage() {
   const [query, setQuery] = useState('');
   const [profileQuery, setProfileQuery] = useState('');
+  const [kpiTotal, setKpiTotal] = useState('');
+  const [kpi24h, setKpi24h] = useState('');
+  const [kpiAssinados, setKpiAssinados] = useState('');
+  
   const [loading, setLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [kpiLoading, setKpiLoading] = useState<string | null>(null);
+  
   const [message, setMessage] = useState('');
   const [activeConnName, setActiveConnName] = useState('');
 
@@ -21,29 +27,45 @@ export default function ConfigConsultasPage() {
     setQuery(storage.activeQuery || '');
     setProfileQuery(storage.profileQuery || '');
     
+    if (storage.kpiQueries) {
+      setKpiTotal(storage.kpiQueries.total || '');
+      setKpi24h(storage.kpiQueries.prod24h || '');
+      setKpiAssinados(storage.kpiQueries.assinados || '');
+    }
+    
     const active = storage.connections.find((c: any) => c.id === storage.activeConnectionId);
     if (active) setActiveConnName(active.name);
   }
 
-  async function handleSave(type: 'MAIN' | 'PROFILE') {
+  async function handleSave(type: 'MAIN' | 'PROFILE' | 'KPI_TOTAL' | 'KPI_24H' | 'KPI_ASSINADOS') {
     if (type === 'MAIN') setLoading(true);
-    else setProfileLoading(true);
+    else if (type === 'PROFILE') setProfileLoading(true);
+    else setKpiLoading(type);
+    
+    let bodyType = '';
+    let bodyQuery = '';
+
+    switch(type) {
+      case 'MAIN': bodyType = 'SAVE_QUERY'; bodyQuery = query; break;
+      case 'PROFILE': bodyType = 'SAVE_PROFILE_QUERY'; bodyQuery = profileQuery; break;
+      case 'KPI_TOTAL': bodyType = 'SAVE_KPI_TOTAL'; bodyQuery = kpiTotal; break;
+      case 'KPI_24H': bodyType = 'SAVE_KPI_24H'; bodyQuery = kpi24h; break;
+      case 'KPI_ASSINADOS': bodyType = 'SAVE_KPI_ASSINADOS'; bodyQuery = kpiAssinados; break;
+    }
     
     try {
       await fetch('/api/connections', {
         method: 'POST',
-        body: JSON.stringify({ 
-          type: type === 'MAIN' ? 'SAVE_QUERY' : 'SAVE_PROFILE_QUERY', 
-          query: type === 'MAIN' ? query : profileQuery 
-        }),
+        body: JSON.stringify({ type: bodyType, query: bodyQuery }),
       });
-      setMessage(`${type === 'MAIN' ? 'Query Principal' : 'Query Perfil'} salva com sucesso!`);
+      setMessage(`Configuração salva com sucesso!`);
       setTimeout(() => setMessage(''), 3000);
     } catch (err) {
-      setMessage('Erro ao salvar query.');
+      setMessage('Erro ao salvar configuração.');
     } finally {
-      if (type === 'MAIN') setLoading(false);
-      else setProfileLoading(false);
+      setLoading(false);
+      setProfileLoading(false);
+      setKpiLoading(null);
     }
   }
 
@@ -86,7 +108,7 @@ export default function ConfigConsultasPage() {
               </button>
             </div>
             <textarea 
-              className="w-full h-[200px] bg-[var(--background)]/50 text-[var(--primary)] font-mono p-6 rounded-xl border border-[var(--border)] focus:border-[var(--primary)] outline-none resize-none shadow-inner leading-relaxed text-sm selection:bg-[var(--primary)]/30"
+              className="w-full h-[150px] bg-[var(--background)]/50 text-[var(--primary)] font-mono p-6 rounded-xl border border-[var(--border)] focus:border-[var(--primary)] outline-none resize-none shadow-inner leading-relaxed text-sm selection:bg-[var(--primary)]/30"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               spellCheck={false}
@@ -112,12 +134,86 @@ export default function ConfigConsultasPage() {
               </button>
             </div>
             <textarea 
-              className="w-full h-[200px] bg-[var(--background)]/50 text-purple-400 font-mono p-6 rounded-xl border border-[var(--border)] focus:border-purple-500/50 outline-none resize-none shadow-inner leading-relaxed text-sm selection:bg-purple-500/30"
+              className="w-full h-[150px] bg-[var(--background)]/50 text-purple-400 font-mono p-6 rounded-xl border border-[var(--border)] focus:border-purple-500/50 outline-none resize-none shadow-inner leading-relaxed text-sm selection:bg-purple-500/30"
               value={profileQuery}
               onChange={(e) => setProfileQuery(e.target.value)}
               spellCheck={false}
               placeholder="SELECT * FROM PERFIL_AMBULATORIAL..."
             />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* KPI Total */}
+            <div className="glass rounded-2xl p-6 border border-[var(--border)]/50 relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-1 h-full bg-blue-500/50"></div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                  KPI: Total Geral
+                </span>
+                <button 
+                  onClick={() => handleSave('KPI_TOTAL')}
+                  disabled={kpiLoading === 'KPI_TOTAL'}
+                  className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-all disabled:opacity-50"
+                  title="Salvar Query de Total"
+                >
+                  <Save size={14} />
+                </button>
+              </div>
+              <textarea 
+                className="w-full h-[100px] bg-[var(--background)]/50 text-blue-400 font-mono p-4 rounded-xl border border-[var(--border)] focus:border-blue-500/50 outline-none resize-none text-xs selection:bg-blue-500/30"
+                value={kpiTotal}
+                onChange={(e) => setKpiTotal(e.target.value)}
+                spellCheck={false}
+              />
+            </div>
+
+            {/* KPI 24h */}
+            <div className="glass rounded-2xl p-6 border border-[var(--border)]/50 relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-1 h-full bg-orange-500/50"></div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                  KPI: Produção 24h
+                </span>
+                <button 
+                  onClick={() => handleSave('KPI_24H')}
+                  disabled={kpiLoading === 'KPI_24H'}
+                  className="p-1.5 rounded-lg bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white transition-all disabled:opacity-50"
+                  title="Salvar Query 24h"
+                >
+                  <Save size={14} />
+                </button>
+              </div>
+              <textarea 
+                className="w-full h-[100px] bg-[var(--background)]/50 text-orange-400 font-mono p-4 rounded-xl border border-[var(--border)] focus:border-orange-500/50 outline-none resize-none text-xs selection:bg-orange-500/30"
+                value={kpi24h}
+                onChange={(e) => setKpi24h(e.target.value)}
+                spellCheck={false}
+              />
+            </div>
+
+            {/* KPI Assinados */}
+            <div className="glass rounded-2xl p-6 border border-[var(--border)]/50 relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500/50"></div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                  KPI: Taxa Assinatura
+                </span>
+                <button 
+                  onClick={() => handleSave('KPI_ASSINADOS')}
+                  disabled={kpiLoading === 'KPI_ASSINADOS'}
+                  className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all disabled:opacity-50"
+                  title="Salvar Query Assinados"
+                >
+                  <Save size={14} />
+                </button>
+              </div>
+              <textarea 
+                className="w-full h-[100px] bg-[var(--background)]/50 text-emerald-400 font-mono p-4 rounded-xl border border-[var(--border)] focus:border-emerald-500/50 outline-none resize-none text-xs selection:bg-emerald-500/30"
+                value={kpiAssinados}
+                onChange={(e) => setKpiAssinados(e.target.value)}
+                spellCheck={false}
+              />
+            </div>
           </div>
         </div>
 
@@ -141,15 +237,15 @@ export default function ConfigConsultasPage() {
             <ul className="text-xs text-slate-400 space-y-3">
               <li className="flex gap-2">
                 <span className="text-[var(--primary)]">•</span>
-                A Query Principal define a estrutura da tabela de Documentos.
+                As queries de KPI alimentam os cards do Dashboard inicial.
               </li>
               <li className="flex gap-2">
                 <span className="text-[var(--primary)]">•</span>
-                A Query de Perfil (Vínculos) é executada ao selecionar um documento.
+                Tente retornar uma coluna chamada <b>TOTAL</b> para melhor compatibilidade.
               </li>
               <li className="flex gap-2">
                 <span className="text-[var(--primary)]">•</span>
-                Use o parâmetro <b>:CD_DOCUMENTO</b> na query de perfil para filtrar dinamicamente.
+                Use o parâmetro <b>:CD_DOCUMENTO</b> apenas na query de perfil.
               </li>
             </ul>
           </div>

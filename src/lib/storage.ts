@@ -18,6 +18,11 @@ export interface StorageData {
   activeQuery: string;
   profileQuery: string;
   oracleClientPath: string;
+  kpiQueries: {
+    total: string;
+    prod24h: string;
+    assinados: string;
+  };
 }
 
 const INITIAL_DATA: StorageData = {
@@ -25,7 +30,12 @@ const INITIAL_DATA: StorageData = {
   activeConnectionId: null,
   activeQuery: 'SELECT * FROM DUAL',
   profileQuery: 'SELECT * FROM DUAL',
-  oracleClientPath: 'C:\\orant\\Client\\instantclient_23_0'
+  oracleClientPath: 'C:\\orant\\Client\\instantclient_23_0',
+  kpiQueries: {
+    total: 'SELECT COUNT(*) as TOTAL FROM DBAMV.PW_DOCUMENTO_CLINICO',
+    prod24h: "SELECT COUNT(*) as TOTAL FROM DBAMV.PW_DOCUMENTO_CLINICO WHERE DH_CRIACAO >= SYSDATE - 1",
+    assinados: "SELECT COUNT(*) as TOTAL FROM DBAMV.PW_DOCUMENTO_CLINICO WHERE TP_STATUS = 'ASSINADO' AND DH_CRIACAO >= SYSDATE - 30"
+  }
 };
 
 function ensureDataDir() {

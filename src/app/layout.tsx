@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DocOracle Pro - Dashboard de Documentos",
-  description: "Monitoramento inteligente de documentos no banco Oracle",
+  title: "Medlytics Pro - Clinical Analytics",
+  description: "Monitoramento e Auditoria Inteligente de Documentos Clínicos",
 };
 
 export default function RootLayout({

@@ -215,7 +215,7 @@ export default function Dashboard() {
         <div>
           <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic flex items-center gap-3">
             <BarChart3 size={32} className="text-[var(--primary)]" />
-            Dashboard Estratégico
+            Medlytics Dashboard
           </h2>
           <p className="text-slate-500 font-medium mt-1 text-sm tracking-tight">Telemetria em tempo real • Oracle DBAMV</p>
         </div>

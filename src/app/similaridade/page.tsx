@@ -497,11 +497,14 @@ export default function SimilaridadePage() {
           <div className="bg-white w-full max-w-6xl h-[85vh] rounded-[var(--radius)] shadow-2xl relative flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
             <header className="px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-[var(--primary)] text-white rounded-[var(--radius)]">
-                  <Split size={20} />
+                <div className="p-3 bg-slate-900 text-white rounded-[var(--radius)] shadow-lg shadow-slate-200">
+                  <ScanEye size={24} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-slate-900 uppercase italic tracking-tighter">Comparação de Evolução</h3>
+                  <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase italic flex items-center gap-3">
+                    Medlytics Pro Audit
+                  </h2>
+                  <p className="text-slate-500 font-bold mt-0.5 text-[10px] tracking-[0.2em] uppercase">Auditoria de Similaridade Inteligente • PLN</p>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
                     Doc: {getVal(comparingDoc, 'DOCUMENTO')} | Similaridade: <b className="text-[var(--primary)]">{(Number(getVal(comparingDoc, 'SCORE')) || 0).toFixed(1)}%</b>
                   </p>

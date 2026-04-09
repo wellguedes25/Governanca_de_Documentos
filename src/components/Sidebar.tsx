@@ -11,17 +11,21 @@ export default function Sidebar() {
 
   return (
     <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-white border-r border-[var(--border)] h-screen fixed left-0 top-0 transition-all duration-300 z-50 flex flex-col shadow-xl shadow-slate-200/40 overflow-hidden print:hidden`}>
-      <div className={`p-6 border-b border-[var(--border)] flex items-center ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
-        {sidebarOpen && (
-          <h1 className="text-xl font-black bg-gradient-to-r from-[var(--primary)] to-emerald-600 bg-clip-text text-transparent italic animate-in slide-in-from-left-2 transition-all">
-            DocOracle Pro
-          </h1>
-        )}
+      <div className={`p-5 py-8 border-b border-[var(--border)] flex flex-col items-center justify-center min-h-[120px] relative`}>
+        <div className={`flex items-center justify-center transition-all duration-500 ${sidebarOpen ? 'w-48' : 'w-12'} animate-in zoom-in-95`}>
+           <img 
+             src="/brand/logo.png" 
+             alt="Medlytics Pro" 
+             className="w-full h-auto object-contain transition-transform hover:scale-105 duration-300" 
+           />
+        </div>
+        
         <button 
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-1.5 rounded-[var(--radius)] bg-[var(--accent)] text-slate-500 hover:text-[var(--primary)] transition-colors"
+          className="absolute -right-0 top-2 p-1.5 rounded-l-[var(--radius)] bg-slate-50 border border-slate-200 text-slate-400 hover:text-[var(--primary)] transition-all shadow-sm hover:translate-x-[-2px]"
+          title={sidebarOpen ? "Recolher Menu" : "Expandir Menu"}
         >
-          {sidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+          {sidebarOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
         </button>
       </div>
 

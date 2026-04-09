@@ -12,6 +12,18 @@ export interface DbConnection {
   connectString: string;
 }
 
+export interface CustomCard {
+  id: string;
+  title: string;
+  query: string;
+  type: 'kpi' | 'chart';
+  icon: string;
+  color: string;
+  enabled: boolean;
+  order: number;
+  valueType?: 'number' | 'percent';
+}
+
 export interface StorageData {
   connections: DbConnection[];
   activeConnectionId: string | null;
@@ -23,9 +35,20 @@ export interface StorageData {
     prod24h: string;
     assinados: string;
   };
+  analyticQueries: {
+    top10: string;
+    idle: string;
+    volume3m: string;
+    unitAdherence: string;
+    unitInactivity: string;
+  };
+  similarityQuery: string;
+  enabledQueries: Record<string, boolean>;
+  customCards: CustomCard[];
+  cardSettings: Record<string, { title?: string; icon?: string; color?: string }>;
 }
 
-const INITIAL_DATA: StorageData = {
+export const INITIAL_DATA: StorageData = {
   connections: [],
   activeConnectionId: null,
   activeQuery: 'SELECT * FROM DUAL',
@@ -35,7 +58,128 @@ const INITIAL_DATA: StorageData = {
     total: 'SELECT COUNT(*) as TOTAL FROM DBAMV.PW_DOCUMENTO_CLINICO',
     prod24h: "SELECT COUNT(*) as TOTAL FROM DBAMV.PW_DOCUMENTO_CLINICO WHERE DH_CRIACAO >= SYSDATE - 1",
     assinados: "SELECT COUNT(*) as TOTAL FROM DBAMV.PW_DOCUMENTO_CLINICO WHERE TP_STATUS = 'ASSINADO' AND DH_CRIACAO >= SYSDATE - 30"
-  }
+  },
+  analyticQueries: {
+    top10: `SELECT * FROM (
+    SELECT CAST(ED.CD_DOCUMENTO AS NUMBER) AS CD_DOCUMENTO,
+           UPPER(ED.DS_DOCUMENTO) AS DS_DOCUMENTO,
+           COUNT(PDC.CD_DOCUMENTO_CLINICO) AS QTD_TOTAL
+      FROM DBAMV.PW_DOCUMENTO_CLINICO PDC
+      JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO
+      JOIN EDITOR_DOCUMENTO ED ON TO_CHAR(ED.CD_DOCUMENTO) = TO_CHAR(PEC.CD_DOCUMENTO)
+      JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO
+     WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63)
+       AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO')
+       AND ED.CD_TIPO_ITEM = 13
+       AND PDC.DH_CRIACAO >= ADD_MONTHS(SYSDATE, -3)
+     GROUP BY CAST(ED.CD_DOCUMENTO AS NUMBER), UPPER(ED.DS_DOCUMENTO)
+     ORDER BY QTD_TOTAL DESC
+) 
+WHERE ROWNUM <= 10`,
+    idle: `WITH FT_DOC_USO AS (
+    SELECT PEC.CD_DOCUMENTO
+      FROM DBAMV.PW_DOCUMENTO_CLINICO PDC
+      JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO
+      JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO
+     WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63)
+       AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO')
+       AND PDC.DH_CRIACAO >= ADD_MONTHS(SYSDATE, -3)
+     GROUP BY PEC.CD_DOCUMENTO
+)
+SELECT CAST(ED.CD_DOCUMENTO AS NUMBER) AS CD_DOCUMENTO,
+       UPPER(ED.DS_DOCUMENTO) AS DS_DOCUMENTO,
+       'SEM USO NOS ÚLTIMOS 3 MESES' AS STATUS_OCIOSIDADE
+  FROM EDITOR_DOCUMENTO ED
+  LEFT JOIN FT_DOC_USO F ON TO_CHAR(F.CD_DOCUMENTO) = TO_CHAR(ED.CD_DOCUMENTO)
+ WHERE ED.CD_TIPO_ITEM = 13
+   AND F.CD_DOCUMENTO IS NULL
+ ORDER BY ED.DS_DOCUMENTO`,
+    volume3m: `SELECT COUNT(PDC.CD_DOCUMENTO_CLINICO) AS TOTAL_GERAL_PREENCHIDO
+  FROM DBAMV.PW_DOCUMENTO_CLINICO PDC
+  JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO
+  JOIN EDITOR_DOCUMENTO ED ON TO_CHAR(ED.CD_DOCUMENTO) = TO_CHAR(PEC.CD_DOCUMENTO)
+  JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO
+ WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63)
+   AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO')
+   AND ED.CD_TIPO_ITEM = 13
+   AND PDC.DH_CRIACAO >= ADD_MONTHS(SYSDATE, -3)`,
+    unitAdherence: `SELECT A.CD_MULTI_EMPRESA,
+       CASE A.CD_MULTI_EMPRESA
+            WHEN 3 THEN 'CSSJ'
+            WHEN 4 THEN 'HST'
+            WHEN 7 THEN 'HSC'
+            WHEN 10 THEN 'HSJ'
+            WHEN 11 THEN 'HMRP'
+            WHEN 25 THEN 'HCNSC'
+            WHEN 63 THEN 'HR'
+       END AS SIGLA_UNIDADE,
+       COUNT(PDC.CD_DOCUMENTO_CLINICO) AS QTD_TOTAL_PREENCHIDA
+  FROM DBAMV.PW_DOCUMENTO_CLINICO PDC
+  JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO
+  JOIN EDITOR_DOCUMENTO ED ON TO_CHAR(ED.CD_DOCUMENTO) = TO_CHAR(PEC.CD_DOCUMENTO)
+  JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO
+ WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63)
+   AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO')
+   AND ED.CD_TIPO_ITEM = 13
+   AND PDC.DH_CRIACAO >= ADD_MONTHS(SYSDATE, -3)
+ GROUP BY A.CD_MULTI_EMPRESA
+ ORDER BY QTD_TOTAL_PREENCHIDA DESC`,
+    unitInactivity: `SELECT CAST(ED.CD_DOCUMENTO AS NUMBER) AS CD_DOCUMENTO,
+       UPPER(ED.DS_DOCUMENTO) AS DS_DOCUMENTO,
+       CASE A.CD_MULTI_EMPRESA
+            WHEN 3 THEN 'CSSJ'
+            WHEN 4 THEN 'HST'
+            WHEN 7 THEN 'HSC'
+            WHEN 10 THEN 'HSJ'
+            WHEN 11 THEN 'HMRP'
+            WHEN 25 THEN 'HCNSC'
+            WHEN 63 THEN 'HR'
+       END AS SIGLA_UNIDADE,
+       MAX(PDC.DH_CRIACAO) AS ULTIMA_DATA_USO,
+       TRUNC(SYSDATE) - TRUNC(MAX(PDC.DH_CRIACAO)) AS DIAS_SEM_USO
+  FROM DBAMV.PW_DOCUMENTO_CLINICO PDC
+  JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO
+  JOIN EDITOR_DOCUMENTO ED ON TO_CHAR(ED.CD_DOCUMENTO) = TO_CHAR(PEC.CD_DOCUMENTO)
+  JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO
+ WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63)
+   AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO')
+   AND ED.CD_TIPO_ITEM = 13
+   AND PDC.DH_CRIACAO >= ADD_MONTHS(SYSDATE, -3)
+ GROUP BY CAST(ED.CD_DOCUMENTO AS NUMBER),
+          UPPER(ED.DS_DOCUMENTO),
+          A.CD_MULTI_EMPRESA
+ ORDER BY DIAS_SEM_USO DESC`
+  },
+  similarityQuery: `SELECT 
+    CD_ATENDIMENTO as ATENDIMENTO,
+    CD_DOCUMENTO as DOCUMENTO,
+    DS_DOCUMENTO as NOME_DOCUMENTO,
+    IDENTIFICADOR_FILTRO as IDENTIFICADOR,
+    DH_FECHAMENTO as DATA_HORA,
+    CD_PRESTADOR as PRESTADOR,
+    LEITO,
+    UNIDADE,
+    GRAU_SIMILARIDADE as SCORE
+FROM 
+    DBAMV.TB_AUDITORIA_SIMILARIDADE
+WHERE 
+    CD_DOCUMENTO = :CD_DOCUMENTO
+    AND IDENTIFICADOR_FILTRO = :CD_CAMPO
+    AND DH_FECHAMENTO BETWEEN TO_DATE(:DATA_INI, 'YYYY-MM-DD') AND TO_DATE(:DATA_FIM, 'YYYY-MM-DD') + 1
+ORDER BY 
+    CD_ATENDIMENTO DESC, DH_FECHAMENTO DESC`,
+  enabledQueries: {
+    total: true,
+    prod24h: true,
+    assinados: true,
+    top10: true,
+    idle: true,
+    volume3m: true,
+    unitAdherence: true,
+    unitInactivity: true
+  },
+  cardSettings: {},
+  customCards: []
 };
 
 function ensureDataDir() {
@@ -44,22 +188,30 @@ function ensureDataDir() {
   }
 }
 
-export function getData(): StorageData {
+export async function getData(): Promise<StorageData> {
   ensureDataDir();
   if (!fs.existsSync(STORAGE_FILE)) {
-    saveData(INITIAL_DATA);
     return INITIAL_DATA;
   }
+  const fileContent = fs.readFileSync(STORAGE_FILE, 'utf-8');
   try {
-    const content = fs.readFileSync(STORAGE_FILE, 'utf-8');
-    return JSON.parse(content);
-  } catch (error) {
-    console.error('Error reading storage file:', error);
+    const data = JSON.parse(fileContent);
+    return {
+      ...INITIAL_DATA,
+      ...data,
+      enabledQueries: {
+        ...INITIAL_DATA.enabledQueries,
+        ...(data.enabledQueries || {})
+      },
+      cardSettings: data.cardSettings || {},
+      customCards: data.customCards || []
+    };
+  } catch (e) {
     return INITIAL_DATA;
   }
 }
 
-export function saveData(data: StorageData) {
+export async function saveData(data: StorageData) {
   ensureDataDir();
-  fs.writeFileSync(STORAGE_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  fs.writeFileSync(STORAGE_FILE, JSON.stringify(data, null, 2));
 }

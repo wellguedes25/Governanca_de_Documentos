@@ -3,10 +3,10 @@ import { getData, DbConnection } from './storage';
 
 let clientInitialized = false;
 
-function initOracle() {
+async function initOracle() {
   if (!clientInitialized) {
     try {
-      const data = getData();
+      const data = await getData();
       const libDir = data.oracleClientPath;
       
       if (!libDir) {
@@ -50,8 +50,10 @@ export async function executeQuery(connection: DbConnection, sql: string) {
       connectString: connectString,
     });
 
-    // O driver Oracle não aceita semicolon no final de statements simples.
-    const cleanSql = sql.replace(/;\s*$/, '');
+    // O driver Oracle Thick v5 não aceita semicolon no final de statements simples.
+    // Removemos qualquer semicolon que esteja no final do comando, 
+    // mesmo se seguido por espaços ou comentários de linha.
+    const cleanSql = sql.trim().replace(/;[\s\n]*(--.*)?$/, '');
     const result = await conn.execute(cleanSql, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
     return result.rows;
   } catch (err) {

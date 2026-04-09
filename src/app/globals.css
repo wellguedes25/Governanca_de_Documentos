@@ -1,12 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  --background: #001a1f; /* Deepest Navy/Teal */
-  --foreground: #ffffff; /* White */
-  --card: #002d36; /* Dark Navy/Teal */
-  --primary: #009688; /* Teal / Emerald */
-  --accent: #00404D; /* Medium Navy/Teal */
-  --border: #003a45;
+  --background: #F8FAFC; /* Slate 50 - Paper White */
+  --foreground: #0F172A; /* Slate 900 - Navy Foreground */
+  --card: #FFFFFF; /* Pure White */
+  --primary: #0D9488; /* Teal 600 - Deep Teal */
+  --accent: #F1F5F9; /* Slate 100 - Subtle Accent */
+  --border: #E2E8F0; /* Slate 200 - Clean Border */
+  --radius: 2px; /* Technical Sharp Geometry */
 }
 
 body {

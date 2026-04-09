@@ -4,7 +4,7 @@ import { executeQuery, testConnection } from '@/lib/oracle';
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const data = getData();
+  const data = await getData();
 
   const connection = data.connections.find(c => c.id === data.activeConnectionId);
 

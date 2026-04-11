@@ -59,6 +59,8 @@ export interface StorageData {
   cardSettings: Record<string, { title?: string; icon?: string; color?: string }>;
   docMappings: DocMapping[];
   reportBaseUrl?: string;
+  siglarioAllowed?: string[];
+  siglarioForbidden?: string[];
 }
 
 export const INITIAL_DATA: StorageData = {
@@ -202,7 +204,9 @@ ORDER BY
       ] 
     }
   ],
-  reportBaseUrl: 'http://dev3-mvh5.acsc.org.br:84/mveditor/report?regId='
+  reportBaseUrl: 'http://dev3-mvh5.acsc.org.br:84/mveditor/report?regId=',
+  siglarioAllowed: [],
+  siglarioForbidden: []
 };
 
 function ensureDataDir() {
@@ -232,7 +236,9 @@ export async function getData(): Promise<StorageData> {
         ...m,
         fields: m.fields.map((f: any) => typeof f === 'string' ? { id: f, name: f } : f)
       })),
-      reportBaseUrl: data.reportBaseUrl || INITIAL_DATA.reportBaseUrl
+      reportBaseUrl: data.reportBaseUrl || INITIAL_DATA.reportBaseUrl,
+      siglarioAllowed: data.siglarioAllowed || INITIAL_DATA.siglarioAllowed,
+      siglarioForbidden: data.siglarioForbidden || INITIAL_DATA.siglarioForbidden
     };
   } catch (e) {
     return INITIAL_DATA;

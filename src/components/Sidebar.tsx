@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { LayoutDashboard, FileText, Settings, Database, ChevronLeft, ChevronRight, ScanEye } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, Database, ChevronLeft, ChevronRight, ScanEye, BookOpen } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useUI } from '@/context/UIContext';
 
@@ -51,6 +51,12 @@ export default function Sidebar() {
               <Link href="/similaridade" title={!sidebarOpen ? 'Similaridade' : ''} className={`flex items-center gap-3 px-4 py-2.5 rounded-[var(--radius)] transition-all ${pathname === '/similaridade' ? 'bg-[var(--primary)] text-white' : 'text-slate-500 hover:bg-[var(--accent)] hover:text-[var(--primary)]'} ${!sidebarOpen && 'justify-center'}`}>
                 <ScanEye size={18} className="shrink-0" />
                 {sidebarOpen && <span className="font-semibold text-sm animate-in slide-in-from-left-2">Similaridade</span>}
+              </Link>
+            </li>
+            <li>
+              <Link href="/auditoria-siglario" title={!sidebarOpen ? 'Auditoria Siglário' : ''} className={`flex items-center gap-3 px-4 py-2.5 rounded-[var(--radius)] transition-all ${pathname === '/auditoria-siglario' ? 'bg-[var(--primary)] text-white' : 'text-slate-500 hover:bg-[var(--accent)] hover:text-[var(--primary)]'} ${!sidebarOpen && 'justify-center'}`}>
+                <BookOpen size={18} className="shrink-0" />
+                {sidebarOpen && <span className="font-semibold text-sm animate-in slide-in-from-left-2">Siglário</span>}
               </Link>
             </li>
           </ul>

@@ -1,3 +1,4 @@
+// @ts-ignore
 import * as oracledb from 'oracledb';
 import { getData, DbConnection } from './storage';
 

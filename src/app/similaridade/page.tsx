@@ -14,14 +14,19 @@ import {
   Printer, 
   AlertTriangle, 
   Loader2, 
-  Split,
+  ArrowRight,
+  Database,
+  SearchCode,
+  Settings as SettingsIcon,
+  Plus,
+  Trash2,
   Calendar,
   User,
   X,
-  ArrowRight,
-  Database,
-  SearchCode
+  Split
 } from 'lucide-react';
+
+import type { DocMapping } from '@/lib/storage';
 
 export default function SimilaridadePage() {
   const [similarityData, setSimilarityData] = useState<any[]>([]);
@@ -30,6 +35,9 @@ export default function SimilaridadePage() {
   const [activeConnName, setActiveConnName] = useState('');
   const [similarityQuery, setSimilarityQuery] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
+  const [docMappings, setDocMappings] = useState<DocMapping[]>([]);
+  const [showMappingsModal, setShowMappingsModal] = useState(false);
+  const [reportUrl, setReportUrl] = useState('http://dev3-mvh5.acsc.org.br:84/mveditor/report?regId=');
 
   // Filtros
   const [filters, setFilters] = useState({
@@ -47,7 +55,7 @@ export default function SimilaridadePage() {
 
   // Estado para Modal de Comparação
   const [comparingDoc, setComparingDoc] = useState<any | null>(null);
-  const [comparisonTexts, setComparisonTexts] = useState<{atual: string, anterior: string} | null>(null);
+  const [comparisonTexts, setComparisonTexts] = useState<any | null>(null);
   const [compLoading, setCompLoading] = useState(false);
 
   useEffect(() => {
@@ -61,7 +69,28 @@ export default function SimilaridadePage() {
       const active = storage.connections.find((c: any) => c.id === storage.activeConnectionId);
       if (active) setActiveConnName(active.name);
       if (storage.similarityQuery) setSimilarityQuery(storage.similarityQuery);
+      if (storage.docMappings) setDocMappings(storage.docMappings);
+      if (storage.reportBaseUrl) setReportUrl(storage.reportBaseUrl);
     } catch (err) {}
+  }
+
+  async function handleSaveMappings(newMappings: DocMapping[]) {
+    try {
+      const res = await fetch('/api/connections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          type: 'SAVE_DOC_MAPPINGS',
+          mappings: newMappings
+        }),
+      });
+      if (res.ok) {
+        setDocMappings(newMappings);
+        setShowMappingsModal(false);
+      }
+    } catch (err) {
+      console.error('Erro ao salvar mapeamentos:', err);
+    }
   }
 
   // Helper para buscar valor de chave independente de case ou aspas
@@ -75,6 +104,12 @@ export default function SimilaridadePage() {
     // Validação de Campos Obrigatórios
     if (!filters.documento || !filters.campo || !filters.dataInicio || !filters.dataFim) {
       setError('Por favor, preencha o Cód. Documento, Identificador Campo e o período para consultar.');
+      return;
+    }
+
+    // Validação de Lógica de Datas
+    if (filters.dataFim < filters.dataInicio) {
+      setError('A Data Fim não pode ser anterior à Data Início.');
       return;
     }
 
@@ -102,7 +137,7 @@ export default function SimilaridadePage() {
             DBAMV.TB_AUDITORIA_SIMILARIDADE
         WHERE 
             CD_DOCUMENTO = :CD_DOCUMENTO
-            AND IDENTIFICADOR_FILTRO = :CD_CAMPO
+            AND IDENTIFICADOR_FILTRO = :IDENTIFICADOR
             AND DH_FECHAMENTO BETWEEN TO_DATE(:DATA_INI, 'YYYY-MM-DD') AND TO_DATE(:DATA_FIM, 'YYYY-MM-DD') + 1
         ORDER BY 
             CD_ATENDIMENTO DESC, DH_FECHAMENTO DESC
@@ -115,7 +150,8 @@ export default function SimilaridadePage() {
           query,
           params: {
             CD_DOCUMENTO: filters.documento,
-            CD_CAMPO: filters.campo,
+            IDENTIFICADOR: filters.campo,
+            CD_CAMPO: filters.campo, // Mantém compatibilidade com queries salvas antigas no storage
             DATA_INI: filters.dataInicio,
             DATA_FIM: filters.dataFim
           }
@@ -147,6 +183,8 @@ export default function SimilaridadePage() {
                 ATE.CD_PACIENTE,
                 ECA.CD_CAMPO,
                 PDC.DH_FECHAMENTO,
+                PDC.CD_DOCUMENTO_CLINICO as CD_DOC_CLINICO,
+                PEC.CD_EDITOR_REGISTRO as CD_REG_ATUAL,
                 DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) as TEXTO_ATUAL
             FROM DBAMV.PW_DOCUMENTO_CLINICO PDC
             JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO
@@ -157,10 +195,14 @@ export default function SimilaridadePage() {
               AND PEC.CD_DOCUMENTO = :CD_DOCUMENTO
               AND ECA.DS_IDENTIFICADOR = :IDENTIFICADOR
               AND TO_CHAR(PDC.DH_FECHAMENTO, 'YYYY-MM-DD HH24:MI:SS') = :DATA_HORA
+              AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO')
               AND ROWNUM = 1
         )
         SELECT 
             B.TEXTO_ATUAL,
+            TO_CHAR(B.DH_FECHAMENTO, 'DD/MM/YYYY HH24:MI:SS') as DATA_HORA_ATUAL,
+            B.CD_DOC_CLINICO as CD_DOCUMENTO_ATUAL,
+            B.CD_REG_ATUAL as CD_REGISTRO_ATUAL,
             (
                 SELECT TEXTO_PREV FROM (
                     SELECT DBMS_LOB.SUBSTR(ERC2.LO_VALOR, 4000, 1) as TEXTO_PREV
@@ -175,7 +217,52 @@ export default function SimilaridadePage() {
                       AND PDC2.TP_STATUS IN ('FECHADO', 'ASSINADO')
                     ORDER BY PDC2.DH_FECHAMENTO DESC
                 ) WHERE ROWNUM = 1
-            ) as TEXTO_ANTERIOR
+            ) as TEXTO_ANTERIOR,
+            (
+                SELECT TO_CHAR(DH_PREV, 'DD/MM/YYYY HH24:MI:SS') FROM (
+                    SELECT PDC2.DH_FECHAMENTO as DH_PREV
+                    FROM DBAMV.PW_DOCUMENTO_CLINICO PDC2
+                    JOIN DBAMV.PW_EDITOR_CLINICO PEC2 ON PEC2.CD_DOCUMENTO_CLINICO = PDC2.CD_DOCUMENTO_CLINICO
+                    JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC2 ON ERC2.CD_REGISTRO = PEC2.CD_EDITOR_REGISTRO
+                    JOIN DBAMV.ATENDIME ATE2 ON ATE2.CD_ATENDIMENTO = PDC2.CD_ATENDIMENTO
+                    WHERE ATE2.CD_PACIENTE = B.CD_PACIENTE
+                      AND PEC2.CD_DOCUMENTO = :CD_DOCUMENTO
+                      AND ERC2.CD_CAMPO = B.CD_CAMPO
+                      AND PDC2.DH_FECHAMENTO < B.DH_FECHAMENTO
+                      AND PDC2.TP_STATUS IN ('FECHADO', 'ASSINADO')
+                    ORDER BY PDC2.DH_FECHAMENTO DESC
+                ) WHERE ROWNUM = 1
+            ) as DATA_HORA_ANTERIOR,
+            (
+                SELECT CD_PREV FROM (
+                    SELECT PDC2.CD_DOCUMENTO_CLINICO as CD_PREV
+                    FROM DBAMV.PW_DOCUMENTO_CLINICO PDC2
+                    JOIN DBAMV.PW_EDITOR_CLINICO PEC2 ON PEC2.CD_DOCUMENTO_CLINICO = PDC2.CD_DOCUMENTO_CLINICO
+                    JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC2 ON ERC2.CD_REGISTRO = PEC2.CD_EDITOR_REGISTRO
+                    JOIN DBAMV.ATENDIME ATE2 ON ATE2.CD_ATENDIMENTO = PDC2.CD_ATENDIMENTO
+                    WHERE ATE2.CD_PACIENTE = B.CD_PACIENTE
+                      AND PEC2.CD_DOCUMENTO = :CD_DOCUMENTO
+                      AND ERC2.CD_CAMPO = B.CD_CAMPO
+                      AND PDC2.DH_FECHAMENTO < B.DH_FECHAMENTO
+                      AND PDC2.TP_STATUS IN ('FECHADO', 'ASSINADO')
+                    ORDER BY PDC2.DH_FECHAMENTO DESC
+                ) WHERE ROWNUM = 1
+            ) as CD_DOCUMENTO_ANTERIOR,
+            (
+                SELECT CD_REG_PREV FROM (
+                    SELECT PEC2.CD_EDITOR_REGISTRO as CD_REG_PREV
+                    FROM DBAMV.PW_DOCUMENTO_CLINICO PDC2
+                    JOIN DBAMV.PW_EDITOR_CLINICO PEC2 ON PEC2.CD_DOCUMENTO_CLINICO = PDC2.CD_DOCUMENTO_CLINICO
+                    JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC2 ON ERC2.CD_REGISTRO = PEC2.CD_EDITOR_REGISTRO
+                    JOIN DBAMV.ATENDIME ATE2 ON ATE2.CD_ATENDIMENTO = PDC2.CD_ATENDIMENTO
+                    WHERE ATE2.CD_PACIENTE = B.CD_PACIENTE
+                      AND PEC2.CD_DOCUMENTO = :CD_DOCUMENTO
+                      AND ERC2.CD_CAMPO = B.CD_CAMPO
+                      AND PDC2.DH_FECHAMENTO < B.DH_FECHAMENTO
+                      AND PDC2.TP_STATUS IN ('FECHADO', 'ASSINADO')
+                    ORDER BY PDC2.DH_FECHAMENTO DESC
+                ) WHERE ROWNUM = 1
+            ) as CD_REGISTRO_ANTERIOR
         FROM BaseDoc B
       `;
 
@@ -183,7 +270,18 @@ export default function SimilaridadePage() {
       const cdAtendimento = getVal(doc, 'ATENDIMENTO');
       const docId = getVal(doc, 'DOCUMENTO');
       const fieldId = getVal(doc, 'IDENTIFICADOR');
-      const dataHoraIso = getVal(doc, 'DATA_HORA_ISO');
+      let dataHoraIso = getVal(doc, 'DATA_HORA_ISO');
+
+      // Correção: Se a consulta do usuário não retornou DATA_HORA_ISO, fazemos o parse localmente resgatando o Timezone
+      if (!dataHoraIso) {
+        const rawDate = getVal(doc, 'DATA_HORA');
+        if (rawDate) {
+           const d = new Date(rawDate);
+           const pad = (n: number) => n.toString().padStart(2, '0');
+           // Retorna o horário local do navegador (-3h) que anula o shift UTC do JSON
+           dataHoraIso = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        }
+      }
 
       const res = await fetch('/api/oracle/execute', {
         method: 'POST',
@@ -194,18 +292,24 @@ export default function SimilaridadePage() {
             CD_ATENDIMENTO: cdAtendimento,
             CD_DOCUMENTO: docId,
             IDENTIFICADOR: fieldId,
-            DATA_HORA: dataHoraIso
+            DATA_HORA: dataHoraIso || '' // Previne undefined
           } 
         }),
       });
       
       const result = await res.json();
-      if (result.rows && result.rows.length > 0) {
-        setComparisonTexts({
-          atual: getVal(result.rows[0], 'TEXTO_ATUAL') || '',
-          anterior: getVal(result.rows[0], 'TEXTO_ANTERIOR') || 'Sem registro anterior para comparação.'
-        });
-      }
+              if (result.rows && result.rows.length > 0) {
+                setComparisonTexts({
+                  atual: getVal(result.rows[0], 'TEXTO_ATUAL') || '',
+                  anterior: getVal(result.rows[0], 'TEXTO_ANTERIOR') || 'Sem registro anterior para comparação.',
+                  dataAtual: getVal(result.rows[0], 'DATA_HORA_ATUAL'),
+                  dataAnterior: getVal(result.rows[0], 'DATA_HORA_ANTERIOR'),
+                  cdAtual: getVal(result.rows[0], 'CD_DOCUMENTO_ATUAL'),
+                  cdAnterior: getVal(result.rows[0], 'CD_DOCUMENTO_ANTERIOR'),
+                  regAtual: getVal(result.rows[0], 'CD_REGISTRO_ATUAL'),
+                  regAnterior: getVal(result.rows[0], 'CD_REGISTRO_ANTERIOR')
+                });
+              }
     } catch (err) {
       console.error('Erro ao buscar comparação:', err);
     } finally {
@@ -233,6 +337,13 @@ export default function SimilaridadePage() {
 
     return data;
   }, [similarityData, searchTerm, filters.prestador, filters.minScore]);
+  
+  // Opções para o select de Identificadores baseado no Doc selecionado
+  const fieldOptions = useMemo(() => {
+    if (!filters.documento) return [];
+    const mapping = docMappings.find(m => m.id === filters.documento);
+    return mapping ? mapping.fields : [];
+  }, [filters.documento, docMappings]);
 
   const totalPages = Math.ceil(filteredData.length / pageSize);
   const paginatedData = filteredData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -277,33 +388,51 @@ export default function SimilaridadePage() {
       {/* Painel de Filtros Ultra-Compacto (Single Line) */}
       <div className="bg-white border border-slate-200 rounded-[var(--radius)] p-4 shadow-sm relative group overflow-hidden">
         <div className="flex flex-wrap items-end gap-3 lg:gap-4">
-          {/* Documento (5 chars aprox) */}
-          <div className="w-[65px] space-y-1.5">
+          {/* Documento (Selector) - Ampliado conforme solicitado */}
+          <div className="flex-1 min-w-[280px] max-w-[400px] space-y-1.5">
             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block truncate">
-              Doc <span className="text-rose-500">*</span>
+              Documento <span className="text-rose-500">*</span>
             </label>
-            <input 
-              type="text" 
-              placeholder="916"
+            <select 
               className={`w-full bg-slate-50 border rounded-[var(--radius)] px-2 py-1.5 text-xs font-bold outline-none transition-all ${!filters.documento && hasSearched ? 'border-rose-300' : 'border-slate-200 focus:border-[var(--primary)]'}`}
               value={filters.documento}
-              onChange={(e) => setFilters(f => ({...f, documento: e.target.value}))}
-            />
+              onChange={(e) => {
+                const newDoc = e.target.value;
+                setFilters(f => ({...f, documento: newDoc, campo: ''}));
+              }}
+            >
+              <option value="">Selecione o Documento...</option>
+              {docMappings.map(m => (
+                <option key={m.id} value={m.id}>{m.id} - {m.name}</option>
+              ))}
+            </select>
           </div>
 
-          {/* Identificador (Compacto) */}
-          <div className="w-[160px] space-y-1.5">
+          {/* Identificador (Selector Dependente) - Ampliado conforme solicitado */}
+          <div className="flex-1 min-w-[220px] max-w-[320px] space-y-1.5">
             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block truncate">
-              Campo <span className="text-rose-500">*</span>
+              Campo (Identificador) <span className="text-rose-500">*</span>
             </label>
-            <input 
-              type="text" 
-              placeholder="Ex: EVOLUCAO"
+            <select 
               className={`w-full bg-slate-50 border rounded-[var(--radius)] px-2 py-1.5 text-xs font-bold outline-none transition-all ${!filters.campo && hasSearched ? 'border-rose-300' : 'border-slate-200 focus:border-[var(--primary)]'}`}
               value={filters.campo}
               onChange={(e) => setFilters(f => ({...f, campo: e.target.value}))}
-            />
+              disabled={!filters.documento}
+            >
+              <option value="">{filters.documento ? 'Selecione o Identificador...' : 'Aguardando Documento...'}</option>
+              {fieldOptions.map(f => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
           </div>
+
+          <button 
+            onClick={() => setShowMappingsModal(true)}
+            className="h-[34px] w-[34px] min-w-[34px] bg-slate-50 border border-slate-200 text-slate-400 hover:text-[var(--primary)] hover:border-[var(--primary)] rounded-[var(--radius)] flex items-center justify-center transition-all shadow-sm"
+            title="Gerenciar Documentos e Campos"
+          >
+            <SettingsIcon size={16} />
+          </button>
 
           {/* Datas */}
           <div className="w-[130px] space-y-1.5">
@@ -314,7 +443,16 @@ export default function SimilaridadePage() {
               type="date" 
               className={`w-full bg-slate-50 border rounded-[var(--radius)] px-2 py-1.5 text-xs font-bold outline-none transition-all ${!filters.dataInicio && hasSearched ? 'border-rose-300' : 'border-slate-200 focus:border-[var(--primary)]'}`}
               value={filters.dataInicio}
-              onChange={(e) => setFilters(f => ({...f, dataInicio: e.target.value}))}
+              onChange={(e) => {
+                const initDate = e.target.value;
+                setFilters(f => {
+                  const payload = { ...f, dataInicio: initDate };
+                  if (f.dataFim && initDate > f.dataFim) {
+                    payload.dataFim = initDate;
+                  }
+                  return payload;
+                });
+              }}
             />
           </div>
           <div className="w-[130px] space-y-1.5">
@@ -325,6 +463,7 @@ export default function SimilaridadePage() {
               type="date" 
               className={`w-full bg-slate-50 border rounded-[var(--radius)] px-2 py-1.5 text-xs font-bold outline-none transition-all ${!filters.dataFim && hasSearched ? 'border-rose-300' : 'border-slate-200 focus:border-[var(--primary)]'}`}
               value={filters.dataFim}
+              min={filters.dataInicio}
               onChange={(e) => setFilters(f => ({...f, dataFim: e.target.value}))}
             />
           </div>
@@ -343,8 +482,8 @@ export default function SimilaridadePage() {
             />
           </div>
 
-          {/* Score */}
-          <div className="w-[150px] space-y-1.5">
+          {/* Score - Redimensionado conforme solicitado */}
+          <div className="w-[115px] space-y-1.5">
             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
               <ChevronUp size={10} /> Score Mín.
             </label>
@@ -356,6 +495,7 @@ export default function SimilaridadePage() {
               <option value="0">Todos</option>
               <option value="50">+50%</option>
               <option value="80">+80%</option>
+              <option value="90">+90%</option>
               <option value="95">+95%</option>
             </select>
           </div>
@@ -519,7 +659,25 @@ export default function SimilaridadePage() {
               {/* Texto Anterior */}
               <div className="flex-1 flex flex-col">
                 <div className="px-8 py-3 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Histórico (Anterior)</span>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Histórico (Anterior)</span>
+                    {comparisonTexts?.dataAnterior && (
+                      <span className="text-[9px] font-bold text-slate-400 mt-0.5 opacity-80 flex items-center gap-2">
+                        <span>{comparisonTexts.dataAnterior} {comparisonTexts.cdAnterior && `| DOC: ${comparisonTexts.cdAnterior}`}</span>
+                        {comparisonTexts.regAnterior && (
+                          <a 
+                            href={`${reportUrl}${comparisonTexts.regAnterior}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="bg-slate-200/60 hover:bg-slate-300 text-slate-500 hover:text-slate-700 px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors" 
+                            title="Imprimir Registro Anterior"
+                          >
+                            <Printer size={10} /> PDF
+                          </a>
+                        )}
+                      </span>
+                    )}
+                  </div>
                   <div className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-[9px] font-black">ORIGINAL/ANTERIOR</div>
                 </div>
                 <div className="flex-1 p-8 overflow-y-auto font-serif text-slate-600 leading-relaxed bg-slate-50/30">
@@ -544,7 +702,25 @@ export default function SimilaridadePage() {
               {/* Texto Atual */}
               <div className="flex-1 flex flex-col">
                 <div className="px-8 py-3 bg-white border-b border-slate-100 flex items-center justify-between">
-                  <span className="text-[10px] font-black text-[var(--primary)] uppercase tracking-widest">Auditoria (Atual)</span>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-[var(--primary)] uppercase tracking-widest">Auditoria (Atual)</span>
+                    {comparisonTexts?.dataAtual && (
+                      <span className="text-[9px] font-bold text-[var(--primary)] mt-0.5 opacity-80 flex items-center gap-2">
+                        <span>{comparisonTexts.dataAtual} {comparisonTexts.cdAtual && `| DOC: ${comparisonTexts.cdAtual}`}</span>
+                        {comparisonTexts.regAtual && (
+                          <a 
+                            href={`${reportUrl}${comparisonTexts.regAtual}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="bg-[var(--primary)]/10 hover:bg-[var(--primary)]/20 text-[var(--primary)] px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors" 
+                            title="Imprimir Registro Atual"
+                          >
+                            <Printer size={10} /> PDF
+                          </a>
+                        )}
+                      </span>
+                    )}
+                  </div>
                   <div className={`px-2 py-0.5 rounded text-[9px] font-black border ${getScoreColor(Number(getVal(comparingDoc, 'SCORE')) || 0)}`}>
                     {(Number(getVal(comparingDoc, 'SCORE')) || 0).toFixed(1)}% SIMILAR
                   </div>
@@ -581,6 +757,160 @@ export default function SimilaridadePage() {
               >
                 <Printer size={16} /> Imprimir Laudo Auditoria
               </button>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Gerenciamento de Mapeamentos (DOC/CAMPO) */}
+      {showMappingsModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]" onClick={() => setShowMappingsModal(false)}></div>
+          <div className="bg-white w-full max-w-2xl rounded-[var(--radius)] shadow-2xl relative flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+            <header className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+               <div className="flex items-center gap-3">
+                  <div className="p-2 bg-slate-900 text-white rounded-[var(--radius)]">
+                    <SettingsIcon size={18} />
+                  </div>
+                  <h3 className="text-lg font-black text-slate-800 uppercase italic tracking-tighter">Gerenciar Mapeamentos</h3>
+               </div>
+               <button onClick={() => setShowMappingsModal(false)} className="text-slate-400 hover:text-slate-600">
+                 <X size={20} />
+               </button>
+            </header>
+
+            <div className="p-6 overflow-y-auto max-h-[60vh] space-y-6">
+               <div className="space-y-4">
+                 {docMappings.map((mapping, mIdx) => (
+                   <div key={mIdx} className="p-4 border border-slate-200 rounded-[var(--radius)] bg-slate-50 relative group/card">
+                     <button 
+                       onClick={() => handleSaveMappings(docMappings.filter((_, i) => i !== mIdx))}
+                       className="absolute top-2 right-2 p-1.5 text-slate-300 hover:text-rose-500 transition-colors"
+                     >
+                       <Trash2 size={14} />
+                     </button>
+                     
+                     <div className="grid grid-cols-2 gap-4 mb-4">
+                       <div>
+                         <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Cód. Documento</label>
+                         <input 
+                           type="text" 
+                           className="w-full bg-white border border-slate-200 rounded-[var(--radius)] px-3 py-1.5 text-xs font-bold"
+                           value={mapping.id}
+                           onChange={(e) => {
+                             const newList = [...docMappings];
+                             newList[mIdx].id = e.target.value;
+                             setDocMappings(newList);
+                           }}
+                         />
+                       </div>
+                       <div>
+                         <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Nome Amigável</label>
+                         <input 
+                           type="text" 
+                           className="w-full bg-white border border-slate-200 rounded-[var(--radius)] px-3 py-1.5 text-xs font-bold"
+                           value={mapping.name}
+                           onChange={(e) => {
+                             const newList = [...docMappings];
+                             newList[mIdx].name = e.target.value;
+                             setDocMappings(newList);
+                           }}
+                         />
+                       </div>
+                     </div>
+
+                     <div>
+                       <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Campos (Identificadores)</label>
+                       <div className="flex flex-wrap gap-2 mb-4">
+                         {mapping.fields.map((field, fIdx) => (
+                           <div key={fIdx} className="flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1 rounded-full group/tag">
+                             <div className="flex flex-col leading-none">
+                               <span className="text-[10px] font-bold text-slate-800">{field.name}</span>
+                               <span className="text-[7px] font-mono text-slate-400 uppercase">{field.id}</span>
+                             </div>
+                             <button 
+                               onClick={() => {
+                                 const newList = [...docMappings];
+                                 newList[mIdx].fields = mapping.fields.filter((_, i) => i !== fIdx);
+                                 setDocMappings(newList);
+                               }}
+                               className="text-slate-300 hover:text-rose-500 ml-1"
+                             >
+                               <X size={10} />
+                             </button>
+                           </div>
+                         ))}
+                       </div>
+
+                       <div className="bg-slate-100/50 p-3 rounded-[var(--radius)] border border-slate-200 border-dashed">
+                         <div className="flex items-end gap-3">
+                            <div className="flex-1">
+                              <label className="text-[8px] font-bold text-slate-400 uppercase mb-1 block">ID Técnico (Oracle)</label>
+                              <input 
+                                id={`new-field-id-${mIdx}`}
+                                type="text"
+                                placeholder="EX: EVOLUCAO"
+                                className="w-full bg-white border border-slate-200 px-3 py-1.5 rounded-[var(--radius)] text-[10px] font-bold outline-none focus:border-[var(--primary)]"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <label className="text-[8px] font-bold text-slate-400 uppercase mb-1 block">Descrição Amigável</label>
+                              <input 
+                                id={`new-field-name-${mIdx}`}
+                                type="text"
+                                placeholder="EX: Evolução Médica"
+                                className="w-full bg-white border border-slate-200 px-3 py-1.5 rounded-[var(--radius)] text-[10px] font-bold outline-none focus:border-[var(--primary)]"
+                              />
+                            </div>
+                            <button 
+                              onClick={() => {
+                                const idInput = document.getElementById(`new-field-id-${mIdx}`) as HTMLInputElement;
+                                const nameInput = document.getElementById(`new-field-name-${mIdx}`) as HTMLInputElement;
+                                const id = idInput.value.trim().toUpperCase();
+                                const name = nameInput.value.trim();
+                                
+                                if (id && name) {
+                                  const newList = [...docMappings];
+                                  newList[mIdx].fields.push({ id, name });
+                                  setDocMappings(newList);
+                                  idInput.value = '';
+                                  nameInput.value = '';
+                                } else {
+                                  alert('Por favor, preencha o ID Técnico e a Descrição.');
+                                }
+                              }}
+                              className="h-[30px] px-4 bg-slate-900 text-white rounded-[var(--radius)] text-[9px] font-black uppercase tracking-widest hover:bg-black transition-all"
+                            >
+                              Vincular Campo
+                            </button>
+                         </div>
+                       </div>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+
+               <button 
+                 onClick={() => setDocMappings([...docMappings, { id: '', name: '', fields: [] }])}
+                 className="w-full py-3 border-2 border-dashed border-slate-200 rounded-[var(--radius)] text-slate-400 hover:text-[var(--primary)] hover:border-[var(--primary)] hover:bg-slate-50 transition-all flex items-center justify-center gap-2 font-bold text-sm"
+               >
+                 <Plus size={18} /> Adicionar Novo Documento
+               </button>
+            </div>
+
+            <footer className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+               <button 
+                 onClick={() => setShowMappingsModal(false)}
+                 className="px-6 py-2 text-slate-500 font-bold text-xs uppercase tracking-widest hover:text-slate-700"
+               >
+                 Cancelar
+               </button>
+               <button 
+                 onClick={() => handleSaveMappings(docMappings)}
+                 className="px-8 py-2 bg-slate-900 text-white rounded-[var(--radius)] text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-md"
+               >
+                 Salvar Mapeamentos
+               </button>
             </footer>
           </div>
         </div>

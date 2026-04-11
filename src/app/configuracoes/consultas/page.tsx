@@ -5,7 +5,7 @@ import {
   Database, Play, Save, Info, AlertTriangle, RefreshCw, 
   Loader2, BarChart3, Search, TrendingUp, Users, Clock, 
   FileText, Plus, Trash2, Edit3, Check, X, Palette, 
-  Settings2, LayoutIcon, ScanEye
+  Settings2, LayoutIcon, ScanEye, Printer
 } from 'lucide-react';
 
 export default function ConfigConsultasPage() {
@@ -13,6 +13,7 @@ export default function ConfigConsultasPage() {
   const [query, setQuery] = useState('');
   const [profileQuery, setProfileQuery] = useState('');
   const [similarityQuery, setSimilarityQuery] = useState('');
+  const [reportBaseUrl, setReportBaseUrl] = useState('');
   const [kpiTotal, setKpiTotal] = useState('');
   const [kpi24h, setKpi24h] = useState('');
   const [kpiAssinados, setKpiAssinados] = useState('');
@@ -59,6 +60,7 @@ export default function ConfigConsultasPage() {
       setQuery(storage.activeQuery || '');
       setProfileQuery(storage.profileQuery || '');
       setSimilarityQuery(storage.similarityQuery || '');
+      setReportBaseUrl(storage.reportBaseUrl || 'http://dev3-mvh5.acsc.org.br:84/mveditor/report?regId=');
       
       if (storage.kpiQueries) {
         setKpiTotal(storage.kpiQueries.total || '');
@@ -88,11 +90,12 @@ export default function ConfigConsultasPage() {
     }
   }
 
-  async function handleSave(type: 'MAIN' | 'PROFILE' | 'KPI_TOTAL' | 'KPI_24H' | 'KPI_ASSINADOS' | 'KPI_TOP10' | 'KPI_IDLE' | 'KPI_VOLUME3M' | 'KPI_UNIT_ADHERENCE' | 'KPI_UNIT_INACTIVITY' | 'SETTINGS') {
+  async function handleSave(type: 'MAIN' | 'PROFILE' | 'SIMILARITY' | 'REPORT_URL' | 'KPI_TOTAL' | 'KPI_24H' | 'KPI_ASSINADOS' | 'KPI_TOP10' | 'KPI_IDLE' | 'KPI_VOLUME3M' | 'KPI_UNIT_ADHERENCE' | 'KPI_UNIT_INACTIVITY' | 'SETTINGS') {
     if (type === 'MAIN') setLoading(true);
     else if (type === 'PROFILE') setProfileLoading(true);
-    else if (type === 'SIMILARITY') setProfileLoading(true); // Reuso profileLoading ou outro estado se preferir
-    else if (type === 'SETTINGS') setLoading(true); // Reuso loading para settings
+    else if (type === 'SIMILARITY') setProfileLoading(true); 
+    else if (type === 'REPORT_URL') setProfileLoading(true); 
+    else if (type === 'SETTINGS') setLoading(true); 
     else setKpiLoading(type);
     
     let bodyType = '';
@@ -102,6 +105,7 @@ export default function ConfigConsultasPage() {
       case 'MAIN': bodyType = 'SAVE_QUERY'; bodyQuery = query; break;
       case 'PROFILE': bodyType = 'SAVE_PROFILE_QUERY'; bodyQuery = profileQuery; break;
       case 'SIMILARITY': bodyType = 'SAVE_SIMILARITY_QUERY'; bodyQuery = similarityQuery; break;
+      case 'REPORT_URL': bodyType = 'SAVE_REPORT_URL'; bodyQuery = reportBaseUrl; break;
       case 'KPI_TOTAL': bodyType = 'SAVE_KPI_TOTAL'; bodyQuery = kpiTotal; break;
       case 'KPI_24H': bodyType = 'SAVE_KPI_24H'; bodyQuery = kpi24h; break;
       case 'KPI_ASSINADOS': bodyType = 'SAVE_KPI_ASSINADOS'; bodyQuery = kpiAssinados; break;
@@ -116,9 +120,11 @@ export default function ConfigConsultasPage() {
     try {
       const res = await fetch('/api/connections', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           type: bodyType, 
           query: bodyQuery,
+          url: bodyType === 'SAVE_REPORT_URL' ? bodyQuery : undefined,
           enabledQueries,
           cardSettings
         }),
@@ -583,6 +589,32 @@ export default function ConfigConsultasPage() {
             <button onClick={() => handleSave('SIMILARITY')} disabled={profileLoading} className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.2em] transition-all">
               {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
               Salvar Motor de Auditoria
+            </button>
+          </div>
+        </div>
+
+        {/* Configuração do Relatório Dinâmico MV */}
+        <div className="bg-white rounded-[var(--radius)] p-10 border border-slate-200 shadow-sm relative overflow-hidden group mt-8">
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-800"></div>
+          <h4 className="text-[10px] font-black text-slate-900 mb-6 uppercase tracking-[0.3em] flex items-center gap-2">
+            <Printer size={14} className="text-slate-800" />
+            Vínculo Report Web (Laudos PDF MV)
+          </h4>
+          <p className="text-[10px] text-slate-400 font-bold mb-4">
+            Defina a URL base para visualização remota dos documentos no portal MV (ex: integração DEV3, HOMOL ou PRD).
+          </p>
+          <input 
+            type="text"
+            className={`w-full bg-slate-50 border border-slate-200 rounded-[var(--radius)] px-6 py-4 text-[11px] font-mono font-bold text-slate-600 focus:outline-none focus:border-slate-800 transition-all`}
+            value={reportBaseUrl}
+            onChange={(e) => setReportBaseUrl(e.target.value)}
+            placeholder="http://dev3-mvh5.acsc.org.br:84/mveditor/report?regId="
+          />
+          <div className="flex justify-between items-center mt-8 border-t border-slate-50 pt-6">
+            <p className="text-[10px] text-slate-400 font-bold uppercase italic italic-wider">Será complementado por: <b className="text-slate-800 text-[9px]">+ CD_REGISTRO</b></p>
+            <button onClick={() => handleSave('REPORT_URL')} disabled={profileLoading} className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.2em] transition-all">
+              {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+              Salvar URL do Laudo
             </button>
           </div>
         </div>

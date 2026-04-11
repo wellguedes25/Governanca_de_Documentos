@@ -31,6 +31,7 @@
     "unitAdherence": "SELECT /*+ PARALLEL(4) */ \n       A.CD_MULTI_EMPRESA,\n       CASE A.CD_MULTI_EMPRESA\n            WHEN 3 THEN 'CSSJ'\n            WHEN 4 THEN 'HST'\n            WHEN 7 THEN 'HSC'\n            WHEN 10 THEN 'HSJ'\n            WHEN 11 THEN 'HMRP'\n            WHEN 25 THEN 'HCNSC'\n            WHEN 63 THEN 'HR'\n       END AS SIGLA_UNIDADE,\n       COUNT(1) AS QTD_TOTAL_PREENCHIDA\n\n  FROM DBAMV.PW_DOCUMENTO_CLINICO PDC\n  JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO\n  -- JOIN limpo para uso de índices nativos\n  JOIN EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO \n  JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO\n  \n WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63)\n   AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO')\n   AND ED.CD_TIPO_ITEM = 13\n   AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90 -- Filtro de data otimizado\n\n GROUP BY A.CD_MULTI_EMPRESA\n ORDER BY QTD_TOTAL_PREENCHIDA DESC\n",
     "unitInactivity": "SELECT /*+ PARALLEL(4) */ \n       CAST(ED.CD_DOCUMENTO AS NUMBER) AS CD_DOCUMENTO,\n       UPPER(ED.DS_DOCUMENTO) AS DS_DOCUMENTO,\n       CASE A.CD_MULTI_EMPRESA\n            WHEN 3 THEN 'CSSJ'\n            WHEN 4 THEN 'HST'\n            WHEN 7 THEN 'HSC'\n            WHEN 10 THEN 'HSJ'\n            WHEN 11 THEN 'HMRP'\n            WHEN 25 THEN 'HCNSC'\n            WHEN 63 THEN 'HR'\n       END AS SIGLA_UNIDADE,\n       MAX(PDC.DH_CRIACAO) AS ULTIMA_DATA_USO,\n       \n       -- Calcula os dias corridos de ociosidade\n       TRUNC(SYSDATE) - TRUNC(MAX(PDC.DH_CRIACAO)) AS DIAS_SEM_USO\n\n  FROM DBAMV.PW_DOCUMENTO_CLINICO PDC\n  JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO\n  -- JOIN limpo para garantir a leitura rápida\n  JOIN EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO \n  JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO\n\n WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63)\n   AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO')\n   AND ED.CD_TIPO_ITEM = 13\n   AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90\n\n GROUP BY CAST(ED.CD_DOCUMENTO AS NUMBER),\n          UPPER(ED.DS_DOCUMENTO),\n          A.CD_MULTI_EMPRESA\n          \n ORDER BY DIAS_SEM_USO DESC\n"
   },
+  "similarityQuery": "SELECT \n    CD_ATENDIMENTO as ATENDIMENTO,\n    CD_DOCUMENTO as DOCUMENTO,\n    DS_DOCUMENTO as NOME_DOCUMENTO,\n    IDENTIFICADOR_FILTRO as IDENTIFICADOR,\n    DH_FECHAMENTO as DATA_HORA,\n    CD_PRESTADOR as PRESTADOR,\n    LEITO,\n    UNIDADE,\n    GRAU_SIMILARIDADE as SCORE\nFROM \n    DBAMV.TB_AUDITORIA_SIMILARIDADE\nWHERE \n    CD_DOCUMENTO = :CD_DOCUMENTO\n    AND IDENTIFICADOR_FILTRO = :IDENTIFICADOR\n    AND DH_FECHAMENTO BETWEEN TO_DATE(:DATA_INI, 'YYYY-MM-DD') AND TO_DATE(:DATA_FIM, 'YYYY-MM-DD') + 1\nORDER BY \n    CD_ATENDIMENTO DESC, DH_FECHAMENTO DESC",
   "enabledQueries": {
     "total": true,
     "prod24h": true,
@@ -46,5 +47,26 @@
       "title": "Status"
     }
   },
-  "customCards": []
+  "customCards": [],
+  "docMappings": [
+    {
+      "id": "916",
+      "name": "Evolução Médica - Aberta",
+      "fields": [
+        {
+          "id": "CX_TXT_CONDUTA_DIARIA_1",
+          "name": "Conduta"
+        },
+        {
+          "id": "CX_TXT_EVOLUCAO_1",
+          "name": "Evolução"
+        }
+      ]
+    },
+    {
+      "id": "",
+      "name": "",
+      "fields": []
+    }
+  ]
 }

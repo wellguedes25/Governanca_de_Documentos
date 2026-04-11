@@ -53,6 +53,10 @@ export async function POST(request: Request) {
     data.analyticQueries.unitAdherence = body.query;
   } else if (body.type === 'SAVE_KPI_UNIT_INACTIVITY') {
     data.analyticQueries.unitInactivity = body.query;
+  } else if (body.type === 'SAVE_DOC_MAPPINGS') {
+    data.docMappings = body.mappings;
+  } else if (body.type === 'SAVE_REPORT_URL') {
+    data.reportBaseUrl = body.url;
   }
 
   if (body.enabledQueries) {

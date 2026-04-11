@@ -24,6 +24,17 @@ export interface CustomCard {
   valueType?: 'number' | 'percent';
 }
 
+export interface FieldMapping {
+  id: string;   // Nome técnico (ex: EVOLUCAO)
+  name: string; // Descrição amigável (ex: Evolução Clínica)
+}
+
+export interface DocMapping {
+  id: string;
+  name: string;
+  fields: FieldMapping[];
+}
+
 export interface StorageData {
   connections: DbConnection[];
   activeConnectionId: string | null;
@@ -46,6 +57,8 @@ export interface StorageData {
   enabledQueries: Record<string, boolean>;
   customCards: CustomCard[];
   cardSettings: Record<string, { title?: string; icon?: string; color?: string }>;
+  docMappings: DocMapping[];
+  reportBaseUrl?: string;
 }
 
 export const INITIAL_DATA: StorageData = {
@@ -164,7 +177,7 @@ FROM
     DBAMV.TB_AUDITORIA_SIMILARIDADE
 WHERE 
     CD_DOCUMENTO = :CD_DOCUMENTO
-    AND IDENTIFICADOR_FILTRO = :CD_CAMPO
+    AND IDENTIFICADOR_FILTRO = :IDENTIFICADOR
     AND DH_FECHAMENTO BETWEEN TO_DATE(:DATA_INI, 'YYYY-MM-DD') AND TO_DATE(:DATA_FIM, 'YYYY-MM-DD') + 1
 ORDER BY 
     CD_ATENDIMENTO DESC, DH_FECHAMENTO DESC`,
@@ -179,7 +192,17 @@ ORDER BY
     unitInactivity: true
   },
   cardSettings: {},
-  customCards: []
+  customCards: [],
+  docMappings: [
+    { 
+      id: '916', 
+      name: 'Evolução Médica/Enf', 
+      fields: [
+        { id: 'EVOLUCAO', name: 'Evolução Clínica' }
+      ] 
+    }
+  ],
+  reportBaseUrl: 'http://dev3-mvh5.acsc.org.br:84/mveditor/report?regId='
 };
 
 function ensureDataDir() {
@@ -204,7 +227,12 @@ export async function getData(): Promise<StorageData> {
         ...(data.enabledQueries || {})
       },
       cardSettings: data.cardSettings || {},
-      customCards: data.customCards || []
+      customCards: data.customCards || [],
+      docMappings: (data.docMappings || INITIAL_DATA.docMappings).map((m: any) => ({
+        ...m,
+        fields: m.fields.map((f: any) => typeof f === 'string' ? { id: f, name: f } : f)
+      })),
+      reportBaseUrl: data.reportBaseUrl || INITIAL_DATA.reportBaseUrl
     };
   } catch (e) {
     return INITIAL_DATA;

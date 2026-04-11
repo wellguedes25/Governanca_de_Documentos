@@ -318,8 +318,8 @@ export default function ConfigConsultasPage() {
   }
 
   return (
-    <div className="space-y-10 animate-in slide-in-from-bottom-5 duration-700 pb-24 text-slate-800">
-      <header className="flex justify-between items-end border-b border-slate-200 pb-8">
+    <div className="space-y-3 animate-in slide-in-from-bottom-5 duration-700 pb-12 text-slate-800">
+      <header className="flex justify-between items-end border-b border-slate-200 pb-2">
         <div className="max-w-4xl">
           <h2 className="text-3xl font-black text-slate-900 flex items-center gap-3 uppercase italic tracking-tighter">
             <Database className="text-[var(--primary)]" size={32} />
@@ -339,13 +339,13 @@ export default function ConfigConsultasPage() {
       </header>
 
       {/* Seção de Cards Customizados */}
-      <section className="bg-white border border-slate-200 rounded-[var(--radius)] p-10 shadow-sm relative overflow-hidden group">
+      <section className="bg-white border border-slate-200 rounded-[var(--radius)] p-4 shadow-sm relative overflow-hidden group">
         <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-600"></div>
-        <div className="absolute top-0 right-0 p-10 opacity-[0.03] grayscale pointer-events-none">
+        <div className="absolute top-0 right-0 p-4 opacity-[0.03] grayscale pointer-events-none">
           <Palette size={160} />
         </div>
         
-        <div className="flex justify-between items-center mb-10 relative z-10">
+        <div className="flex justify-between items-center mb-3 relative z-10">
           <div>
             <h3 className="text-xl font-black text-slate-900 flex items-center gap-3 tracking-tighter uppercase italic">
               <LayoutIcon className="text-blue-600" size={24} />
@@ -433,9 +433,9 @@ export default function ConfigConsultasPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 relative z-10">
           {customCards.map(card => (
-            <div key={card.id} className="p-6 rounded-[var(--radius)] bg-slate-50 border border-slate-100 hover:border-[var(--primary)] transition-all flex flex-col justify-between group shadow-sm">
+            <div key={card.id} className="p-4 rounded-[var(--radius)] bg-slate-50 border border-slate-100 hover:border-[var(--primary)] transition-all flex flex-col justify-between group shadow-sm">
               <div>
                 <div className="flex justify-between items-start mb-6">
                   <div className={`p-3 rounded-[var(--radius)] bg-white border border-slate-200 text-slate-900 shadow-sm`}>
@@ -467,17 +467,17 @@ export default function ConfigConsultasPage() {
       </section>
 
       {/* Grid de Configurações Existentes */}
-      <h3 className="text-xl font-black text-slate-900 flex items-center gap-3 pt-12 uppercase italic tracking-tighter">
+      <h3 className="text-xl font-black text-slate-900 flex items-center gap-3 pt-2 uppercase italic tracking-tighter">
         <Settings2 className="text-[var(--primary)]" size={24} />
         Algoritmos Nativos DocOracle
       </h3>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* KPI: Total de Documentos */}
-        <div className="bg-white rounded-[var(--radius)] p-10 border border-slate-200 shadow-sm relative group overflow-hidden">
+        <div className="bg-white rounded-[var(--radius)] p-4 border border-slate-200 shadow-sm relative group overflow-hidden">
           <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-900"></div>
           <QueryHeader title="Volume Total Docs" queryKey="total" icon={FileText} defaultTitle="Volume Total" />
           <textarea 
-            className={`w-full h-40 bg-slate-50 border rounded-[var(--radius)] p-6 text-[11px] font-mono font-bold text-slate-600 focus:outline-none transition-all ${
+            className={`w-full h-32 bg-slate-50 border rounded-[var(--radius)] p-3 text-[11px] font-mono font-bold text-slate-600 focus:outline-none transition-all ${
               enabledQueries['total'] !== false ? 'border-slate-200 focus:border-[var(--primary)]' : 'border-slate-100 opacity-40 grayscale pointer-events-none'
             }`}
             value={kpiTotal}
@@ -496,11 +496,11 @@ export default function ConfigConsultasPage() {
         </div>
 
         {/* Produção 24h */}
-        <div className="bg-white rounded-[var(--radius)] p-10 border border-slate-200 shadow-sm relative group overflow-hidden">
+        <div className="bg-white rounded-[var(--radius)] p-4 border border-slate-200 shadow-sm relative group overflow-hidden">
           <div className="absolute top-0 left-0 w-1.5 h-full bg-orange-500"></div>
           <QueryHeader title="Produção Snapshot" queryKey="prod24h" icon={Clock} defaultTitle="Produção 24h" />
           <textarea 
-            className={`w-full h-40 bg-slate-50 border rounded-[var(--radius)] p-6 text-[11px] font-mono font-bold text-slate-600 focus:outline-none transition-all ${
+            className={`w-full h-32 bg-slate-50 border rounded-[var(--radius)] p-3 text-[11px] font-mono font-bold text-slate-600 focus:outline-none transition-all ${
               enabledQueries['prod24h'] !== false ? 'border-slate-200 focus:border-orange-500' : 'border-slate-100 opacity-40 grayscale pointer-events-none'
             }`}
             value={kpi24h}
@@ -512,11 +512,11 @@ export default function ConfigConsultasPage() {
         </div>
 
         {/* Taxa de Assinatura */}
-        <div className="bg-white rounded-[var(--radius)] p-10 border border-slate-200 shadow-sm relative group overflow-hidden">
+        <div className="bg-white rounded-[var(--radius)] p-4 border border-slate-200 shadow-sm relative group overflow-hidden">
           <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500"></div>
           <QueryHeader title="Taxa Compliance" queryKey="assinados" icon={TrendingUp} defaultTitle="Taxa Assinatura" />
           <textarea 
-            className={`w-full h-40 bg-slate-50 border rounded-[var(--radius)] p-6 text-[11px] font-mono font-bold text-slate-600 focus:outline-none transition-all ${
+            className={`w-full h-32 bg-slate-50 border rounded-[var(--radius)] p-3 text-[11px] font-mono font-bold text-slate-600 focus:outline-none transition-all ${
               enabledQueries['assinados'] !== false ? 'border-slate-200 focus:border-emerald-500' : 'border-slate-100 opacity-40 grayscale pointer-events-none'
             }`}
              value={kpiAssinados}
@@ -528,11 +528,11 @@ export default function ConfigConsultasPage() {
         </div>
 
         {/* Volume 3 Meses */}
-        <div className="bg-white rounded-[var(--radius)] p-10 border border-slate-200 shadow-sm relative group overflow-hidden">
+        <div className="bg-white rounded-[var(--radius)] p-4 border border-slate-200 shadow-sm relative group overflow-hidden">
           <div className="absolute top-0 left-0 w-1.5 h-full bg-cyan-500"></div>
           <QueryHeader title="Timeline 90 Dias" queryKey="volume3m" icon={BarChart3} defaultTitle="Volume Global" />
           <textarea 
-            className={`w-full h-40 bg-slate-50 border rounded-[var(--radius)] p-6 text-[11px] font-mono font-bold text-slate-600 focus:outline-none transition-all ${
+            className={`w-full h-32 bg-slate-50 border rounded-[var(--radius)] p-3 text-[11px] font-mono font-bold text-slate-600 focus:outline-none transition-all ${
               enabledQueries['volume3m'] !== false ? 'border-slate-200 focus:border-cyan-500' : 'border-slate-100 opacity-40 grayscale pointer-events-none'
             }`}
             value={kpiVolume3m}
@@ -544,36 +544,36 @@ export default function ConfigConsultasPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-8 mt-12 pb-16">
+      <div className="grid grid-cols-1 gap-4 mt-4 pb-8">
         {/* Curva ABC Config */}
-        <div className="bg-white rounded-[var(--radius)] p-10 border border-slate-200 shadow-sm relative overflow-hidden group">
+        <div className="bg-white rounded-[var(--radius)] p-4 border border-slate-200 shadow-sm relative overflow-hidden group">
           <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-600"></div>
           <QueryHeader title="Analytics: Curva ABC de Documentação" queryKey="top10" icon={TrendingUp} defaultTitle="Ranking Top 10" />
           <textarea 
-            className={`w-full h-60 bg-slate-50 border rounded-[var(--radius)] p-8 text-[11px] font-mono font-bold text-slate-600 focus:outline-none transition-all ${
+            className={`w-full h-48 bg-slate-50 border rounded-[var(--radius)] p-3 text-[11px] font-mono font-bold text-slate-600 focus:outline-none transition-all ${
               enabledQueries['top10'] !== false ? 'border-slate-200 focus:border-indigo-500' : 'border-slate-100 opacity-40 grayscale pointer-events-none'
             }`}
-            value={kpiTop10}
-            onChange={(e) => setKpiTop10(e.target.value)}
+             value={kpiTop10}
+             onChange={(e) => setKpiTop10(e.target.value)}
           />
-          <div className="flex justify-end mt-8 border-t border-slate-50 pt-6">
+          <div className="flex justify-end mt-2 pt-2 border-t border-slate-50">
             <button onClick={() => handleSave('KPI_TOP10')} disabled={kpiLoading === 'KPI_TOP10'} className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.2em] transition-all"><Save size={16} /> Salvar Algoritmo Analytics</button>
           </div>
         </div>
 
         {/* Perfil Vinculado (Documentos Page) */}
-        <div className="bg-white rounded-[var(--radius)] p-10 border border-slate-200 shadow-sm relative overflow-hidden group">
+        <div className="bg-white rounded-[var(--radius)] p-4 border border-slate-200 shadow-sm relative overflow-hidden group">
           <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-600"></div>
-          <h4 className="text-[10px] font-black text-slate-900 mb-6 uppercase tracking-[0.3em] flex items-center gap-2">
+          <h4 className="text-[10px] font-black text-slate-900 mb-2 uppercase tracking-[0.3em] flex items-center gap-2">
             <Search size={14} className="text-emerald-600" />
             Motor de Reconciliação (Página de Documentos)
           </h4>
           <textarea 
-            className={`w-full h-60 bg-slate-50 border border-slate-200 rounded-[var(--radius)] p-8 text-[11px] font-mono font-bold text-slate-600 focus:outline-none focus:border-emerald-500 transition-all`}
+            className={`w-full h-48 bg-slate-50 border border-slate-200 rounded-[var(--radius)] p-3 text-[11px] font-mono font-bold text-slate-600 focus:outline-none focus:border-emerald-500 transition-all`}
             value={profileQuery}
             onChange={(e) => setProfileQuery(e.target.value)}
           />
-          <div className="flex justify-between items-center mt-8 border-t border-slate-50 pt-6">
+          <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-50">
             <p className="text-[10px] text-slate-400 font-bold uppercase italic italic-wider">Variável Requerida: <b className="text-emerald-600">:CD_DOCUMENTO</b></p>
             <button onClick={() => handleSave('PROFILE')} disabled={profileLoading} className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.2em] transition-all">
               {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
@@ -583,18 +583,18 @@ export default function ConfigConsultasPage() {
         </div>
 
         {/* Motor de Similaridade (Busca de Redundância) */}
-        <div className="bg-white rounded-[var(--radius)] p-10 border border-slate-200 shadow-sm relative overflow-hidden group">
+        <div className="bg-white rounded-[var(--radius)] p-4 border border-slate-200 shadow-sm relative overflow-hidden group">
           <div className="absolute top-0 left-0 w-1.5 h-full bg-[var(--primary)]"></div>
-          <h4 className="text-[10px] font-black text-slate-900 mb-6 uppercase tracking-[0.3em] flex items-center gap-2">
+          <h4 className="text-[10px] font-black text-slate-900 mb-2 uppercase tracking-[0.3em] flex items-center gap-2">
             <ScanEye size={14} className="text-[var(--primary)]" />
             Motor de Auditoria de Similaridade (Redundância EMR)
           </h4>
           <textarea 
-            className={`w-full h-60 bg-slate-50 border border-slate-200 rounded-[var(--radius)] p-8 text-[11px] font-mono font-bold text-slate-600 focus:outline-none focus:border-[var(--primary)] transition-all`}
+            className={`w-full h-48 bg-slate-50 border border-slate-200 rounded-[var(--radius)] p-3 text-[11px] font-mono font-bold text-slate-600 focus:outline-none focus:border-[var(--primary)] transition-all`}
             value={similarityQuery}
             onChange={(e) => setSimilarityQuery(e.target.value)}
           />
-          <div className="flex justify-between items-center mt-8 border-t border-slate-50 pt-6">
+          <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-50">
             <p className="text-[10px] text-slate-400 font-bold uppercase italic italic-wider">Variáveis Requeridas: <b className="text-[var(--primary)] text-[9px]">:CD_DOCUMENTO, :CD_CAMPO, :DATA_INI, :DATA_FIM</b></p>
             <button onClick={() => handleSave('SIMILARITY')} disabled={profileLoading} className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.2em] transition-all">
               {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
@@ -604,23 +604,23 @@ export default function ConfigConsultasPage() {
         </div>
 
         {/* Configuração do Relatório Dinâmico MV */}
-        <div className="bg-white rounded-[var(--radius)] p-10 border border-slate-200 shadow-sm relative overflow-hidden group mt-8">
+        <div className="bg-white rounded-[var(--radius)] p-4 border border-slate-200 shadow-sm relative overflow-hidden group mt-2">
           <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-800"></div>
-          <h4 className="text-[10px] font-black text-slate-900 mb-6 uppercase tracking-[0.3em] flex items-center gap-2">
+          <h4 className="text-[10px] font-black text-slate-900 mb-2 uppercase tracking-[0.3em] flex items-center gap-2">
             <Printer size={14} className="text-slate-800" />
             Vínculo Report Web (Laudos PDF MV)
           </h4>
-          <p className="text-[10px] text-slate-400 font-bold mb-4">
-            Defina a URL base para visualização remota dos documentos no portal MV (ex: integração DEV3, HOMOL ou PRD).
+          <p className="text-[10px] text-slate-400 font-bold mb-2">
+            Defina a URL base para visualização remota dos documentos no portal MV.
           </p>
           <input 
             type="text"
-            className={`w-full bg-slate-50 border border-slate-200 rounded-[var(--radius)] px-6 py-4 text-[11px] font-mono font-bold text-slate-600 focus:outline-none focus:border-slate-800 transition-all`}
+            className={`w-full bg-slate-50 border border-slate-200 rounded-[var(--radius)] px-4 py-2 text-[11px] font-mono font-bold text-slate-600 focus:outline-none focus:border-slate-800 transition-all`}
             value={reportBaseUrl}
             onChange={(e) => setReportBaseUrl(e.target.value)}
             placeholder="http://dev3-mvh5.acsc.org.br:84/mveditor/report?regId="
           />
-          <div className="flex justify-between items-center mt-8 border-t border-slate-50 pt-6">
+          <div className="flex justify-between items-center mt-4 pt-4 border-t border-slate-50">
             <p className="text-[10px] text-slate-400 font-bold uppercase italic italic-wider">Será complementado por: <b className="text-slate-800 text-[9px]">+ CD_REGISTRO</b></p>
             <button onClick={() => handleSave('REPORT_URL')} disabled={profileLoading} className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.2em] transition-all">
               {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
@@ -630,35 +630,33 @@ export default function ConfigConsultasPage() {
         </div>
 
         {/* Parâmetros Globais de Auditoria */}
-        <div className="bg-white rounded-[var(--radius)] p-10 border border-slate-200 shadow-sm relative overflow-hidden group mt-8">
+        <div className="bg-white rounded-[var(--radius)] p-4 border border-slate-200 shadow-sm relative overflow-hidden group mt-2">
           <div className="absolute top-0 left-0 w-1.5 h-full bg-rose-600"></div>
-          <h4 className="text-[10px] font-black text-slate-900 mb-6 uppercase tracking-[0.3em] flex items-center gap-2">
+          <h4 className="text-[10px] font-black text-slate-900 mb-4 uppercase tracking-[0.3em] flex items-center gap-2">
             <ScanEye size={14} className="text-rose-600" />
             Parâmetros Globais de Auditoria (Motores Python)
           </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2 block">Janela de Processamento (Dias)</label>
+              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1 block">Janela de Processamento (Dias)</label>
               <input 
                 type="number"
-                className="w-full bg-slate-50 border border-slate-200 rounded-[var(--radius)] px-4 py-3 text-[11px] font-bold text-slate-700 focus:outline-none focus:border-rose-500 transition-all"
+                className="w-full bg-slate-50 border border-slate-200 rounded-[var(--radius)] px-3 py-2 text-[11px] font-bold text-slate-700 focus:outline-none focus:border-rose-500 transition-all"
                 value={auditDays}
                 onChange={(e) => setAuditDays(parseInt(e.target.value) || 0)}
               />
-              <p className="text-[9px] text-slate-400 mt-2 italic">* Define quantos dias o motor olha para trás para reprocessar.</p>
             </div>
             <div>
-              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2 block">ID do Documento Alvo (Filtro)</label>
+              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1 block">ID do Documento Alvo (Filtro)</label>
               <input 
                 type="number"
-                className="w-full bg-slate-50 border border-slate-200 rounded-[var(--radius)] px-4 py-3 text-[11px] font-bold text-slate-700 focus:outline-none focus:border-rose-500 transition-all"
+                className="w-full bg-slate-50 border border-slate-200 rounded-[var(--radius)] px-3 py-2 text-[11px] font-bold text-slate-700 focus:outline-none focus:border-rose-500 transition-all"
                 value={auditDocId}
                 onChange={(e) => setAuditDocId(parseInt(e.target.value) || 0)}
               />
-              <p className="text-[9px] text-slate-400 mt-2 italic">* Use 0 para processar todos os documentos disponíveis.</p>
             </div>
           </div>
-          <div className="flex justify-end mt-8 border-t border-slate-50 pt-6">
+          <div className="flex justify-end mt-4 pt-4 border-t border-slate-50">
             <button 
               onClick={() => handleSave('AUDIT_PARAMS')} 
               disabled={loading} 

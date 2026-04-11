@@ -25,8 +25,8 @@ if ORACLE_CLIENT_PATH:
         print(f"AVISO: Falha ao carregar Oracle Client: {e}")
 
 # Filtro de processamento (Opcional)
-CD_DOCUMENTO_ALVO = 916
-DIAS_A_PROCESSAR = 7
+CD_DOCUMENTO_ALVO = 0
+DIAS_A_PROCESSAR = 15
 
 # ==========================================
 # FUNÇÃO DE SIMILARIDADE

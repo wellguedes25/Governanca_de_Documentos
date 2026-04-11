@@ -28,7 +28,7 @@ LEFT JOIN DBAMV.LEITO LEI ON ATE.CD_LEITO = LEI.CD_LEITO
 LEFT JOIN DBAMV.UNID_INT UNI ON LEI.CD_UNID_INT = UNI.CD_UNID_INT
 WHERE
     PDC.TP_STATUS IN ('FECHADO', 'ASSINADO')
-    AND PDC.DH_FECHAMENTO >= TRUNC(SYSDATE) - 30 -- Filtro de segurança de 30 dias na view
+    AND PDC.DH_FECHAMENTO >= TRUNC(SYSDATE) - 15 -- Filtro de segurança de 15 dias na view
     AND ERC.LO_VALOR IS NOT NULL;
 
 -- Comentário: A view é genérica. O script Python ou a consulta podem filtrar por CD_DOCUMENTO específico.

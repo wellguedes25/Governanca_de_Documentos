@@ -26,8 +26,8 @@ if ORACLE_CLIENT_PATH:
 # ==========================================
 # PARÂMETROS DE PROCESSAMENTO
 # ==========================================
-DIAS_A_PROCESSAR = 7       # Janela de análise (dias atrás)
-CD_DOCUMENTO_ALVO = 916    # 0 = todos os documentos
+DIAS_A_PROCESSAR = 15      # Janela de análise (dias atrás)
+CD_DOCUMENTO_ALVO = 0      # 0 = todos os documentos
 
 # ==========================================
 # CARREGA DICIONÁRIO DO STORAGE.JSON

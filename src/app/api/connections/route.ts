@@ -57,6 +57,9 @@ export async function POST(request: Request) {
     data.docMappings = body.mappings;
   } else if (body.type === 'SAVE_REPORT_URL') {
     data.reportBaseUrl = body.url;
+  } else if (body.type === 'SAVE_AUDIT_PARAMS') {
+    if (typeof body.auditDays === 'number') data.auditDays = body.auditDays;
+    if (typeof body.auditDocId === 'number') data.auditDocId = body.auditDocId;
   }
 
   if (body.enabledQueries) {

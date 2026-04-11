@@ -24,67 +24,120 @@ if ORACLE_CLIENT_PATH:
         print(f"AVISO: Falha ao carregar Oracle Client: {e}")
 
 # ==========================================
-# PARÂMETROS DE PROCESSAMENTO
-# ==========================================
-DIAS_A_PROCESSAR = 15      # Janela de análise (dias atrás)
-CD_DOCUMENTO_ALVO = 0      # 0 = todos os documentos
-
-# ==========================================
-# CARREGA DICIONÁRIO DO STORAGE.JSON
+# CARREGA PARÂMETROS DO STORAGE.JSON
 # ==========================================
 BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STORAGE_FILE = os.path.join(BASE_DIR, 'data', 'storage.json')
 
-def load_siglario():
+def load_storage_data():
     if not os.path.exists(STORAGE_FILE):
-        print(f"AVISO: {STORAGE_FILE} não encontrado. Usando listas vazias.")
-        return set(), set()
+        print(f"AVISO: {STORAGE_FILE} não encontrado. Usando padrões.")
+        return set(), set(), 15, 0
     with open(STORAGE_FILE, 'r', encoding='utf-8') as f:
         storage = json.load(f)
-    allowed   = set(s.lower() for s in storage.get('siglarioAllowed',   []))
-    forbidden = set(s.lower() for s in storage.get('siglarioForbidden', []))
-    return allowed, forbidden
+    
+    allowed    = set(s.lower() for s in storage.get('siglarioAllowed',   []))
+    forbidden  = set(s.lower() for s in storage.get('siglarioForbidden', []))
+    audit_days = storage.get('auditDays', 15)
+    audit_doc  = storage.get('auditDocId', 0)
+    
+    return allowed, forbidden, audit_days, audit_doc
 
-ALLOWED, FORBIDDEN = load_siglario()
-print(f"[{datetime.now().strftime('%H:%M:%S')}] Siglário: {len(ALLOWED)} permitidas | {len(FORBIDDEN)} proibidas")
+ALLOWED, FORBIDDEN, DIAS_A_PROCESSAR, CD_DOCUMENTO_ALVO = load_storage_data()
+
+print(f"[{datetime.now().strftime('%H:%M:%S')}] Configurações Medlytics:")
+print(f" - Janela: {DIAS_A_PROCESSAR} dias")
+print(f" - Documento Alvo: {'Todos' if CD_DOCUMENTO_ALVO == 0 else CD_DOCUMENTO_ALVO}")
+print(f" - Siglário: {len(ALLOWED)} permitidas | {len(FORBIDDEN)} proibidas")
 
 # ==========================================
-# REGRAS REGEX
+# REGRAS NLP — REFINADAS
 # ==========================================
-REGEX_UPPER   = re.compile(r'\b[A-Z]{2,}\b')           # Ex: IAM, SVO
-REGEX_DOT     = re.compile(r'\b(?:[A-Za-z]\.){2,}')   # Ex: S.V.O.
-REGEX_ABBREV  = re.compile(r'\b[a-zA-Z]{2,}\.')        # Ex: pac. med.
 
-def detectar_infracoes(texto, sigla_doc):
-    """Retorna lista de (sigla, contexto) detectadas no texto."""
+# Siglas médicas reais têm no máximo ~6 letras (IAM, DPOC, BIPAP, APACHE).
+# Palavras de template em caps (PACIENTE, INICIAL, LIBERADO) têm 7+ letras.
+MAX_SIGLA_LEN = 6
+
+# Palavras de sistema ou template que aparecem em texto gerado automaticamente
+# e são escritas em maiúsculas por formatação — NÃO são siglas clínicas.
+BLOCKLIST_SISTEMA = {
+    'dbamv', 'mvpep', 'mveditor', 'oracle', 'select', 'insert', 'update',
+    'delete', 'from', 'where', 'join', 'null', 'true', 'false',
+    # Templates MV comuns
+    'sem', 'nao', 'sim', 'com', 'para', 'por', 'uma', 'uns', 'mas',
+    'que', 'dos', 'das', 'nos', 'nas', 'seu', 'sua', 'foi', 'era',
+    'esta', 'este', 'isso', 'pois', 'como',
+    # Palavras de aviso de template em caps
+    'paciente', 'medico', 'inicial', 'final', 'inicio', 'atendimento',
+    'diagnóstico', 'diagnostico', 'liberado', 'valida', 'acesso',
+    'informado', 'selecione', 'preencha', 'recomendamos', 'convenio',
+    'hospital', 'unidade', 'setor', 'leito', 'equipe', 'data', 'hora',
+}
+
+# Regex 1: Siglas puras em maiúsculas — curtas (2 a 6 letras) ex: IAM, HAS, DPOC
+REGEX_UPPER  = re.compile(r'\b[A-Z]{2,6}\b')
+
+# Regex 2: Siglas intercaladas com pontos ex: S.V.O.  A.V.C.
+REGEX_DOT    = re.compile(r'\b(?:[A-Za-z]\.){2,}')
+
+# Regex 3: Abreviações clínicas curtas (2-4 letras) terminando em ponto
+# ex: pac.  med.  pt.  hs.  ampl.      NÃO pega: atendimento.  alongada.
+REGEX_ABBREV = re.compile(r'\b[a-zA-Z]{2,4}\.')
+
+
+def detectar_infracoes(texto, cd_documento):
+    """Retorna lista de (sigla, contexto) de termos não padronizados no texto."""
     encontrados = set()
     resultados  = []
 
-    for m in list(REGEX_UPPER.finditer(texto)) + list(REGEX_DOT.finditer(texto)) + list(REGEX_ABBREV.finditer(texto)):
+    candidatos = (
+        list(REGEX_UPPER.finditer(texto)) +
+        list(REGEX_DOT.finditer(texto))   +
+        list(REGEX_ABBREV.finditer(texto))
+    )
+
+    for m in candidatos:
         sigla = m.group()
-        s_low = sigla.lower()
+        s_low = sigla.lower().rstrip('.')   # normaliza para comparar
 
+        # Já processado neste documento
         if s_low in encontrados:
-            continue  # já detectada neste doc — evita avalanche de duplicatas
+            continue
 
+        # Filtro 1: Está na blocklist de palavras de sistema/template
+        if s_low in BLOCKLIST_SISTEMA:
+            continue
+
+        # Filtro 2: Palavra inteiramente maiúscula maior que o limite
+        if sigla.isupper() and len(sigla) > MAX_SIGLA_LEN:
+            continue
+
+        # Avalia se é infração
         is_invalid = False
+
         if s_low in FORBIDDEN:
+            # Explicitamente proibida pelo dicionário
             is_invalid = True
         elif s_low not in ALLOWED:
-            if sigla.isupper() and len(sigla) >= 3:
-                is_invalid = True  # maiúscula não cadastrada
-            elif '.' in sigla:
-                is_invalid = True  # pontuada não cadastrada
+            # Não está na whitelist — analisa o padrão
+            if sigla.isupper() and len(sigla) >= 2:
+                is_invalid = True   # maiúscula curta não cadastrada
+            elif re.match(r'^(?:[A-Za-z]\.){2,}$', sigla):
+                is_invalid = True   # padrão A.B.C. não cadastrado
+            elif re.match(r'^[a-zA-Z]{2,4}\.$', sigla):
+                is_invalid = True   # abreviação curta não cadastrada
 
         if is_invalid:
             encontrados.add(s_low)
-            # Gera snippet de contexto
-            start   = max(0, m.start() - 40)
-            end     = min(len(texto), m.end() + 40)
-            snippet = ('...' if start > 0 else '') + texto[start:end].replace('\r', ' ').replace('\n', ' ').strip() + ('...' if end < len(texto) else '')
+            start   = max(0, m.start() - 45)
+            end     = min(len(texto), m.end() + 45)
+            snippet = ('...' if start > 0 else '') + \
+                      texto[start:end].replace('\r', ' ').replace('\n', ' ').strip() + \
+                      ('...' if end < len(texto) else '')
             resultados.append((sigla, snippet[:490]))
 
     return resultados
+
 
 def main():
     if not all([DB_USER, DB_PASS, DB_DSN]):

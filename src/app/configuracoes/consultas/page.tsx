@@ -23,6 +23,10 @@ export default function ConfigConsultasPage() {
   const [kpiUnitAdherence, setKpiUnitAdherence] = useState('');
   const [kpiUnitInactivity, setKpiUnitInactivity] = useState('');
   
+  // Auditoria Params
+  const [auditDays, setAuditDays] = useState(15);
+  const [auditDocId, setAuditDocId] = useState(0);
+  
   // Custom Cards e Metadados
   const [customCards, setCustomCards] = useState<any[]>([]);
   const [cardSettings, setCardSettings] = useState<Record<string, any>>({});
@@ -76,6 +80,9 @@ export default function ConfigConsultasPage() {
         setKpiUnitInactivity(storage.analyticQueries.unitInactivity || '');
       }
 
+      setAuditDays(storage.auditDays || 15);
+      setAuditDocId(storage.auditDocId || 0);
+
       setEnabledQueries(storage.enabledQueries || {});
       setCustomCards(storage.customCards || []);
       setCardSettings(storage.cardSettings || {});
@@ -90,7 +97,7 @@ export default function ConfigConsultasPage() {
     }
   }
 
-  async function handleSave(type: 'MAIN' | 'PROFILE' | 'SIMILARITY' | 'REPORT_URL' | 'KPI_TOTAL' | 'KPI_24H' | 'KPI_ASSINADOS' | 'KPI_TOP10' | 'KPI_IDLE' | 'KPI_VOLUME3M' | 'KPI_UNIT_ADHERENCE' | 'KPI_UNIT_INACTIVITY' | 'SETTINGS') {
+  async function handleSave(type: 'MAIN' | 'PROFILE' | 'SIMILARITY' | 'REPORT_URL' | 'KPI_TOTAL' | 'KPI_24H' | 'KPI_ASSINADOS' | 'KPI_TOP10' | 'KPI_IDLE' | 'KPI_VOLUME3M' | 'KPI_UNIT_ADHERENCE' | 'KPI_UNIT_INACTIVITY' | 'SETTINGS' | 'AUDIT_PARAMS') {
     if (type === 'MAIN') setLoading(true);
     else if (type === 'PROFILE') setProfileLoading(true);
     else if (type === 'SIMILARITY') setProfileLoading(true); 
@@ -115,6 +122,7 @@ export default function ConfigConsultasPage() {
       case 'KPI_UNIT_ADHERENCE': bodyType = 'SAVE_KPI_UNIT_ADHERENCE'; bodyQuery = kpiUnitAdherence; break;
       case 'KPI_UNIT_INACTIVITY': bodyType = 'SAVE_KPI_UNIT_INACTIVITY'; bodyQuery = kpiUnitInactivity; break;
       case 'SETTINGS': bodyType = 'SAVE_SETTINGS'; break;
+      case 'AUDIT_PARAMS': bodyType = 'SAVE_AUDIT_PARAMS'; break;
     }
     
     try {
@@ -126,7 +134,9 @@ export default function ConfigConsultasPage() {
           query: bodyQuery,
           url: bodyType === 'SAVE_REPORT_URL' ? bodyQuery : undefined,
           enabledQueries,
-          cardSettings
+          cardSettings,
+          auditDays: bodyType === 'SAVE_AUDIT_PARAMS' ? auditDays : undefined,
+          auditDocId: bodyType === 'SAVE_AUDIT_PARAMS' ? auditDocId : undefined
         }),
       });
       if (!res.ok) throw new Error('Falha no salvamento');
@@ -615,6 +625,47 @@ export default function ConfigConsultasPage() {
             <button onClick={() => handleSave('REPORT_URL')} disabled={profileLoading} className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.2em] transition-all">
               {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
               Salvar URL do Laudo
+            </button>
+          </div>
+        </div>
+
+        {/* Parâmetros Globais de Auditoria */}
+        <div className="bg-white rounded-[var(--radius)] p-10 border border-slate-200 shadow-sm relative overflow-hidden group mt-8">
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-rose-600"></div>
+          <h4 className="text-[10px] font-black text-slate-900 mb-6 uppercase tracking-[0.3em] flex items-center gap-2">
+            <ScanEye size={14} className="text-rose-600" />
+            Parâmetros Globais de Auditoria (Motores Python)
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2 block">Janela de Processamento (Dias)</label>
+              <input 
+                type="number"
+                className="w-full bg-slate-50 border border-slate-200 rounded-[var(--radius)] px-4 py-3 text-[11px] font-bold text-slate-700 focus:outline-none focus:border-rose-500 transition-all"
+                value={auditDays}
+                onChange={(e) => setAuditDays(parseInt(e.target.value) || 0)}
+              />
+              <p className="text-[9px] text-slate-400 mt-2 italic">* Define quantos dias o motor olha para trás para reprocessar.</p>
+            </div>
+            <div>
+              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2 block">ID do Documento Alvo (Filtro)</label>
+              <input 
+                type="number"
+                className="w-full bg-slate-50 border border-slate-200 rounded-[var(--radius)] px-4 py-3 text-[11px] font-bold text-slate-700 focus:outline-none focus:border-rose-500 transition-all"
+                value={auditDocId}
+                onChange={(e) => setAuditDocId(parseInt(e.target.value) || 0)}
+              />
+              <p className="text-[9px] text-slate-400 mt-2 italic">* Use 0 para processar todos os documentos disponíveis.</p>
+            </div>
+          </div>
+          <div className="flex justify-end mt-8 border-t border-slate-50 pt-6">
+            <button 
+              onClick={() => handleSave('AUDIT_PARAMS')} 
+              disabled={loading} 
+              className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.2em] transition-all"
+            >
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+              Salvar Parâmetros de Motor
             </button>
           </div>
         </div>

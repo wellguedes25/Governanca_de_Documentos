@@ -1,6 +1,7 @@
 import pandas as pd
 import oracledb
 import os
+import json
 from difflib import SequenceMatcher
 from datetime import datetime
 from dotenv import load_dotenv
@@ -24,9 +25,27 @@ if ORACLE_CLIENT_PATH:
     except Exception as e:
         print(f"AVISO: Falha ao carregar Oracle Client: {e}")
 
-# Filtro de processamento (Opcional)
-CD_DOCUMENTO_ALVO = 0
-DIAS_A_PROCESSAR = 15
+# ==========================================
+# CARREGA PARÂMETROS DO STORAGE.JSON
+# ==========================================
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STORAGE_FILE = os.path.join(BASE_DIR, 'data', 'storage.json')
+
+def load_storage_params():
+    if not os.path.exists(STORAGE_FILE):
+        return 15, 0
+    try:
+        with open(STORAGE_FILE, 'r', encoding='utf-8') as f:
+            storage = json.load(f)
+            return storage.get('auditDays', 15), storage.get('auditDocId', 0)
+    except:
+        return 15, 0
+
+DIAS_A_PROCESSAR, CD_DOCUMENTO_ALVO = load_storage_params()
+
+print(f"[{datetime.now().strftime('%H:%M:%S')}] Configurações Medlytics:")
+print(f" - Janela: {DIAS_A_PROCESSAR} dias")
+print(f" - Documento Alvo: {'Todos' if CD_DOCUMENTO_ALVO == 0 else CD_DOCUMENTO_ALVO}")
 
 # ==========================================
 # FUNÇÃO DE SIMILARIDADE

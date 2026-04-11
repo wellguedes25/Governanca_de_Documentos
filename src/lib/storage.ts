@@ -61,6 +61,8 @@ export interface StorageData {
   reportBaseUrl?: string;
   siglarioAllowed?: string[];
   siglarioForbidden?: string[];
+  auditDays?: number;
+  auditDocId?: number;
 }
 
 export const INITIAL_DATA: StorageData = {
@@ -206,7 +208,9 @@ ORDER BY
   ],
   reportBaseUrl: 'http://dev3-mvh5.acsc.org.br:84/mveditor/report?regId=',
   siglarioAllowed: [],
-  siglarioForbidden: []
+  siglarioForbidden: [],
+  auditDays: 15,
+  auditDocId: 0
 };
 
 function ensureDataDir() {
@@ -238,7 +242,9 @@ export async function getData(): Promise<StorageData> {
       })),
       reportBaseUrl: data.reportBaseUrl || INITIAL_DATA.reportBaseUrl,
       siglarioAllowed: data.siglarioAllowed || INITIAL_DATA.siglarioAllowed,
-      siglarioForbidden: data.siglarioForbidden || INITIAL_DATA.siglarioForbidden
+      siglarioForbidden: data.siglarioForbidden || INITIAL_DATA.siglarioForbidden,
+      auditDays: typeof data.auditDays === 'number' ? data.auditDays : INITIAL_DATA.auditDays,
+      auditDocId: typeof data.auditDocId === 'number' ? data.auditDocId : INITIAL_DATA.auditDocId
     };
   } catch (e) {
     return INITIAL_DATA;

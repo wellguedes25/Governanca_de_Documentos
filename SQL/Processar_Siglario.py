@@ -1,233 +1,188 @@
+import oracledb
 import os
 import json
 import re
-import cx_Oracle
-import time
 from datetime import datetime
 from dotenv import load_dotenv
 
-# Configura o diretório base
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_PATH = os.path.join(BASE_DIR, 'data', 'storage.json')
-ENV_PATH = os.path.join(BASE_DIR, 'SQL', '.env')
+# ==========================================
+# CONFIGURAÇÕES
+# ==========================================
+load_dotenv()
 
-load_dotenv(ENV_PATH)
+DB_USER = os.getenv("ORACLE_USER")
+DB_PASS = os.getenv("ORACLE_PASS")
+DB_DSN  = os.getenv("ORACLE_DSN")        # Ex: ip:1521/servico
+ORACLE_CLIENT_PATH = os.getenv("ORACLE_CLIENT_PATH")
 
-print(f"[START] Iniciando Processador de Siglario - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
-def get_storage_data():
-    if not os.path.exists(DATA_PATH):
-        print(f"[ERRO] Arquivo storage.json nao encontrado em: {DATA_PATH}")
-        return None
+# Ativa Thick Mode (igual ao Processar_Similaridade.py)
+if ORACLE_CLIENT_PATH:
     try:
-        with open(DATA_PATH, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        oracledb.init_oracle_client(lib_dir=ORACLE_CLIENT_PATH)
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Thick Mode ativado com: {ORACLE_CLIENT_PATH}")
     except Exception as e:
-        print(f"[ERRO] Falha ao ler storage.json: {e}")
-        return None
+        print(f"AVISO: Falha ao carregar Oracle Client: {e}")
 
-storage = get_storage_data()
-if not storage:
-    exit(1)
+# ==========================================
+# PARÂMETROS DE PROCESSAMENTO
+# ==========================================
+DIAS_A_PROCESSAR = 7       # Janela de análise (dias atrás)
+CD_DOCUMENTO_ALVO = 916    # 0 = todos os documentos
 
-# Pega o cliente Oracle configurado
-oracle_client_path = storage.get('oracleClientPath', r'C:\orant\Client\instantclient_23_0')
-if not os.path.exists(oracle_client_path):
-    print(f"[ERRO] Oracle Client nao encontrado no diretorio: {oracle_client_path}")
-    exit(1)
+# ==========================================
+# CARREGA DICIONÁRIO DO STORAGE.JSON
+# ==========================================
+BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STORAGE_FILE = os.path.join(BASE_DIR, 'data', 'storage.json')
 
-try:
-    cx_Oracle.init_oracle_client(lib_dir=oracle_client_path)
-    print(f"[INFO] Oracle Client inicializado: {oracle_client_path}")
-except cx_Oracle.ProgrammingError as e:
-    if "Oracle Client library has already been initialized" in str(e):
-        pass # Ignora
-    else:
-        print(f"[ERRO] cx_Oracle init falhou: {e}")
-        exit(1)
-except Exception as e:
-    print(f"[ERRO] Nao foi possivel inicializar o oracledb: {e}")
-    exit(1)
+def load_siglario():
+    if not os.path.exists(STORAGE_FILE):
+        print(f"AVISO: {STORAGE_FILE} não encontrado. Usando listas vazias.")
+        return set(), set()
+    with open(STORAGE_FILE, 'r', encoding='utf-8') as f:
+        storage = json.load(f)
+    allowed   = set(s.lower() for s in storage.get('siglarioAllowed',   []))
+    forbidden = set(s.lower() for s in storage.get('siglarioForbidden', []))
+    return allowed, forbidden
 
-# Carrega Whitelist (tudo case-insensitive idealmente)
-allow_list = storage.get('siglarioAllowed', [])
-forbidden_list = storage.get('siglarioForbidden', [])
+ALLOWED, FORBIDDEN = load_siglario()
+print(f"[{datetime.now().strftime('%H:%M:%S')}] Siglário: {len(ALLOWED)} permitidas | {len(FORBIDDEN)} proibidas")
 
-# Adiciona o próprio nome "Sigla" que as vezes escapa do parser
-allow_list_lower = set([a.lower() for a in allow_list])
-forbidden_list_lower = set([f.lower() for f in forbidden_list])
+# ==========================================
+# REGRAS REGEX
+# ==========================================
+REGEX_UPPER   = re.compile(r'\b[A-Z]{2,}\b')           # Ex: IAM, SVO
+REGEX_DOT     = re.compile(r'\b(?:[A-Za-z]\.){2,}')   # Ex: S.V.O.
+REGEX_ABBREV  = re.compile(r'\b[a-zA-Z]{2,}\.')        # Ex: pac. med.
 
-print(f"[INFO] Siglario Carregado: {len(allow_list_lower)} Permitidas | {len(forbidden_list_lower)} Proibidas")
+def detectar_infracoes(texto, sigla_doc):
+    """Retorna lista de (sigla, contexto) detectadas no texto."""
+    encontrados = set()
+    resultados  = []
 
-def get_connection():
-    active_id = storage.get('activeConnectionId')
-    conns = storage.get('connections', [])
-    active_conn = next((c for c in conns if c['id'] == active_id), None)
-    
-    if not active_conn:
-        print("[ERRO] Nenhuma conexao ativa configurada.")
-        return None
+    for m in list(REGEX_UPPER.finditer(texto)) + list(REGEX_DOT.finditer(texto)) + list(REGEX_ABBREV.finditer(texto)):
+        sigla = m.group()
+        s_low = sigla.lower()
+
+        if s_low in encontrados:
+            continue  # já detectada neste doc — evita avalanche de duplicatas
+
+        is_invalid = False
+        if s_low in FORBIDDEN:
+            is_invalid = True
+        elif s_low not in ALLOWED:
+            if sigla.isupper() and len(sigla) >= 3:
+                is_invalid = True  # maiúscula não cadastrada
+            elif '.' in sigla:
+                is_invalid = True  # pontuada não cadastrada
+
+        if is_invalid:
+            encontrados.add(s_low)
+            # Gera snippet de contexto
+            start   = max(0, m.start() - 40)
+            end     = min(len(texto), m.end() + 40)
+            snippet = ('...' if start > 0 else '') + texto[start:end].replace('\r', ' ').replace('\n', ' ').strip() + ('...' if end < len(texto) else '')
+            resultados.append((sigla, snippet[:490]))
+
+    return resultados
+
+def main():
+    if not all([DB_USER, DB_PASS, DB_DSN]):
+        print("ERRO: Credenciais não encontradas no arquivo .env")
+        return
 
     try:
-        if active_conn.get('user') and active_conn.get('password') and active_conn.get('connectString'):
-            conn = cx_Oracle.connect(
-                user=active_conn['user'],
-                password=active_conn['password'],
-                dsn=active_conn['connectString'],
-                encoding="UTF-8"
-            )
-        else:
-            print("[ERRO] Credenciais incompletas.")
-            return None
-        return conn
-    except Exception as e:
-        print(f"[ERRO] Falha de conexao BD: {e}")
-        return None
-
-
-# Regex builder
-# 1. Palavras que sejam apenas Maiusculas com 2 ou mais letras (ex: IAM, SVO)
-REGEX_UPPER_ACRONYM = re.compile(r'\b[A-Z]{2,}\b')
-# 2. Siglas do tipo A.B.C ou S.V.O.
-REGEX_DOT_ACRONYM = re.compile(r'\b(?:[A-Za-z]\.){2,}')
-# 3. Abreviações que terminam com um ponto logo apos texto normal (ex: pac., med., hc.)
-REGEX_WORD_DOT = re.compile(r'\b[a-zA-Z]{2,}\.') 
-
-def extract_snippet(text, match_start, match_end, padding=40):
-    start = max(0, match_start - padding)
-    end = min(len(text), match_end + padding)
-    snippet = text[start:end]
-    # Limpa quebras de linha excessivas
-    snippet = snippet.replace('\r', ' ').replace('\n', ' ')
-    if start > 0: snippet = '...' + snippet
-    if end < len(text): snippet = snippet + '...'
-    return snippet.strip()
-
-def process():
-    conn = get_connection()
-    if not conn: return
-    
-    try:
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Conectando ao Oracle...")
+        conn   = oracledb.connect(user=DB_USER, password=DB_PASS, dsn=DB_DSN)
         cursor = conn.cursor()
-        
-        # Pega a query ativa q tras os documentos (reaproveitando a general scope)
-        query = storage.get('profileQuery', '')
-        if not query or query == 'SELECT * FROM DUAL':
-            print("[ERRO] Sem query de V_AUDITORIA para extrair textos.")
-            return
-            
-        print("[INFO] Buscando documentos para auditoria de Siglario...")
-        # Adiciona condição de rownum < 500 caso seja mto pesado
-        cursor.execute(f"SELECT * FROM ({query}) WHERE ROWNUM <= 200")
-        docs = cursor.fetchall()
-        cols = [col[0].upper() for col in cursor.description]
-        
-        # Mapping index
-        idx_cd_atend = cols.index('CD_ATENDIMENTO') if 'CD_ATENDIMENTO' in cols else -1
-        idx_cd_doc = cols.index('CD_DOCUMENTO') if 'CD_DOCUMENTO' in cols else -1
-        idx_ds_doc = cols.index('DS_DOCUMENTO') if 'DS_DOCUMENTO' in cols else -1
-        idx_id_filtro = cols.index('IDENTIFICADOR_FILTRO') if 'IDENTIFICADOR_FILTRO' in cols else -1
-        idx_texto = cols.index('TEXTO') if 'TEXTO' in cols else -1
-        idx_dh_fech = cols.index('DH_FECHAMENTO') if 'DH_FECHAMENTO' in cols else -1
-        idx_cd_prest = cols.index('CD_PRESTADOR') if 'CD_PRESTADOR' in cols else -1
-        idx_unidade = cols.index('UNIDADE') if 'UNIDADE' in cols else -1
-        idx_cd_doc_clinico = cols.index('CD_DOCUMENTO_CLINICO') if 'CD_DOCUMENTO_CLINICO' in cols else -1
-        idx_cd_reg = cols.index('CD_REGISTRO') if 'CD_REGISTRO' in cols else -1
 
-        if idx_texto == -1:
-            print("[ERRO] 'TEXTO' ausente na V_AUDITORIA.")
-            return
+        # ----------------------------------------------------------
+        # 1. EXTRAÇÃO — reutiliza a mesma view da Similaridade
+        # ----------------------------------------------------------
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Extraindo documentos dos últimos {DIAS_A_PROCESSAR} dias...")
 
-        insert_sql = """
-            INSERT INTO DBAMV.TB_AUDITORIA_SIGLARIO (
-                CD_ATENDIMENTO, CD_DOCUMENTO, CD_EDITOR_REGISTRO, CD_DOCUMENTO_CLINICO, 
-                SIGLA_DETECTADA, CONTEXTO, DH_FECHAMENTO, CD_PRESTADOR, UNIDADE
-            ) VALUES (
-                :1, :2, :3, :4, :5, :6, :7, :8, :9
-            )
+        query_ext = f"""
+            SELECT 
+                CD_ATENDIMENTO,
+                CD_DOCUMENTO,
+                TEXTO_ATUAL AS TEXTO,
+                DH_FECHAMENTO,
+                CD_PRESTADOR,
+                UNIDADE
+            FROM DBAMV.V_AUDITORIA_COPIA_COLA
+            WHERE DH_FECHAMENTO >= TRUNC(SYSDATE) - {DIAS_A_PROCESSAR}
         """
-        
-        print(f"[INFO] Analisando {len(docs)} documentos...")
-        
-        infracoes_batch = []
-        
-        for row in docs:
-            texto = row[idx_texto]
-            if not texto: continue
-            
-            # Lida com CLOB
-            if hasattr(texto, 'read'):
+        if CD_DOCUMENTO_ALVO:
+            query_ext += f" AND CD_DOCUMENTO = {CD_DOCUMENTO_ALVO}"
+
+        cursor.execute(query_ext)
+        cols = [c[0] for c in cursor.description]
+        rows = cursor.fetchall()
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Total de documentos para auditoria: {len(rows)}")
+
+        if not rows:
+            print("Nenhum documento no período. Encerrando.")
+            return
+
+        # ----------------------------------------------------------
+        # 2. LIMPEZA — remove infrações antigas do mesmo período
+        # ----------------------------------------------------------
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Limpando registros do período na tabela...")
+        del_q = f"DELETE FROM DBAMV.TB_AUDITORIA_SIGLARIO WHERE DH_FECHAMENTO >= TRUNC(SYSDATE) - {DIAS_A_PROCESSAR}"
+        if CD_DOCUMENTO_ALVO:
+            del_q += f" AND CD_DOCUMENTO = {CD_DOCUMENTO_ALVO}"
+        cursor.execute(del_q)
+
+        # ----------------------------------------------------------
+        # 3. PROCESSAMENTO NLP
+        # ----------------------------------------------------------
+        COL = {c: i for i, c in enumerate(cols)}
+
+        infracoes = []
+        for row in rows:
+            texto = row[COL['TEXTO']]
+            if not texto:
+                continue
+            if hasattr(texto, 'read'):   # CLOB
                 texto = texto.read()
-                
-            resultados = []
-            
-            # 1. upper
-            for m in REGEX_UPPER_ACRONYM.finditer(texto):
-                resultados.append(m)
-            # 2. dots
-            for m in REGEX_DOT_ACRONYM.finditer(texto):
-                resultados.append(m)
-            # 3. words ending in dot
-            for m in REGEX_WORD_DOT.finditer(texto):
-                resultados.append(m)
-                
-            infracoes_doc = set() # Evitar dup
-            
-            for m in resultados:
-                sigla = m.group()
-                sigla_lower = sigla.lower()
-                
-                # Regras de Negocio:
-                is_invalid = False
-                
-                # Se esta na blacklist
-                if sigla_lower in forbidden_list_lower:
-                    is_invalid = True
-                else:
-                    # Se NÃO está na whitelist e tem caracteristicas suspeitas
-                    if sigla_lower not in allow_list_lower:
-                        # Precisamos evitar falsos positivos pesados (nomes, inicios de frase, etc)
-                        # Essa heurística pode ser ajustada.
-                        if sigla.isupper() and len(sigla) >= 3: # Sigla inteira maiuscula não cadastrada
-                            is_invalid = True
-                        elif '.' in sigla: # Qualquer pontuada n cadastrada
-                            is_invalid = True
-                            
-                if is_invalid and sigla_lower not in infracoes_doc:
-                    contexto = extract_snippet(texto, m.start(), m.end())
-                    
-                    infracoes_doc.add(sigla_lower)
-                    
-                    cd_atend = row[idx_cd_atend] if idx_cd_atend != -1 else 0
-                    cd_doc = row[idx_cd_doc] if idx_cd_doc != -1 else 0
-                    cd_editor_reg = row[idx_cd_reg] if idx_cd_reg != -1 else 0
-                    cd_doc_clinico = row[idx_cd_doc_clinico] if idx_cd_doc_clinico != -1 else 0
-                    dh_fech = row[idx_dh_fech] if idx_dh_fech != -1 else datetime.now()
-                    cd_prest = row[idx_cd_prest] if idx_cd_prest != -1 else None
-                    unidade = row[idx_unidade] if idx_unidade != -1 else None
-                    
-                    infracoes_batch.append((
-                        cd_atend, cd_doc, cd_editor_reg, cd_doc_clinico,
-                        sigla, contexto[:490], dh_fech, cd_prest, unidade
-                    ))
 
-        if len(infracoes_batch) > 0:
-            print(f"[INFO] Inserindo {len(infracoes_batch)} infracoes detectadas no Dicionario...")
-            # Limpa tabela base ou loga? Vamos apenas inserir. Pra esse teste, 
-            # podemos limpar caso seja rodada de homologacao, ou confiar que a view ja limita a data.
-            # cursor.execute("DELETE FROM DBAMV.TB_AUDITORIA_SIGLARIO")
-            cursor.executemany(insert_sql, infracoes_batch)
+            for sigla, contexto in detectar_infracoes(texto, row[COL['CD_DOCUMENTO']]):
+                infracoes.append((
+                    row[COL['CD_ATENDIMENTO']],
+                    row[COL['CD_DOCUMENTO']],
+                    0,  # CD_EDITOR_REGISTRO — não exposto na view
+                    0,  # CD_DOCUMENTO_CLINICO — não exposto na view
+                    sigla,
+                    contexto,
+                    row[COL['DH_FECHAMENTO']],
+                    row[COL['CD_PRESTADOR']],
+                    row[COL['UNIDADE']],
+                ))
+
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Infrações detectadas: {len(infracoes)}")
+
+        # ----------------------------------------------------------
+        # 4. CARGA
+        # ----------------------------------------------------------
+        if infracoes:
+            insert_q = """
+                INSERT INTO DBAMV.TB_AUDITORIA_SIGLARIO (
+                    CD_ATENDIMENTO, CD_DOCUMENTO, CD_EDITOR_REGISTRO, CD_DOCUMENTO_CLINICO,
+                    SIGLA_DETECTADA, CONTEXTO, DH_FECHAMENTO, CD_PRESTADOR, UNIDADE
+                ) VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9)
+            """
+            cursor.executemany(insert_q, infracoes)
             conn.commit()
-            print("[SUCCESS] Lote de Siglario salvo com sucesso.")
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] SUCESSO! {cursor.rowcount} registros gravados.")
         else:
-            print("[INFO] Nenhuma infracao detectada no lote de documentos analisado.")
-            
-    except Exception as e:
-        print(f"[ERRO] Falha no processamento NLP: {e}")
-    finally:
-        if conn:
-            conn.close()
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] Nenhuma infração para gravar.")
 
-if __name__ == '__main__':
-    process()
-    print(f"[END] Processamento finalizado - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    except Exception as e:
+        print(f"ERRO: {e}")
+    finally:
+        if 'conn' in locals():
+            conn.close()
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Processo finalizado.")
+
+if __name__ == "__main__":
+    main()

@@ -483,14 +483,14 @@ export default function ConfigConsultasPage() {
             value={kpiTotal}
             onChange={(e) => setKpiTotal(e.target.value)}
           />
-          <div className="flex justify-end mt-6">
+          <div className="flex justify-end mt-4">
             <button 
               onClick={() => handleSave('KPI_TOTAL')}
               disabled={kpiLoading === 'KPI_TOTAL'}
-              className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.2em] transition-all"
+              title="Atualizar Motor SQL"
+              className="flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white p-2.5 rounded-[var(--radius)] transition-all shadow-md group/btn"
             >
-              {kpiLoading === 'KPI_TOTAL' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-              Atualizar Motor
+              {kpiLoading === 'KPI_TOTAL' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
             </button>
           </div>
         </div>
@@ -506,8 +506,8 @@ export default function ConfigConsultasPage() {
             value={kpi24h}
             onChange={(e) => setKpi24h(e.target.value)}
           />
-          <div className="flex justify-end mt-6">
-            <button onClick={() => handleSave('KPI_24H')} disabled={kpiLoading === 'KPI_24H'} className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.2em] transition-all"><Save size={16} /> Atualizar Motor</button>
+          <div className="flex justify-end mt-4">
+            <button onClick={() => handleSave('KPI_24H')} disabled={kpiLoading === 'KPI_24H'} title="Atualizar Motor Snapshot" className="flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white p-2.5 rounded-[var(--radius)] transition-all shadow-md group/btn">{kpiLoading === 'KPI_24H' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}</button>
           </div>
         </div>
 
@@ -522,8 +522,8 @@ export default function ConfigConsultasPage() {
              value={kpiAssinados}
              onChange={(e) => setKpiAssinados(e.target.value)}
           />
-          <div className="flex justify-end mt-6">
-            <button onClick={() => handleSave('KPI_ASSINADOS')} disabled={kpiLoading === 'KPI_ASSINADOS'} className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.2em] transition-all"><Save size={16} /> Atualizar Motor</button>
+          <div className="flex justify-end mt-4">
+            <button onClick={() => handleSave('KPI_ASSINADOS')} disabled={kpiLoading === 'KPI_ASSINADOS'} title="Atualizar Motor Compliance" className="flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white p-2.5 rounded-[var(--radius)] transition-all shadow-md group/btn">{kpiLoading === 'KPI_ASSINADOS' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}</button>
           </div>
         </div>
 
@@ -538,8 +538,8 @@ export default function ConfigConsultasPage() {
             value={kpiVolume3m}
             onChange={(e) => setKpiVolume3m(e.target.value)}
           />
-          <div className="flex justify-end mt-6">
-            <button onClick={() => handleSave('KPI_VOLUME3M')} disabled={kpiLoading === 'KPI_VOLUME3M'} className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.2em] transition-all"><Save size={16} /> Atualizar Motor</button>
+          <div className="flex justify-end mt-4">
+            <button onClick={() => handleSave('KPI_VOLUME3M')} disabled={kpiLoading === 'KPI_VOLUME3M'} title="Atualizar Motor Global" className="flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white p-2.5 rounded-[var(--radius)] transition-all shadow-md group/btn">{kpiLoading === 'KPI_VOLUME3M' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}</button>
           </div>
         </div>
       </div>
@@ -557,7 +557,7 @@ export default function ConfigConsultasPage() {
              onChange={(e) => setKpiTop10(e.target.value)}
           />
           <div className="flex justify-end mt-2 pt-2 border-t border-slate-50">
-            <button onClick={() => handleSave('KPI_TOP10')} disabled={kpiLoading === 'KPI_TOP10'} className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.2em] transition-all"><Save size={16} /> Salvar Algoritmo Analytics</button>
+            <button onClick={() => handleSave('KPI_TOP10')} disabled={kpiLoading === 'KPI_TOP10'} title="Salvar Algoritmo Analytics" className="flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white p-2.5 rounded-[var(--radius)] transition-all shadow-md group/btn">{kpiLoading === 'KPI_TOP10' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}</button>
           </div>
         </div>
 
@@ -575,9 +575,8 @@ export default function ConfigConsultasPage() {
           />
           <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-50">
             <p className="text-[10px] text-slate-400 font-bold uppercase italic italic-wider">Variável Requerida: <b className="text-emerald-600">:CD_DOCUMENTO</b></p>
-            <button onClick={() => handleSave('PROFILE')} disabled={profileLoading} className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.2em] transition-all">
-              {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-              Salvar Motor de Vínculo
+            <button onClick={() => handleSave('PROFILE')} disabled={profileLoading} title="Salvar Motor de Vínculo" className="flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white p-2.5 rounded-[var(--radius)] transition-all shadow-md group/btn">
+              {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
             </button>
           </div>
         </div>
@@ -596,9 +595,8 @@ export default function ConfigConsultasPage() {
           />
           <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-50">
             <p className="text-[10px] text-slate-400 font-bold uppercase italic italic-wider">Variáveis Requeridas: <b className="text-[var(--primary)] text-[9px]">:CD_DOCUMENTO, :CD_CAMPO, :DATA_INI, :DATA_FIM</b></p>
-            <button onClick={() => handleSave('SIMILARITY')} disabled={profileLoading} className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.2em] transition-all">
-              {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-              Salvar Motor de Auditoria
+            <button onClick={() => handleSave('SIMILARITY')} disabled={profileLoading} title="Salvar Motor de Auditoria" className="flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white p-2.5 rounded-[var(--radius)] transition-all shadow-md group/btn">
+              {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
             </button>
           </div>
         </div>
@@ -622,9 +620,8 @@ export default function ConfigConsultasPage() {
           />
           <div className="flex justify-between items-center mt-4 pt-4 border-t border-slate-50">
             <p className="text-[10px] text-slate-400 font-bold uppercase italic italic-wider">Será complementado por: <b className="text-slate-800 text-[9px]">+ CD_REGISTRO</b></p>
-            <button onClick={() => handleSave('REPORT_URL')} disabled={profileLoading} className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.2em] transition-all">
-              {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-              Salvar URL do Laudo
+            <button onClick={() => handleSave('REPORT_URL')} disabled={profileLoading} title="Salvar URL do Laudo" className="flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white p-2.5 rounded-[var(--radius)] transition-all shadow-md group/btn">
+              {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
             </button>
           </div>
         </div>
@@ -660,10 +657,10 @@ export default function ConfigConsultasPage() {
             <button 
               onClick={() => handleSave('AUDIT_PARAMS')} 
               disabled={loading} 
-              className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.2em] transition-all"
+              title="Salvar Parâmetros de Motor"
+              className="flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white p-2.5 rounded-[var(--radius)] transition-all shadow-md group/btn"
             >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-              Salvar Parâmetros de Motor
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
             </button>
           </div>
         </div>

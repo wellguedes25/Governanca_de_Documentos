@@ -29,6 +29,13 @@ export async function GET(request: Request) {
       return executeQuery(conn, sql);
     };
 
+    // Helper robusto para pegar valor por nome de coluna (case-insensitive)
+    const getCol = (row: any, colName: string) => {
+      if (!row) return 0;
+      const key = Object.keys(row).find(k => k.replace(/"/g, '').toUpperCase() === colName.toUpperCase());
+      return key ? row[key] : 0;
+    };
+
     // Consultas individuais para refresh granular
     if (type) {
       if (type === 'assinados') {
@@ -36,34 +43,37 @@ export async function GET(request: Request) {
           safeExecute(activeConn, kpiQueries.total, 'total'),
           safeExecute(activeConn, kpiQueries.assinados, 'assinados')
         ]);
-        const total = totalRes?.[0]?.[Object.keys(totalRes[0])[0]] || 0;
-        const raw = assinadosRes?.[0]?.[Object.keys(assinadosRes[0])[0]] || 0;
-        const percent = total > 0 ? ((Number(raw) / Number(total)) * 100).toFixed(1) : 0;
+        const total = Number(getCol(totalRes?.[0], 'TOTAL_GERAL_PREENCHIDO') || getCol(totalRes?.[0], 'TOTAL_GERAL') || getCol(totalRes?.[0], Object.keys(totalRes?.[0] || {})[0]) || 0);
+        // Pega QTD_ASSINADO explicitamente — corrige o bug de pegar TOTAL_GERAL
+        const assinadoVal = Number(getCol(assinadosRes?.[0], 'QTD_ASSINADO') || 0);
+        const percent = total > 0 ? ((assinadoVal / total) * 100).toFixed(1) : '0.0';
         
         return NextResponse.json({ 
-          assinadosRaw: Number(raw).toLocaleString('pt-BR'),
+          assinadosRaw: Number(assinadoVal).toLocaleString('pt-BR'),
           assinadosPercent: percent + '%'
         });
       }
 
-      let sql = '';
-      switch (type) {
-        case 'total': sql = kpiQueries.total; break;
-        case 'prod24h': sql = kpiQueries.prod24h; break;
-        default: 
-          // Se não for um tipo nativo, pode ser um customId
-          const customCard = (data.customCards || []).find(c => String(c.id) === String(type));
-          if (customCard) {
-            sql = customCard.query;
-            const res = await safeExecute(activeConn, sql, type);
-            const value = res?.[0]?.[Object.keys(res[0])[0]] || 0;
-            return NextResponse.json({ value });
-          }
-          return NextResponse.json({ error: 'Tipo ou ID customizado inválido' }, { status: 400 });
+      if (type === 'prod24h') {
+        const res = await safeExecute(activeConn, kpiQueries.prod24h, 'prod24h');
+        const totalGeral = Number(getCol(res?.[0], 'TOTAL_GERAL') || getCol(res?.[0], Object.keys(res?.[0] || {})[0]) || 0);
+        return NextResponse.json({ prod24h: Number(totalGeral).toLocaleString('pt-BR') });
       }
-      const res = await safeExecute(activeConn, sql, type);
-      const value = res?.[0]?.[Object.keys(res[0])[0]] || 0;
-      return NextResponse.json({ [type]: Number(value).toLocaleString('pt-BR') });
+
+      if (type === 'total') {
+        const res = await safeExecute(activeConn, kpiQueries.total, 'total');
+        const value = Number(getCol(res?.[0], 'TOTAL_GERAL_PREENCHIDO') || getCol(res?.[0], Object.keys(res?.[0] || {})[0]) || 0);
+        return NextResponse.json({ total: Number(value).toLocaleString('pt-BR') });
+      }
+      
+      // Se não for um tipo nativo, pode ser um customId
+      const customCard = (data.customCards || []).find(c => String(c.id) === String(type));
+      if (customCard) {
+        const res = await safeExecute(activeConn, customCard.query, type);
+        const value = res?.[0]?.[Object.keys(res[0])[0]] || 0;
+        return NextResponse.json({ value });
+      }
+      return NextResponse.json({ error: 'Tipo ou ID customizado inválido' }, { status: 400 });
     }
     
     // Executa as 3 queries principais em paralelo (comportamento original)
@@ -73,12 +83,13 @@ export async function GET(request: Request) {
       safeExecute(activeConn, kpiQueries.assinados, 'assinados')
     ]);
 
-    const total = totalRes?.[0]?.[Object.keys(totalRes[0])[0]] || 0;
-    const prod24h = prod24hRes?.[0]?.[Object.keys(prod24hRes[0])[0]] || 0;
-    const assinadosRaw = assinadosRes?.[0]?.[Object.keys(assinadosRes[0])[0]] || 0;
+    const total = Number(getCol(totalRes?.[0], 'TOTAL_GERAL_PREENCHIDO') || getCol(totalRes?.[0], Object.keys(totalRes?.[0] || {})[0]) || 0);
+    const prod24h = Number(getCol(prod24hRes?.[0], 'TOTAL_GERAL') || getCol(prod24hRes?.[0], Object.keys(prod24hRes?.[0] || {})[0]) || 0);
+    // Fix: pega QTD_ASSINADO explicitamente em vez da primeira coluna
+    const assinadosVal = Number(getCol(assinadosRes?.[0], 'QTD_ASSINADO') || 0);
 
     // Calcula taxa de assinatura (evita divisão por zero)
-    const assinaturaPercent = total > 0 ? ((Number(assinadosRaw) / Number(total)) * 100).toFixed(1) : 0;
+    const assinaturaPercent = total > 0 ? ((assinadosVal / total) * 100).toFixed(1) : '0.0';
 
     return NextResponse.json({
       total: Number(total).toLocaleString('pt-BR'),

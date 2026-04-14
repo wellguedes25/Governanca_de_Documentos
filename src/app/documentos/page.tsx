@@ -492,7 +492,7 @@ export default function DocumentosPage() {
                             const companyCols = ['HSC', 'CSSJ', 'HST', 'HSJ', 'HCNSC', 'HMRP', 'HR'];
                             if (companyCols.includes(cleanKey)) {
                               if (strVal === '1') return <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mx-auto" />;
-                              if (strVal === '0') return <div className="w-1.5 h-1.5 rounded-full bg-slate-200 mx-auto" />;
+                              if (strVal === '0') return <div className="w-1.5 h-1.5 rounded-full bg-[var(--destructive)] mx-auto" />;
                             }
                             if (strVal.includes('T') && !isNaN(Date.parse(strVal))) {
                               return <span suppressHydrationWarning className="font-mono text-[9px]">{new Date(strVal).toLocaleString('pt-BR')}</span>;

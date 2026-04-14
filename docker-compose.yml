@@ -1,0 +1,13 @@
+services:
+  medlytics:
+    build: .
+    container_name: medlytics_dashboard
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+      - ./SQL/.env:/app/SQL/.env
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - ORACLE_CLIENT_PATH=/opt/oracle/instantclient_21_1

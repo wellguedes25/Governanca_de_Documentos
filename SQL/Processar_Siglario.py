@@ -65,13 +65,15 @@ BLOCKLIST_SISTEMA = {
     'delete', 'from', 'where', 'join', 'null', 'true', 'false',
     # Templates MV comuns
     'sem', 'nao', 'sim', 'com', 'para', 'por', 'uma', 'uns', 'mas',
-    'que', 'dos', 'das', 'nos', 'nas', 'seu', 'sua', 'foi', 'era',
-    'esta', 'este', 'isso', 'pois', 'como',
+    'que', 'dos', 'das', 'nos', 'nas', 'seu', 'sua', 'foi', 'era', 'em', 'aos', 'aos',
+    'esta', 'este', 'isso', 'pois', 'como', 'aquele', 'aquela', 'pelo', 'pela',
     # Palavras de aviso de template em caps
     'paciente', 'medico', 'inicial', 'final', 'inicio', 'atendimento',
     'diagnóstico', 'diagnostico', 'liberado', 'valida', 'acesso',
     'informado', 'selecione', 'preencha', 'recomendamos', 'convenio',
     'hospital', 'unidade', 'setor', 'leito', 'equipe', 'data', 'hora',
+    'evolução', 'evolucao', 'conduta', 'exame', 'anexo', 'observação', 'observacao',
+    'atendimentos', 'atendimento.', 'atend.', 'atd', 'proc', 'prescr', 'visto', 'conforme',
 }
 
 # Regex 1: Siglas puras em maiúsculas — curtas (2 a 6 letras) ex: IAM, HAS, DPOC
@@ -98,7 +100,8 @@ def detectar_infracoes(texto, cd_documento):
 
     for m in candidatos:
         sigla = m.group()
-        s_low = sigla.lower().rstrip('.')   # normaliza para comparar
+        # Normalização forte: minúsculo, remove pontos, espaços e vírgulas nas extremidades
+        s_low = sigla.lower().strip('.,; ')
 
         # Já processado neste documento
         if s_low in encontrados:

@@ -1,0 +1,11 @@
+<service>
+  <id>medlytics-pro</id>
+  <name>Medlytics Pro Dashboard</name>
+  <description>Painel de Auditoria Clínica Medlytics (Next.js)</description>
+  <executable>node.exe</executable>
+  <arguments>server.js</arguments>
+  <log mode="roll"></log>
+  <env name="NODE_ENV" value="production"/>
+  <env name="PORT" value="3000"/>
+  <env name="ORACLE_CLIENT_PATH" value="C:\oracle\instantclient_21_1"/>
+</service>

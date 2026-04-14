@@ -5,7 +5,7 @@ import {
   Database, Play, Save, Info, AlertTriangle, RefreshCw, 
   Loader2, BarChart3, Search, TrendingUp, Users, Clock, 
   FileText, Plus, Trash2, Edit3, Check, X, Palette, 
-  Settings2, LayoutIcon, ScanEye, Printer
+  Settings2, LayoutIcon, ScanEye, Printer, Terminal, SquarePlay, CircleCheck, CircleX, Download
 } from 'lucide-react';
 
 export default function ConfigConsultasPage() {
@@ -52,9 +52,46 @@ export default function ConfigConsultasPage() {
   const [message, setMessage] = useState('');
   const [activeConnName, setActiveConnName] = useState('');
 
+  // Motor de Processamento Python
+  const [scriptRunning, setScriptRunning] = useState<string | null>(null);
+  const [scriptLog, setScriptLog] = useState<Record<string, string>>({});
+  const [scriptStatus, setScriptStatus] = useState<Record<string, 'idle' | 'running' | 'success' | 'error'>>({});
+
   useEffect(() => {
     fetchData();
   }, []);
+
+  async function handleRunScript(script: 'siglario' | 'similaridade') {
+    setScriptRunning(script);
+    setScriptStatus(prev => ({ ...prev, [script]: 'running' }));
+    setScriptLog(prev => ({ ...prev, [script]: '' }));
+
+    try {
+      const res = await fetch('/api/scripts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ script }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setScriptLog(prev => ({ ...prev, [script]: data.output || 'Processo concluído sem saída.' }));
+        setScriptStatus(prev => ({ ...prev, [script]: 'success' }));
+        setMessage('Processamento concluído com sucesso!');
+      } else {
+        setScriptLog(prev => ({ ...prev, [script]: data.error || 'Erro desconhecido.' }));
+        setScriptStatus(prev => ({ ...prev, [script]: 'error' }));
+        setMessage('Erro durante o processamento.');
+      }
+    } catch (err: any) {
+      setScriptLog(prev => ({ ...prev, [script]: `Erro de conexão: ${err.message}` }));
+      setScriptStatus(prev => ({ ...prev, [script]: 'error' }));
+      setMessage('Falha ao comunicar com a API.');
+    } finally {
+      setScriptRunning(null);
+      setTimeout(() => setMessage(''), 4000);
+    }
+  }
 
   async function fetchData() {
     setIsInitialLoading(true);
@@ -624,6 +661,180 @@ export default function ConfigConsultasPage() {
               {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
             </button>
           </div>
+        </div>
+
+        {/* ============================================================ */}
+        {/* Downloads de Infraestrutura SQL                              */}
+        {/* ============================================================ */}
+        <div className="bg-white rounded-[var(--radius)] p-4 border border-slate-200 shadow-sm relative overflow-hidden mt-2">
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-400" />
+          
+          <div className="flex justify-between items-start mb-4 relative z-10">
+            <div>
+              <h4 className="text-sm font-black text-slate-900 uppercase tracking-tighter italic flex items-center gap-2">
+                <Download size={18} className="text-slate-600" />
+                Downloads de Infraestrutura SQL
+              </h4>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                Scripts necessários para provisionamento no Oracle DBAMV
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 relative z-10">
+            {[
+              { 
+                file: 'Create_Table_Siglario.sql', 
+                label: 'Tabela de Siglario', 
+                desc: 'DDL da TB_AUDITORIA_SIGLARIO' 
+              },
+              { 
+                file: 'crate table auditoria_similaridade.sql', 
+                label: 'Tabela de Similaridade', 
+                desc: 'DDL da TB_AUDITORIA_SIMILARIDADE' 
+              },
+              { 
+                file: 'Create_View_Similaridade.sql', 
+                label: 'View de Extração', 
+                desc: 'View V_AUDITORIA_COPIA_COLA' 
+              }
+            ].map((item) => (
+              <a 
+                key={item.file}
+                href={`/api/scripts/download?file=${encodeURIComponent(item.file)}`}
+                className="flex items-center gap-4 p-3 bg-slate-50 border border-slate-100 rounded-[var(--radius)] hover:border-slate-300 hover:bg-white transition-all group shadow-sm"
+              >
+                <div className="p-2 bg-white rounded-lg border border-slate-100 group-hover:text-blue-600 transition-colors">
+                  <FileText size={16} />
+                </div>
+                <div>
+                  <h5 className="text-[10px] font-black uppercase text-slate-700">{item.label}</h5>
+                  <p className="text-[9px] text-slate-400 font-medium italic mt-0.5">{item.desc}</p>
+                </div>
+                <Download size={12} className="ml-auto text-slate-300 group-hover:text-blue-600 transition-colors" />
+              </a>
+            ))}
+          </div>
+        </div>
+
+        {/* ============================================================ */}
+        {/* Motor de Processamento Python                                  */}
+        {/* ============================================================ */}
+        <div className="bg-white rounded-[var(--radius)] p-4 border border-slate-200 shadow-sm relative overflow-hidden mt-2">
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-violet-600 to-indigo-600" />
+          <div className="absolute top-0 right-0 p-4 opacity-[0.03] grayscale pointer-events-none">
+            <Terminal size={160} />
+          </div>
+
+          <div className="flex justify-between items-start mb-5 relative z-10">
+            <div>
+              <h4 className="text-sm font-black text-slate-900 uppercase tracking-tighter italic flex items-center gap-2">
+                <Terminal size={18} className="text-violet-600" />
+                Motor de Processamento Python
+              </h4>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                Execução manual dos motores de auditoria NLP
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Python {'{'}Runtime{'}'}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
+            {/* Motor Siglário */}
+            {(['siglario', 'similaridade'] as const).map((script) => {
+              const meta = {
+                siglario: {
+                  label: 'Auditoria de Siglário',
+                  desc: 'Processar_Siglario.py',
+                  detail: 'Detecta siglas não padronizadas nos documentos clínicos via NLP.',
+                  color: 'from-orange-500 to-amber-500',
+                  border: 'hover:border-orange-400',
+                  btnColor: 'bg-orange-600 hover:bg-orange-500',
+                  textColor: 'text-orange-600',
+                },
+                similaridade: {
+                  label: 'Auditoria de Similaridade',
+                  desc: 'Processar_Similaridade.py',
+                  detail: 'Calcula grau de redundância textual entre documentos (PLN).',
+                  color: 'from-[var(--primary)] to-indigo-500',
+                  border: 'hover:border-blue-400',
+                  btnColor: 'bg-[var(--primary)] hover:bg-[var(--primary-dark)]',
+                  textColor: 'text-[var(--primary)]',
+                },
+              }[script];
+
+              const status = scriptStatus[script] || 'idle';
+              const log = scriptLog[script] || '';
+              const isRunning = scriptRunning === script;
+
+              return (
+                <div key={script} className={`bg-slate-50 rounded-[var(--radius)] border border-slate-200 ${meta.border} transition-all overflow-hidden`}>
+                  {/* Accent bar */}
+                  <div className={`h-0.5 w-full bg-gradient-to-r ${meta.color}`} />
+
+                  <div className="p-4">
+                    {/* Header */}
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h5 className={`text-[11px] font-black uppercase tracking-tighter ${meta.textColor}`}>{meta.label}</h5>
+                        <p className="text-[9px] font-mono text-slate-400 mt-0.5">{meta.desc}</p>
+                      </div>
+                      {/* Status Badge */}
+                      {status === 'idle' && (
+                        <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 bg-slate-100 px-2 py-1 rounded-full">Aguardando</span>
+                      )}
+                      {status === 'running' && (
+                        <span className="text-[8px] font-black uppercase tracking-widest text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded-full flex items-center gap-1">
+                          <Loader2 size={8} className="animate-spin" /> Executando
+                        </span>
+                      )}
+                      {status === 'success' && (
+                        <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-full flex items-center gap-1">
+                          <CircleCheck size={9} /> Sucesso
+                        </span>
+                      )}
+                      {status === 'error' && (
+                        <span className="text-[8px] font-black uppercase tracking-widest text-rose-600 bg-rose-50 border border-rose-200 px-2 py-1 rounded-full flex items-center gap-1">
+                          <CircleX size={9} /> Erro
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-[9px] text-slate-500 font-bold mb-3 leading-relaxed">{meta.detail}</p>
+
+                    {/* Log Terminal */}
+                    {log && (
+                      <div className="bg-slate-900 rounded-[var(--radius)] p-3 mb-3 max-h-40 overflow-y-auto">
+                        <pre className="text-[9px] font-mono text-emerald-400 leading-relaxed whitespace-pre-wrap break-words">
+                          {log}
+                        </pre>
+                      </div>
+                    )}
+
+                    {/* Run button */}
+                    <button
+                      onClick={() => handleRunScript(script)}
+                      disabled={scriptRunning !== null}
+                      className={`w-full flex items-center justify-center gap-2 ${meta.btnColor} text-white px-4 py-2.5 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.15em] transition-all shadow-md disabled:opacity-40 disabled:cursor-not-allowed`}
+                    >
+                      {isRunning ? (
+                        <><Loader2 size={14} className="animate-spin" /> Processando...</>
+                      ) : (
+                        <><SquarePlay size={14} /> Executar Agora</>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-4 text-center italic relative z-10">
+            Parâmetros de janela e documento alvo são lidos do bloco abaixo.
+          </p>
         </div>
 
         {/* Parâmetros Globais de Auditoria */}

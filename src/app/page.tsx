@@ -121,13 +121,25 @@ export default function Dashboard() {
       try {
         const res = await fetch('/api/connections');
         const data = await res.json();
-        setEnabledQueries(data.enabledQueries || {});
+        const enabled = data.enabledQueries || {};
+        setEnabledQueries(enabled);
         setCardSettings(data.cardSettings || {});
         setCustomCards(data.customCards || []);
 
-        // Carrega dados iniciais (respeita cache interno de fetchStats/fetchAnalytics)
-        fetchStats();
-        fetchAnalytics();
+        // Carregamento Granular: Dispara fetches individuais em paralelo
+        // Isso evita timeouts de requisições longas (>50s) no navegador.
+        
+        // Stats Cards
+        if (enabled['total'] !== false) fetchStats(true, 'total');
+        if (enabled['prod24h'] !== false) fetchStats(true, 'prod24h');
+        if (enabled['assinados'] !== false) fetchStats(true, 'assinados');
+
+        // Analytics Cards & Charts
+        if (enabled['volume3m'] !== false) fetchAnalytics(true, 'volume3m');
+        if (enabled['idle'] !== false) fetchAnalytics(true, 'idle');
+        if (enabled['top10'] !== false) fetchAnalytics(true, 'top10');
+        if (enabled['unitAdherence'] !== false) fetchAnalytics(true, 'unitAdherence');
+        if (enabled['unitInactivity'] !== false) fetchAnalytics(true, 'unitInactivity');
 
         // Carrega dados dos cards customizados
         if (data.customCards) {

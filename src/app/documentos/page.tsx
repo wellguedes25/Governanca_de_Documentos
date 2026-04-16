@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, RefreshCw, Filter, FileText, Download, GripVertical, Check, X, ChevronUp, ChevronDown, ListFilter, XCircle, FileSpreadsheet, Printer, AlertTriangle, Loader2 } from 'lucide-react';
+import { Search, RefreshCw, Filter, FileText, Download, GripVertical, Check, X, ChevronUp, ChevronDown, ListFilter, XCircle, FileSpreadsheet, Printer, AlertTriangle, Loader2, Info, History, Settings, ExternalLink, Zap, Unlink } from 'lucide-react';
 import { useUI } from '@/context/UIContext';
 
 export default function DocumentosPage() {
@@ -23,6 +23,31 @@ export default function DocumentosPage() {
   const [profileSearchTerm, setProfileSearchTerm] = useState('');
   const [profileUnitFilter, setProfileUnitFilter] = useState('');
   const profilePageSize = 5;
+
+  // Estados para Sidebar de Informações Técnicas
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [metadata, setMetadata] = useState<any[]>([]);
+  const [metadataLoading, setMetadataLoading] = useState(false);
+  const [metadataActions, setMetadataActions] = useState<any[]>([]);
+  const [metadataActionsLoading, setMetadataActionsLoading] = useState(false);
+  const [metadataActionsError, setMetadataActionsError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'specs' | 'history' | 'actions'>('specs');
+  const [actionsFilterDoc, setActionsFilterDoc] = useState<string | null>(null);
+
+  // Extrair documentos únicos relacionados para filtros no topo
+  const uniqueRelatedDocs = useMemo(() => {
+    const docs = new Set<string>();
+    metadataActions.forEach(action => {
+      if (action.DOCUMENTO_RELACIONADO) docs.add(String(action.DOCUMENTO_RELACIONADO));
+      if (action.GRUPO_DOCS_RELACIONADOS) {
+        action.GRUPO_DOCS_RELACIONADOS.split(',').forEach((id: string) => {
+          const trimmed = id.trim();
+          if (trimmed) docs.add(trimmed);
+        });
+      }
+    });
+    return Array.from(docs).sort((a, b) => Number(a) - Number(b));
+  }, [metadataActions]);
   
   // Ref para controle de redimensionamento
   const resizingCol = useRef<{ name: string; startX: number; startWidth: number } | null>(null);
@@ -40,15 +65,22 @@ export default function DocumentosPage() {
     }
   }, []);
 
-  // Dispara busca de perfis ao selecionar documento
+  // Dispara busca de perfis e metadados ao selecionar documento
   useEffect(() => {
     if (selectedDoc) {
       setProfileCurrentPage(1);
       setProfileSearchTerm('');
       setProfileUnitFilter('');
       fetchProfile(selectedDoc);
+      fetchMetadata(selectedDoc);
+      fetchActions(selectedDoc);
+      setActionsFilterDoc(null);
     } else {
       setProfileData([]);
+      setMetadata([]);
+      setMetadataActions([]);
+      setMetadataActionsError(null);
+      setActionsFilterDoc(null);
     }
   }, [selectedDoc]);
 
@@ -69,6 +101,52 @@ export default function DocumentosPage() {
       console.error('Erro ao carregar perfis:', err);
     } finally {
       setProfileLoading(false);
+    }
+  }
+
+  async function fetchMetadata(docId: string) {
+    setMetadataLoading(true);
+    try {
+      const res = await fetch('/api/oracle/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          query: 'METADATA', 
+          params: { CD_DOCUMENTO: docId } 
+        })
+      });
+      const result = await res.json();
+      setMetadata(result.rows || []);
+    } catch (err) {
+      console.error('Erro ao carregar metadados técnicos:', err);
+    } finally {
+      setMetadataLoading(false);
+    }
+  }
+
+  async function fetchActions(docId: string) {
+    setMetadataActionsLoading(true);
+    setMetadataActionsError(null);
+    try {
+      const res = await fetch('/api/oracle/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          query: 'ACTIONS', 
+          params: { CD_DOCUMENTO: docId } 
+        })
+      });
+      const result = await res.json();
+      if (result.error) {
+        setMetadataActionsError(result.error);
+      } else {
+        setMetadataActions(result.rows || []);
+      }
+    } catch (err: any) {
+      console.error('Erro ao carregar vínculos SQL:', err);
+      setMetadataActionsError('Falha na comunicação com o servidor.');
+    } finally {
+      setMetadataActionsLoading(false);
     }
   }
 
@@ -437,12 +515,13 @@ export default function DocumentosPage() {
           )}
         </div>
 
-        <div className={`bg-white rounded-[var(--radius)] border border-slate-200 flex flex-col overflow-hidden shadow-md w-full max-w-full transition-all duration-500 ease-in-out ${selectedDoc ? 'min-h-[300px] max-h-[300px]' : 'min-h-[600px]'}`}>
+        <div className={`bg-white rounded-[var(--radius)] border border-slate-200 flex flex-col overflow-hidden shadow-md w-full max-w-full transition-all duration-500 ease-in-out ${selectedDoc && !sidebarOpen ? 'min-h-[300px] max-h-[300px]' : 'min-h-[600px]'}`}>
           <div className="flex-1 overflow-x-auto overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 w-full relative">
             {paginatedData.length > 0 ? (
               <table className="w-full text-left border-collapse table-auto select-none min-w-max">
                 <thead className="sticky top-0 z-10">
-                  <tr className="bg-slate-50 shadow-sm border-b border-slate-200">
+                   <tr className="bg-slate-50 shadow-sm border-b border-slate-200">
+                    <th className="px-4 py-3 w-10 border-r border-slate-100 italic font-black text-slate-300 text-[9px] text-center">INFO</th>
                     {Object.keys(paginatedData[0]).map((key) => {
                       const cleanKey = key.replace(/"/g, '');
                       const isName = cleanKey.toUpperCase() === 'NOME';
@@ -477,11 +556,22 @@ export default function DocumentosPage() {
                     const docCode = String(row['CÓDIGO'] || row['\"CÓDIGO\"'] || '');
                     const isSelected = selectedDoc === docCode;
                     return (
-                      <tr 
+                       <tr 
                         key={idx} 
-                        onClick={() => setSelectedDoc(docCode)}
                         className={`transition-all group cursor-pointer border-l-4 ${isSelected ? 'bg-[var(--primary)]/5 border-[var(--primary)] text-slate-900' : 'hover:bg-slate-50 border-transparent text-slate-600'}`}
                       >
+                        <td className="px-3 py-2 border-r border-slate-50 text-center">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedDoc(docCode);
+                              setSidebarOpen(true);
+                            }}
+                            className={`p-1.5 rounded-full transition-all ${isSelected && sidebarOpen ? 'bg-[var(--primary)] text-white' : 'text-slate-300 hover:text-[var(--primary)] hover:bg-[var(--primary)]/10'}`}
+                          >
+                            <Info size={14} />
+                          </button>
+                        </td>
                         {Object.entries(row).map(([key, val], vIdx) => {
                           const isName = key.replace(/"/g, '').toUpperCase() === 'NOME';
                           const width = columnWidths[key] || (isName ? 150 : 65);
@@ -706,7 +796,271 @@ export default function DocumentosPage() {
               )}
             </div>
           </div>
-        )}
+         )}
+      </div>
+
+      {/* Sidebar Técnico (Opção B) */}
+      <div 
+        className={`fixed top-0 right-0 h-full bg-white shadow-[-20px_0_50px_rgba(0,0,0,0.1)] z-[100] transition-all duration-500 ease-in-out transform flex flex-col ${sidebarOpen ? 'translate-x-0 w-[450px]' : 'translate-x-full w-[450px]'}`}
+      >
+        <button 
+          onClick={() => setSidebarOpen(false)}
+          className="absolute -left-12 top-6 p-3 bg-white border border-slate-200 rounded-l-xl text-slate-400 hover:text-[var(--primary)] shadow-[-5px_0_15px_rgba(0,0,0,0.05)] transition-all"
+        >
+          <X size={20} />
+        </button>
+
+        {/* Lógica de Extração de Metadados (Fix: Oracle Aliases in Uppercase) */}
+        {(() => {
+          const activeSpecs = metadata.find(m => m.STATUS_ATIVO === 'S' && m.IDENTIFICADOR_LAYOUT === 'RELATORIO') 
+                           || metadata.find(m => m.STATUS_ATIVO === 'S');
+          
+          const hasTestVersion = metadata.some(m => m.CODIGO_TIPO_VERSAO === 1);
+          const publishedRow = metadata.find(m => m.CODIGO_TIPO_VERSAO === 3);
+
+          return (
+            <>
+              <div className="p-8 border-b border-slate-100 bg-slate-50/50">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="px-2 py-0.5 bg-[var(--primary)] text-white text-[9px] font-black rounded uppercase tracking-wider">
+                    Document Specs
+                  </span>
+                  {hasTestVersion && (
+                    <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[9px] font-black rounded uppercase tracking-wider flex items-center gap-1">
+                      <AlertTriangle size={10} /> Versão de Teste
+                    </span>
+                  )}
+                </div>
+                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter leading-tight italic">
+                  {metadata[0]?.DESCRICAO_DOCUMENTO || 'Detalhes Técnicos'}
+                </h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">
+                  Oracle Identifier: <b className="text-[var(--primary)]">{selectedDoc}</b>
+                </p>
+              </div>
+
+              <div className="flex border-b border-slate-100 px-8">
+                <button 
+                  onClick={() => setActiveTab('specs')}
+                  className={`px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] border-b-2 transition-all ${activeTab === 'specs' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                >
+                  Especificações
+                </button>
+                <button 
+                  onClick={() => setActiveTab('history')}
+                  className={`px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] border-b-2 transition-all ${activeTab === 'history' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                >
+                  Histórico
+                </button>
+                <button 
+                  onClick={() => setActiveTab('actions')}
+                  className={`px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] border-b-2 transition-all ${activeTab === 'actions' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                >
+                  Vínculos SQL
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 scrollbar-thin scrollbar-thumb-slate-200">
+                {metadataLoading ? (
+                  <div className="h-full flex flex-col items-center justify-center gap-4 opacity-50">
+                    <Loader2 className="animate-spin text-[var(--primary)]" size={32} />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Consultando Banco...</span>
+                  </div>
+                ) : activeTab === 'specs' ? (
+                  <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
+                    <section>
+                      <div className="flex items-center gap-2 mb-4">
+                        <Settings size={14} className="text-slate-400" />
+                        <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Configurações da Versão</h4>
+                      </div>
+                      <div className="grid grid-cols-1 gap-4">
+                        {[
+                          { label: 'Identificador do Documento', value: activeSpecs?.IDENTIFICADOR_DOCUMENTO },
+                          { label: 'Última Versão Publicada', value: publishedRow?.VALOR_VERSAO || 'N/A' },
+                          { label: 'Tipo de Layout Ativo', value: activeSpecs?.DESCRICAO_TIPO_LAYOUT },
+                          { label: 'Código do Cabeçalho (Ativo)', value: activeSpecs?.CODIGO_LAYOUT_CABECALHO || 'Sem Cabeçalho' },
+                          { label: 'Documento Origem Cabecalho', value: activeSpecs?.DOCUMENTO_CABECALHO },
+                          { label: 'Código do Rodapé', value: activeSpecs?.CODIGO_LAYOUT_RODAPE || 'Sem Rodapé' },
+                        ].map((item, i) => (
+                          <div key={i} className="bg-slate-50 border border-slate-100 p-4 rounded-lg group hover:bg-white hover:border-[var(--primary)]/20 transition-all">
+                            <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{item.label}</span>
+                            <span className="block text-xs font-bold text-slate-700 font-mono">{item.value || '--'}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  </div>
+                ) : activeTab === 'history' ? (
+                  <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                     {metadata.sort((a, b) => b.VALOR_VERSAO - a.VALOR_VERSAO).map((v, idx) => (
+                       <div key={idx} className={`relative pl-8 pb-6 border-l-2 ${v.STATUS_ATIVO === 'S' ? 'border-[var(--primary)]' : 'border-slate-100'} last:pb-0`}>
+                         <div className={`absolute left-[-9px] top-0 w-4 h-4 rounded-full border-4 bg-white ${v.STATUS_ATIVO === 'S' ? 'border-[var(--primary)] scale-110 shadow-[0_0_10px_rgba(var(--primary-rgb),0.3)]' : 'border-slate-100'}`}></div>
+                         <div className="flex items-center justify-between mb-1">
+                           <span className="text-[11px] font-black text-slate-900 uppercase tracking-tighter">
+                             Versão {v.VALOR_VERSAO}
+                           </span>
+                           <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border transition-colors ${
+                             v.CODIGO_TIPO_VERSAO === 3 ? 'bg-emerald-50 text-emerald-600 border-emerald-500 ring-1 ring-emerald-500 shadow-sm' : 
+                             v.CODIGO_TIPO_VERSAO === 2 ? 'bg-blue-50 text-blue-600 border-blue-500 ring-1 ring-blue-500 shadow-sm' : 
+                             v.CODIGO_TIPO_VERSAO === 1 ? 'bg-red-50 text-red-600 border-red-500 ring-1 ring-red-500 shadow-sm' : 'bg-slate-50 text-slate-400 border-slate-100'
+                           }`}>
+                             {v.DESCRICAO_TIPO_VERSAO}
+                           </span>
+                         </div>
+                         <div className="text-[10px] text-slate-500 font-bold">
+                           <div className="flex items-center gap-2 mb-1 uppercase tracking-tighter">
+                              <span className="text-slate-300">Layout:</span> {v.DESCRICAO_TIPO_LAYOUT}
+                           </div>
+                           <div className="flex items-center gap-2 text-slate-400 font-mono text-[9px]">
+                              ID Versão: {v.CODIGO_VERSAO_DOCUMENTO}
+                           </div>
+                         </div>
+                         {v.STATUS_ATIVO === 'S' && v.CODIGO_TIPO_VERSAO === 3 && (
+                           <div className="mt-2 text-[9px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1 italic">
+                             <Check size={10} strokeWidth={4} /> Versão Ativa em Produção
+                           </div>
+                         )}
+                       </div>
+                     ))}
+                  </div>
+                ) : (
+                  <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                    <div className="flex flex-col gap-4 mb-4">
+                        <div className="flex items-center gap-2">
+                            <Zap size={14} className="text-amber-500 fill-amber-500" />
+                            <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Fluxos e Relacionamentos</h4>
+                        </div>
+                        
+                        {uniqueRelatedDocs.length > 0 && !metadataActionsLoading && (
+                          <div className="flex flex-wrap gap-2 py-2 border-y border-slate-100/50">
+                            <button 
+                              onClick={() => setActionsFilterDoc(null)}
+                              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
+                                actionsFilterDoc === null 
+                                ? 'bg-[var(--primary)] text-white shadow-md shadow-[var(--primary)]/20' 
+                                : 'bg-slate-50 text-slate-400 hover:bg-slate-100 border border-slate-100'
+                              }`}
+                            >
+                              Todos
+                            </button>
+                            {uniqueRelatedDocs.map(docId => (
+                              <button 
+                                key={docId}
+                                onClick={() => setActionsFilterDoc(docId)}
+                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border ${
+                                  actionsFilterDoc === docId 
+                                  ? 'bg-indigo-600 text-white border-indigo-700 shadow-md shadow-indigo-200' 
+                                  : 'bg-white text-indigo-500 border-indigo-100 hover:border-indigo-300 hover:bg-indigo-50'
+                                }`}
+                              >
+                                {docId}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                    </div>
+                    
+                    {metadataActionsLoading ? (
+                      <div className="py-20 flex flex-col items-center justify-center gap-4 opacity-50">
+                        <Loader2 className="animate-spin text-[var(--primary)]" size={32} />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Escaneando Scripts...</span>
+                      </div>
+                    ) : metadataActionsError ? (
+                      <div className="py-12 px-6 bg-red-50 border border-red-100 rounded-xl text-center">
+                        <AlertTriangle size={32} className="text-red-400 mx-auto mb-4" />
+                        <p className="text-[10px] font-black text-red-700 uppercase tracking-[0.2em] mb-2 font-mono">Erro de Query Oracle</p>
+                        <p className="text-[9px] text-red-500 font-mono leading-relaxed line-clamp-3 overflow-hidden mb-4">
+                          {metadataActionsError}
+                        </p>
+                        <button 
+                          onClick={() => fetchActions(selectedDoc!)}
+                          className="px-4 py-2 bg-red-100 text-red-700 text-[9px] font-black rounded uppercase hover:bg-red-200 transition-all shadow-sm"
+                        >
+                          Tentar Novamente
+                        </button>
+                      </div>
+                    ) : metadataActions.length > 0 ? (
+                      <div className="space-y-4">
+                        {metadataActions
+                          .filter(action => {
+                            if (!actionsFilterDoc) return true;
+                            const single = String(action.DOCUMENTO_RELACIONADO) === actionsFilterDoc;
+                            const group = action.GRUPO_DOCS_RELACIONADOS?.split(',').map((s: string) => s.trim()).includes(actionsFilterDoc);
+                            return single || group;
+                          })
+                          .map((action, idx) => (
+                          <div key={idx} className="bg-slate-50 border border-slate-100 rounded-lg overflow-hidden group hover:border-[var(--primary)]/30 transition-all shadow-sm">
+                            <div className="p-4 border-b border-slate-100 flex items-start justify-between bg-white">
+                              <div className="flex-1 mr-2">
+                                <span className="block text-[10px] font-black text-slate-900 uppercase tracking-widest mb-1 leading-tight">{action.NOME_CAMPO || 'Campo sem Nome'}</span>
+                                <span className="block text-[9px] font-bold text-slate-400 font-mono italic">{action.IDENTIFICADOR_CAMPO}</span>
+                              </div>
+                              <div className="text-right flex flex-col items-end gap-1 shrink-0">
+                                {action.DOCUMENTO_RELACIONADO && (
+                                  <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[8px] font-black rounded uppercase tracking-wider border border-emerald-200 shadow-sm">
+                                    Doc: {action.DOCUMENTO_RELACIONADO}
+                                  </span>
+                                )}
+                                {action.GRUPO_DOCS_RELACIONADOS && (
+                                  <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[8px] font-black rounded uppercase tracking-wider border border-indigo-200 shadow-sm">
+                                    Grupo: {action.GRUPO_DOCS_RELACIONADOS}
+                                  </span>
+                                )}
+                                {!action.DOCUMENTO_RELACIONADO && !action.GRUPO_DOCS_RELACIONADOS && (
+                                  <span className="px-2 py-0.5 bg-slate-100 text-slate-400 text-[8px] font-black rounded uppercase tracking-wider">
+                                    S/ Vínculo Direto
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="p-4 bg-slate-50/50">
+                               <div className="flex flex-col gap-2">
+                                 <div className="flex items-center justify-between">
+                                   <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Escopo da Lógica SQL</span>
+                                   <button 
+                                    onClick={(e) => {
+                                      const next = e.currentTarget.parentElement?.nextElementSibling;
+                                      next?.classList.toggle('hidden');
+                                    }}
+                                    className="text-[8px] font-black text-[var(--primary)] uppercase underline hover:opacity-70"
+                                   >
+                                     Ver Script
+                                   </button>
+                                 </div>
+                                 <div className="hidden mt-1 block w-full">
+                                    <pre className="text-[9px] font-mono text-slate-600 bg-white p-3 rounded border border-slate-200 overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-[150px] overflow-y-auto shadow-inner">
+                                      {action.SCRIPT_ACAO_COMPLETO}
+                                    </pre>
+                                 </div>
+                               </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="py-20 text-center bg-slate-50 border border-dashed border-slate-200 rounded-xl">
+                        <Unlink size={32} className="text-slate-300 mx-auto mb-4" />
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Nenhum Vínculo Detectado</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          );
+        })()}
+
+        <div className="p-8 border-t border-slate-100 bg-slate-50/30 flex items-center gap-3">
+           <button 
+             onClick={() => window.open(`http://dev3-mvh5.acsc.org.br:84/mveditor/report?regId=${selectedDoc}`, '_blank')}
+             className="flex-1 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-[0.98]"
+           >
+             Abrir no Editor
+           </button>
+           <button className="p-3 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-[var(--primary)] hover:border-[var(--primary)]/20 transition-all shadow-sm">
+             <RefreshCw size={16} onClick={() => fetchMetadata(selectedDoc!)} className={metadataLoading ? 'animate-spin' : ''} />
+           </button>
+        </div>
       </div>
 
       <div id="print-area" className="hidden print:block print:bg-white print:text-black w-full" style={{ position: 'absolute', top: 0, left: 0, zIndex: 9999 }}>

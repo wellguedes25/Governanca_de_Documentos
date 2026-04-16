@@ -18,8 +18,17 @@ export async function POST(request: Request) {
         return NextResponse.json(result);
     }
     
-    // Se o tipo for PROFILE, buscamos a query de perfil do storage
-    let sql = body.query === 'PROFILE' ? data.profileQuery : (body.query || data.activeQuery);
+    // Busca a query correspondente no storage
+    let sql;
+    if (body.query === 'PROFILE') {
+      sql = data.profileQuery;
+    } else if (body.query === 'METADATA') {
+      sql = data.docMetadataQuery;
+    } else if (body.query === 'ACTIONS') {
+      sql = data.docActionsQuery;
+    } else {
+      sql = body.query || data.activeQuery;
+    }
     
     // Substituição de parâmetros (ex: :CD_DOCUMENTO -> '1050')
     if (body.params) {

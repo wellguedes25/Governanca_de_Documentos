@@ -54,6 +54,8 @@ export interface StorageData {
     unitInactivity: string;
   };
   similarityQuery: string;
+  docMetadataQuery: string;
+  docActionsQuery: string;
   enabledQueries: Record<string, boolean>;
   customCards: CustomCard[];
   cardSettings: Record<string, { title?: string; icon?: string; color?: string }>;
@@ -168,23 +170,85 @@ SELECT CAST(ED.CD_DOCUMENTO AS NUMBER) AS CD_DOCUMENTO,
  ORDER BY DIAS_SEM_USO DESC`
   },
   similarityQuery: `SELECT 
-    CD_ATENDIMENTO as ATENDIMENTO,
-    CD_DOCUMENTO as DOCUMENTO,
-    DS_DOCUMENTO as NOME_DOCUMENTO,
-    IDENTIFICADOR_FILTRO as IDENTIFICADOR,
-    DH_FECHAMENTO as DATA_HORA,
-    CD_PRESTADOR as PRESTADOR,
-    LEITO,
-    UNIDADE,
-    GRAU_SIMILARIDADE as SCORE
+    T.CD_ATENDIMENTO as ATENDIMENTO,
+    T.CD_DOCUMENTO as DOCUMENTO,
+    T.DS_DOCUMENTO as NOME_DOCUMENTO,
+    T.IDENTIFICADOR_FILTRO as IDENTIFICADOR,
+    T.DH_FECHAMENTO as DATA_HORA,
+    T.CD_PRESTADOR || ' - ' || P.NM_PRESTADOR as PRESTADOR,
+    T.LEITO,
+    T.UNIDADE,
+    T.GRAU_SIMILARIDADE as SCORE
 FROM 
-    DBAMV.TB_AUDITORIA_SIMILARIDADE
+    DBAMV.TB_AUDITORIA_SIMILARIDADE T
+LEFT JOIN 
+    DBAMV.PRESTADOR P ON P.CD_PRESTADOR = T.CD_PRESTADOR
 WHERE 
-    CD_DOCUMENTO = :CD_DOCUMENTO
-    AND IDENTIFICADOR_FILTRO = :IDENTIFICADOR
-    AND DH_FECHAMENTO BETWEEN TO_DATE(:DATA_INI, 'YYYY-MM-DD') AND TO_DATE(:DATA_FIM, 'YYYY-MM-DD') + 1
+    T.CD_DOCUMENTO = :CD_DOCUMENTO
+    AND T.IDENTIFICADOR_FILTRO = :IDENTIFICADOR
+    AND T.DH_FECHAMENTO BETWEEN TO_DATE(:DATA_INI, 'YYYY-MM-DD') AND TO_DATE(:DATA_FIM, 'YYYY-MM-DD') + 1
 ORDER BY 
-    CD_ATENDIMENTO DESC, DH_FECHAMENTO DESC`,
+    T.CD_ATENDIMENTO DESC, T.DH_FECHAMENTO DESC`,
+  docMetadataQuery: `SELECT DISTINCT
+       edo.cd_documento             AS Codigo_Documento,
+       edo.ds_documento             AS Descricao_Documento,
+       edo.ds_identificador         AS Identificador_Documento,
+       evd.cd_versao_documento      AS Codigo_Versao_Documento,
+       etl.cd_tipo_layout           AS Codigo_Tipo_Layout,
+       etl.ds_identificador         AS Identificador_Layout,
+       etl.ds_tipo_layout           AS Descricao_Tipo_Layout,
+       evd.vl_versao                AS Valor_Versao,
+       evd.sn_ativo                 AS Status_Ativo,
+       evd.cd_tipo_versao           AS Codigo_Tipo_Versao,
+       etv.ds_tipo_versao           AS Descricao_Tipo_Versao,
+       edl.cd_layout_cabecalho      AS Codigo_Layout_Cabecalho,
+       (SELECT evdo.cd_documento
+          FROM dbamv.editor_layout el
+         INNER JOIN dbamv.editor_versao_documento evdo
+            ON el.cd_versao_documento = evdo.cd_versao_documento
+         WHERE el.cd_layout = edl.cd_layout_cabecalho) AS Documento_Cabecalho,
+       edl.cd_layout_rodape         AS Codigo_Layout_Rodape
+  FROM dbamv.editor_documento edo
+ INNER JOIN dbamv.editor_versao_documento evd ON edo.cd_documento = evd.cd_documento
+ INNER JOIN dbamv.editor_tipo_versao etv      ON etv.cd_tipo_versao = evd.cd_tipo_versao
+ INNER JOIN dbamv.editor_layout edl           ON evd.cd_versao_documento = edl.cd_versao_documento
+ INNER JOIN dbamv.editor_tipo_layout etl      ON edl.cd_tipo_layout = etl.cd_tipo_layout
+ WHERE etl.ds_identificador NOT IN ('CABECALHO', 'RODAPE')
+   AND edo.cd_documento = :CD_DOCUMENTO
+ ORDER BY Codigo_Documento`,
+  docActionsQuery: `SELECT DISTINCT
+       ed.cd_documento               AS Codigo_Origem,
+       ed.ds_documento               AS Descricao_Origem,
+       ec.cd_metadado                AS Codigo_Metadado,
+       ec.ds_campo                   AS Nome_Campo,
+       ec.ds_identificador           AS Identificador_Campo,
+
+       CASE 
+           WHEN REGEXP_LIKE(DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1), 'CD_DOCUMENTO[[:space:]]+IN[[:space:]]*\\(', 'i')
+           THEN REGEXP_SUBSTR(DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1), 'IN[[:space:]]*\\(([^)]+)\\)', 1, 1, 'i', 1)
+       END                           AS Grupo_Docs_Relacionados,
+
+       REGEXP_SUBSTR(
+           DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1),
+           'CD_DOCUMENTO[[:space:]]*=[[:space:]]*([0-9]+)',
+           1, 1, 'i', 1
+       )                             AS Documento_Relacionado,
+
+       DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1) AS Script_Acao_Completo
+
+  FROM dbamv.editor_documento ed
+ INNER JOIN dbamv.editor_versao_documento evd ON ed.cd_documento = evd.cd_documento
+ INNER JOIN dbamv.editor_layout el            ON evd.cd_versao_documento = el.cd_versao_documento
+ INNER JOIN dbamv.editor_layout_campo elc     ON el.cd_layout = elc.cd_layout
+ INNER JOIN dbamv.editor_campo ec             ON elc.cd_campo = ec.cd_campo
+ INNER JOIN dbamv.editor_campo_prop_val ev    ON ec.cd_metadado = ev.cd_campo
+
+ WHERE evd.cd_tipo_versao = 3  -- Apenas versões publicadas
+   AND ev.cd_propriedade = 4   -- Focado na Propriedade de Ação
+   AND ev.lo_valor IS NOT NULL
+   AND REGEXP_LIKE(DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1), 'CD_DOCUMENTO[[:space:]](=|IN[[:space:]]\\()', 'i')
+   AND ed.cd_documento = :CD_DOCUMENTO
+ ORDER BY ec.ds_identificador`,
   enabledQueries: {
     total: true,
     prod24h: true,

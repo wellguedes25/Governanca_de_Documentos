@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   FileText, Zap, Clock, Activity, Loader2, AlertTriangle,
   RotateCcw, BarChart3, TrendingUp, Users, Search, PlusSquare,
-  Archive, Building2, BookOpen, ScanEye
+  Archive, Building2, BookOpen, ScanEye, Database, LayoutDashboard
 } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,8 +12,12 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
+type DashboardTab = 'operacional' | 'unidades' | 'qualidade';
+
 export default function Dashboard() {
+  const [activeTab, setActiveTab] = useState<DashboardTab>('operacional');
   const [stats, setStats] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<any>(null);
   const [customData, setCustomData] = useState<Record<string, any>>({});
   const [enabledQueries, setEnabledQueries] = useState<Record<string, boolean>>({});
@@ -42,7 +46,11 @@ export default function Dashboard() {
       const url = type ? `/api/dashboard/stats?type=${type}` : '/api/dashboard/stats';
       const res = await fetch(url);
       const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      if (data.error) {
+        setError(data.error);
+        throw new Error(data.error);
+      }
+      setError(null);
 
       setStats((prev: any) => {
         const newData = type ? { ...prev, ...data } : data;
@@ -75,7 +83,11 @@ export default function Dashboard() {
       const url = type ? `/api/dashboard/analytics?type=${type}` : '/api/dashboard/analytics';
       const res = await fetch(url);
       const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      if (data.error) {
+        setError(data.error);
+        throw new Error(data.error);
+      }
+      setError(null);
 
       setAnalytics((prev: any) => {
         const newData = type ? { ...prev, ...data } : data;
@@ -116,378 +128,372 @@ export default function Dashboard() {
     }
   }, []);
 
+  // Inicialização de Configurações
   useEffect(() => {
-    async function init() {
+    async function loadConfig() {
       try {
         const res = await fetch('/api/connections');
         const data = await res.json();
-        const enabled = data.enabledQueries || {};
-        setEnabledQueries(enabled);
+        setEnabledQueries(data.enabledQueries || {});
         setCardSettings(data.cardSettings || {});
         setCustomCards(data.customCards || []);
-
-        // Carregamento Granular: Dispara fetches individuais em paralelo
-        // Isso evita timeouts de requisições longas (>50s) no navegador.
-        
-        // Stats Cards
-        if (enabled['total'] !== false) fetchStats(true, 'total');
-        if (enabled['prod24h'] !== false) fetchStats(true, 'prod24h');
-        if (enabled['assinados'] !== false) fetchStats(true, 'assinados');
-
-        // Analytics Cards & Charts
-        if (enabled['volume3m'] !== false) fetchAnalytics(true, 'volume3m');
-        if (enabled['idle'] !== false) fetchAnalytics(true, 'idle');
-        if (enabled['top10'] !== false) fetchAnalytics(true, 'top10');
-        if (enabled['unitAdherence'] !== false) fetchAnalytics(true, 'unitAdherence');
-        if (enabled['unitInactivity'] !== false) fetchAnalytics(true, 'unitInactivity');
-
-        // Carrega dados dos cards customizados
-        if (data.customCards) {
-          data.customCards.forEach((card: any) => {
-            if (card.enabled !== false) fetchCustomCard(card);
-          });
-        }
       } catch (err) {
-        console.error('Erro na inicialização:', err);
+        console.error('Erro ao carregar config:', err);
       }
     }
-    init();
-  }, [fetchStats, fetchAnalytics, fetchCustomCard]);
+    loadConfig();
+  }, []);
 
-  const defaultCards = [
-    {
-      id: 'total',
-      title: cardSettings['total']?.title || 'Preenchimentos (90d)',
-      value: stats?.total || '0',
-      change: 'Volume Operacional',
-      icon: <FileText size={22} />,
-      color: cardSettings['total']?.color || 'from-[var(--primary)] to-[var(--primary-light)]',
-      onRefresh: () => fetchStats(true, 'total')
-    },
-    {
-      id: 'prod24h',
-      title: cardSettings['prod24h']?.title || 'Produção 24h',
-      value: stats?.prod24h || '0',
-      change: 'Últimas 24 horas',
-      icon: <Activity size={22} />,
-      color: cardSettings['prod24h']?.color || 'from-[var(--cta)] to-red-500',
-      onRefresh: () => fetchStats(true, 'prod24h')
-    },
-    {
-      id: 'assinados',
-      title: cardSettings['assinados']?.title || 'Taxa de Assinatura',
-      value: stats?.assinadosPercent || '0%',
-      change: 'Assinados / Total (90d)',
-      icon: <Zap size={22} />,
-      color: cardSettings['assinados']?.color || 'from-[var(--success)] to-emerald-400',
-      onRefresh: () => fetchStats(true, 'assinados')
-    },
-    {
-      id: 'volume3m',
-      title: cardSettings['volume3m']?.title || 'Prestadores Ativos',
-      value: Number(analytics?.volume3m || 0).toLocaleString('pt-BR'),
-      change: 'Profissionais (90 dias)',
-      icon: <Users size={22} />,
-      color: cardSettings['volume3m']?.color || 'from-[var(--primary-dark)] to-[var(--primary)]',
-      onRefresh: () => fetchAnalytics(true, 'volume3m')
-    },
-    {
-      id: 'idle',
-      title: cardSettings['idle']?.title || 'Documentos Ociosos',
-      value: Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR'),
-      change: 'Sem uso (90 dias)',
-      icon: <Archive size={22} />,
-      color: cardSettings['idle']?.color || 'from-[var(--destructive)] to-[var(--cta)]',
-      onRefresh: () => fetchAnalytics(true, 'idle')
-    },
-  ].filter(card => enabledQueries[card.id] !== false);
+  // Carregamento Sob Demanda baseado na Aba Ativa
+  useEffect(() => {
+    if (Object.keys(enabledQueries).length === 0) return;
 
-  const dynamicCards = customCards.filter(c => c.enabled !== false).map(card => {
-    const rawValue = customData[card.id];
-    let displayValue = rawValue || '---';
-
-    if (rawValue !== undefined && rawValue !== null && rawValue !== '---' && rawValue !== 'Erro') {
-      if (card.valueType === 'percent') {
-        displayValue = `${Number(rawValue).toFixed(1)}%`;
-      } else {
-        displayValue = Number(rawValue).toLocaleString('pt-BR');
-      }
+    if (activeTab === 'operacional') {
+      if (enabledQueries['total'] !== false) fetchStats(false, 'total');
+      if (enabledQueries['prod24h'] !== false) fetchStats(false, 'prod24h');
+      if (enabledQueries['top10'] !== false) fetchAnalytics(false, 'top10');
+      if (enabledQueries['volumeTurno'] !== false) fetchAnalytics(false, 'volumeTurno');
+    } else if (activeTab === 'unidades') {
+      if (enabledQueries['unitAdherence'] !== false) fetchAnalytics(false, 'unitAdherence');
+      if (enabledQueries['unitInactivity'] !== false) fetchAnalytics(false, 'unitInactivity');
+    } else if (activeTab === 'qualidade') {
+      if (enabledQueries['assinados'] !== false) fetchStats(false, 'assinados');
+      if (enabledQueries['idle'] !== false) fetchAnalytics(false, 'idle');
     }
+  }, [activeTab, enabledQueries, fetchStats, fetchAnalytics]);
 
-    return {
-      id: card.id,
-      title: card.title,
-      value: displayValue,
-      change: 'Indicador Customizado',
-      icon: <BarChart3 size={22} />,
-      color: card.color || 'from-slate-500 to-slate-700',
-      onRefresh: () => fetchCustomCard(card, true)
+  const getCardData = (id: string) => {
+    const cardMap: Record<string, any> = {
+      total: { title: 'Volume Geral (90d)', value: stats?.total || '0', icon: <FileText />, color: 'from-[var(--primary)] to-[var(--primary-light)]' },
+      prod24h: { title: 'Produção 24h', value: stats?.prod24h || '0', icon: <Activity />, color: 'from-orange-600 to-red-500' },
+      assinados: { title: 'Taxa de Assinatura', value: stats?.assinadosPercent || '0%', icon: <Zap />, color: 'from-emerald-600 to-teal-400' },
+      idle: { title: 'Documentos Ociosos', value: Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR'), icon: <Archive />, color: 'from-rose-600 to-orange-500' },
     };
-  });
 
-  const allCards = [...defaultCards, ...dynamicCards];
-  const isCardLoading = (id: string) => statsLoading || analyticsLoading || loadingMap[id];
+    if (id === 'hospitais') return {
+      title: 'Hospitais',
+      value: '7 Unidades',
+      icon: <Building2 size={20} />,
+      color: 'from-slate-700 to-slate-900'
+    };
 
-  // Dados para o gráfico de Produção por Unidade
+    if (id === 'volumeTurno') {
+      const dia = analytics?.volumeTurno?.find((t: any) => t.TURNO === 'DIA')?.QTD || 0;
+      const noite = analytics?.volumeTurno?.find((t: any) => t.TURNO === 'NOITE')?.QTD || 0;
+      return {
+        title: 'Produção por Turno',
+        value: `${dia}D / ${noite}N`,
+        icon: <Clock size={20} />,
+        color: 'from-amber-400 to-orange-600'
+      };
+    }
+
+    return cardMap[id] || { title: 'Indicador', value: '0', icon: <BarChart3 />, color: 'from-slate-500 to-slate-700' };
+  };
+
+  const isCardLoading = (id: string) => loadingMap[id];
+
+  // Dados para o gráfico de Unidades
   const unitData: Array<{ sigla: string; total: number }> = (analytics?.unitAdherence || []).map((u: any) => ({
     sigla: u.SIGLA_UNIDADE || '??',
     total: Number(u.QTD_TOTAL_PREENCHIDA || 0)
   }));
   const maxUnitTotal = unitData[0]?.total || 1;
-
-  // Cores consistentes para cada unidade
   const unitColors: Record<string, string> = {
-    'HSC': 'bg-blue-500', 'CSSJ': 'bg-emerald-500', 'HST': 'bg-amber-500',
+    'HSC': 'bg-[var(--primary)]', 'CSSJ': 'bg-emerald-500', 'HST': 'bg-amber-500',
     'HSJ': 'bg-rose-500', 'HMRP': 'bg-indigo-500', 'HCNSC': 'bg-teal-500', 'HR': 'bg-orange-500'
   };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 pb-20">
       {/* Header */}
-      <header className="flex justify-between items-end mb-8 border-b border-slate-200 pb-8">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-slate-100 pb-8">
         <div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic flex items-center gap-3">
-            <BarChart3 size={32} className="text-[var(--primary)]" />
+          <h1 className="text-slate-900 flex items-center gap-4">
+            <div className="p-3 bg-[var(--primary)] rounded-2xl shadow-xl shadow-[var(--primary)]/20">
+              <LayoutDashboard size={32} className="text-white" />
+            </div>
             Medlytics Dashboard
-          </h2>
-          <p className="text-slate-500 font-medium mt-1 text-sm tracking-tight">Telemetria em tempo real • Oracle DBAMV</p>
+          </h1>
+          <p className="text-slate-400 font-bold mt-2 text-xs uppercase tracking-widest flex items-center gap-2">
+            <span className="w-8 h-[2px] bg-[var(--primary-light)]" />
+            Telemetria em tempo real • Oracle ACSC
+          </p>
         </div>
 
-        <Button
-          variant="outline"
-          onClick={() => {
-            fetchStats(true);
-            fetchAnalytics(true);
-            customCards.forEach(c => { if (c.enabled !== false) fetchCustomCard(c, true); });
-          }}
-          disabled={statsLoading || analyticsLoading}
-        >
-          <RotateCcw size={14} className={(statsLoading || analyticsLoading) ? 'animate-spin' : ''} />
-          Sincronizar Dados
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            className="rounded-xl border-slate-200 hover:border-[var(--primary-light)] hover:text-[var(--primary-light)]"
+            onClick={() => {
+              fetchStats(true);
+              fetchAnalytics(true);
+            }}
+          >
+            <RotateCcw size={14} className={(statsLoading || analyticsLoading) ? 'animate-spin' : 'mr-2'} />
+            Sincronizar
+          </Button>
+        </div>
       </header>
 
-      {/* Grid de Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        {allCards.map((card) => (
-          <Card
-            key={card.id}
+      {error && (
+        <div className="bg-rose-50 border-2 border-rose-100 p-6 rounded-3xl animate-in slide-in-from-top-4 duration-500 flex items-center gap-6 group">
+          <div className="p-3 bg-rose-500 rounded-2xl shadow-lg shadow-rose-200 group-hover:scale-110 transition-transform">
+            <AlertTriangle size={24} className="text-white" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-black text-rose-900 uppercase tracking-widest mb-1 italic">Falha na Sincronização</h3>
+            <p className="text-rose-600/80 text-xs font-bold leading-relaxed">
+              O sistema encontrou um problema ao conectar com o Oracle: <span className="text-rose-900 underline underline-offset-4 decoration-rose-300">{error}</span>. 
+              Por favor, verifique as configurações de conexão ou tente sincronizar novamente.
+            </p>
+          </div>
+          <Button 
+            variant="ghost" 
+            onClick={() => { fetchStats(true); fetchAnalytics(true); }}
+            className="rounded-xl hover:bg-rose-100 text-rose-600 font-black text-[10px] uppercase tracking-widest px-6"
+          >
+            Tentar Novamente
+          </Button>
+        </div>
+      )}
+
+      {/* Custom Tabs Navigation */}
+      <div className="flex bg-slate-100/50 p-1 rounded-2xl w-full md:w-fit">
+        {[
+          { id: 'operacional', label: 'Operacional', icon: <TrendingUp size={16} /> },
+          { id: 'unidades', label: 'Unidades', icon: <Building2 size={16} /> },
+          { id: 'qualidade', label: 'Qualidade', icon: <Zap size={16} /> }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as DashboardTab)}
             className={cn(
-              "group hover:border-[var(--primary)] hover:shadow-[var(--shadow-md)] cursor-default relative overflow-hidden",
-              "transition-all duration-200"
+              "flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+              activeTab === tab.id 
+                ? "bg-white text-[var(--primary-light)] shadow-lg scale-[1.02]" 
+                : "text-slate-400 hover:text-slate-600 hover:bg-white/50"
             )}
           >
-            {/* Gradient accent bar */}
-            <div className={cn("absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r opacity-0 group-hover:opacity-100 transition-opacity", card.color)} />
-
-            <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
-              <div className="p-2.5 bg-slate-50 rounded-[var(--radius)] text-[var(--primary)] border border-slate-100 group-hover:bg-[var(--primary)]/5 transition-colors">
-                {card.icon}
-              </div>
-              <Badge variant="live">
-                <span className="w-1 h-1 rounded-full bg-[var(--success)] animate-pulse" />
-                Live
-              </Badge>
-            </CardHeader>
-
-            <CardContent>
-              <CardTitle>{card.title}</CardTitle>
-              <div className="text-3xl font-black text-slate-900 tracking-tighter tabular-nums mt-1">
-                {isCardLoading(card.id) ? (
-                  <Skeleton className="h-9 w-24" />
-                ) : (
-                  card.value
-                )}
-              </div>
-            </CardContent>
-
-            <CardFooter className="pt-4 mt-auto border-t border-slate-50 flex justify-between items-center">
-              <CardDescription>{card.change}</CardDescription>
-              <button
-                onClick={card.onRefresh}
-                disabled={!!loadingMap[card.id]}
-                className="p-1.5 rounded-[var(--radius)] hover:bg-slate-50 text-slate-400 hover:text-[var(--primary)] transition-all disabled:opacity-50 cursor-pointer"
-              >
-                <RotateCcw size={12} className={loadingMap[card.id] ? 'animate-spin' : ''} />
-              </button>
-            </CardFooter>
-          </Card>
+            {tab.icon}
+            {tab.label}
+          </button>
         ))}
       </div>
 
-      {/* Analytics Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Curva ABC (Top 10) */}
-        {enabledQueries['top10'] !== false && (
-          <Card className="lg:col-span-2 relative overflow-hidden min-h-[500px]">
-            {/* Left accent bar */}
-            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[var(--primary)] to-[var(--primary-light)]" />
-
-            <CardHeader className="flex flex-row items-center justify-between">
-              <h3 className="text-xl font-black text-slate-900 flex items-center gap-3 italic uppercase tracking-tighter">
-                <TrendingUp className="text-[var(--primary)]" size={24} />
-                Ranking de Documentos (Curva ABC)
-              </h3>
-              <button
-                onClick={() => fetchAnalytics(true, 'top10')}
-                disabled={analyticsLoading || loadingMap['top10']}
-                className="p-2 rounded-[var(--radius)] hover:bg-slate-50 text-slate-400 hover:text-[var(--primary)] transition-all cursor-pointer"
-              >
-                <RotateCcw size={16} className={(analyticsLoading || loadingMap['top10']) ? 'animate-spin' : ''} />
-              </button>
-            </CardHeader>
-
-            <CardContent className="flex-1">
-              {(analyticsLoading || loadingMap['top10']) ? (
-                <div className="space-y-5">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} className="space-y-2">
-                      <div className="flex justify-between">
-                        <Skeleton className="h-3 w-48" />
-                        <Skeleton className="h-3 w-12" />
+      {/* Tab Content Rendering */}
+      <div className="animate-in slide-in-from-bottom-4 duration-500">
+        {activeTab === 'operacional' && (
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {['total', 'prod24h', 'hospitais', 'volumeTurno'].map(id => {
+                const card = getCardData(id);
+                return (
+                  <Card key={id} className="relative overflow-hidden group">
+                    <div className={cn("absolute top-0 left-0 w-1 h-full bg-gradient-to-b", card.color)} />
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <h3 className="text-slate-500">{card.title}</h3>
+                      <div className="p-2 bg-slate-50 rounded-lg text-[var(--primary-light)]">{card.icon}</div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-black text-slate-900 tracking-tighter">
+                        {isCardLoading(id) ? <Skeleton className="h-10 w-32" /> : card.value}
                       </div>
-                      <Skeleton className="h-2 w-full" />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-5">
-                  {analytics?.top10?.map((doc: any, i: number) => {
-                    const max = analytics.top10[0]?.QTD_TOTAL || 1;
-                    const percent = (doc.QTD_TOTAL / max) * 100;
-                    return (
-                      <div key={i} className="group/bar">
-                        <div className="flex justify-between items-end mb-1.5 px-0.5">
-                          <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight truncate max-w-[85%]">
-                            <span className={cn(
-                              "inline-block w-5 text-[10px] font-black mr-1",
-                              i === 0 ? "text-[var(--primary)]" : i < 3 ? "text-[var(--primary-light)]" : "text-slate-400"
-                            )}>
-                              {String(i + 1).padStart(2, '0')}
+                      {id === 'volumeTurno' && (
+                        <p className="text-[9px] text-slate-400 font-bold uppercase mt-2">Últimos 7 dias (Dia vs Noite)</p>
+                      )}
+                      {id === 'hospitais' && (
+                        <p className="text-[9px] text-slate-400 font-bold uppercase mt-2">Unidades mapeadas</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+
+            <Card className="relative overflow-hidden min-h-[500px]">
+              <div className="absolute top-0 left-0 w-1 h-full bg-[var(--primary)]" />
+              <CardHeader className="flex flex-row items-center justify-between border-b border-slate-50 pb-6">
+                <h2 className="text-slate-900 flex items-center gap-3">
+                  <TrendingUp className="text-[var(--primary-light)]" size={24} />
+                  Ranking de Documentos (Curva ABC)
+                </h2>
+              </CardHeader>
+              <CardContent className="pt-8">
+                {loadingMap['top10'] ? (
+                   <div className="space-y-6">
+                     {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-xl" />)}
+                   </div>
+                ) : (
+                  <div className="space-y-5">
+                    {analytics?.top10?.map((doc: any, i: number) => {
+                      const max = analytics.top10[0]?.QTD_TOTAL || 1;
+                      const percent = (doc.QTD_TOTAL / max) * 100;
+                      return (
+                        <div key={i} className="group/bar">
+                          <div className="flex justify-between items-end mb-2">
+                            <span className="text-[11px] font-black text-slate-700 uppercase tracking-tight">
+                              <span className="text-[var(--primary-light)] mr-2 italic">#{String(i + 1).padStart(2, '0')}</span>
+                              {doc.DS_DOCUMENTO}
                             </span>
-                            {doc.DS_DOCUMENTO}
-                          </span>
-                          <span className="text-[11px] font-mono font-bold text-[var(--primary)] bg-[var(--primary)]/5 px-2 py-0.5 rounded-[var(--radius)] border border-[var(--primary)]/10">
-                            {Number(doc.QTD_TOTAL).toLocaleString('pt-BR')}
-                          </span>
+                            <span className="text-[11px] font-mono font-black text-[var(--primary-light)] bg-[var(--primary-light)]/5 px-2 py-0.5 rounded-lg">
+                              {Number(doc.QTD_TOTAL).toLocaleString('pt-BR')}
+                            </span>
+                          </div>
+                          <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-[var(--primary)] to-[var(--primary-light)] rounded-full transition-all duration-1000"
+                              style={{ width: `${percent}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                          <div
-                            className={cn(
-                              "h-full rounded-full transition-all duration-1000 ease-out",
-                              i === 0
-                                ? "bg-gradient-to-r from-[var(--primary)] to-[var(--primary-light)]"
-                                : i < 3
-                                  ? "bg-[var(--primary)]"
-                                  : "bg-[var(--primary)]/60"
-                            )}
-                            style={{ width: `${percent}%` }}
-                          />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                      )
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         )}
 
-        {/* Sidebar Cards */}
-        <div className="space-y-6">
-          {/* Produção por Unidade — dados reais de unitAdherence */}
-          {enabledQueries['unitAdherence'] !== false && (
-            <Card className="p-8 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-indigo-500 to-blue-500" />
-              <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
-                <h3 className="text-lg font-black text-slate-900 italic uppercase tracking-tighter flex items-center gap-2">
-                  <Building2 size={20} className="text-indigo-500" />
+        {activeTab === 'unidades' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <Card className="lg:col-span-2 p-8 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1 h-full bg-[var(--primary)]" />
+              <CardHeader className="p-0 mb-8 border-b border-slate-100 pb-6">
+                <h2 className="text-slate-900 flex items-center gap-3">
+                  <Building2 size={28} className="text-[var(--primary)]" />
                   Produção por Unidade
-                </h3>
-                <button
-                  onClick={() => fetchAnalytics(true, 'unitAdherence')}
-                  disabled={analyticsLoading || loadingMap['unitAdherence']}
-                  className="p-1.5 rounded-[var(--radius)] hover:bg-slate-50 text-slate-400 hover:text-indigo-500 transition-all cursor-pointer"
-                >
-                  <RotateCcw size={12} className={(analyticsLoading || loadingMap['unitAdherence']) ? 'animate-spin' : ''} />
-                </button>
-              </div>
-
-              {(analyticsLoading || loadingMap['unitAdherence']) ? (
-                <div className="space-y-4">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="space-y-2">
-                      <div className="flex justify-between">
-                        <Skeleton className="h-3 w-16" />
-                        <Skeleton className="h-3 w-10" />
-                      </div>
-                      <Skeleton className="h-2 w-full" />
-                    </div>
-                  ))}
-                </div>
-              ) : unitData.length > 0 ? (
-                <div className="space-y-4">
-                  {unitData.map((unit, i) => {
-                    const percent = (unit.total / maxUnitTotal) * 100;
-                    const barColor = unitColors[unit.sigla] || 'bg-slate-400';
-                    return (
-                      <div key={unit.sigla} className="group/unit">
-                        <div className="flex justify-between items-center mb-1.5">
-                          <span className="text-[11px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                            <span className={cn("w-2 h-2 rounded-sm", barColor)} />
-                            {unit.sigla}
-                          </span>
-                          <span className="text-[10px] font-mono font-bold text-slate-500">
-                            {unit.total.toLocaleString('pt-BR')}
-                          </span>
+                </h2>
+              </CardHeader>
+              <CardContent className="p-0">
+                {loadingMap['unitAdherence'] ? (
+                  <div className="space-y-6">
+                    {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {unitData.map((unit) => {
+                      const percent = (unit.total / maxUnitTotal) * 100;
+                      const barColor = unitColors[unit.sigla] || 'bg-slate-400';
+                      return (
+                        <div key={unit.sigla}>
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
+                              <div className={cn("w-3 h-3 rounded-full shadow-sm", barColor)} />
+                              {unit.sigla}
+                            </span>
+                            <span className="text-xs font-mono font-black text-slate-500">
+                              {unit.total.toLocaleString('pt-BR')}
+                            </span>
+                          </div>
+                          <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                            <div
+                              className={cn("h-full rounded-full transition-all duration-1000 ease-out", barColor)}
+                              style={{ width: `${percent}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                          <div
-                            className={cn("h-full rounded-full transition-all duration-1000 ease-out", barColor)}
-                            style={{ width: `${percent}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-[10px] text-slate-400 font-bold uppercase text-center py-8 italic">Sem dados de unidades</p>
-              )}
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
             </Card>
-          )}
 
-          <Card className="p-8">
-            <h3 className="text-lg font-black text-slate-900 mb-6 italic uppercase tracking-tighter border-b border-slate-100 pb-4">Status Infra</h3>
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse" />
-                  <span className="text-sm font-bold text-slate-700 uppercase tracking-tight">Produção Oracle</span>
-                </div>
-                <Badge variant="success">Estável</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 rounded-full bg-slate-300" />
-                  <span className="text-sm font-bold text-slate-400 uppercase tracking-tight">Sandbox Dev</span>
-                </div>
-                <Badge variant="outline">Standby</Badge>
-              </div>
-            </div>
-          </Card>
+               <Card className="p-8 bg-slate-900 text-white border-none shadow-2xl">
+                 <h4 className="text-xs font-black uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                   <AlertTriangle size={16} className="text-amber-500" />
+                   Status da Rede
+                 </h4>
+                 <div className="space-y-4">
+                    <div className="flex justify-between items-center border-b border-white/10 pb-4">
+                      <span className="text-[10px] font-bold uppercase text-slate-400">Database Oracle</span>
+                      <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 font-black">ESTÁVEL</Badge>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-white/10 pb-4">
+                      <span className="text-[10px] font-bold uppercase text-slate-400">Latência Média</span>
+                      <span className="text-xs font-black text-white">42ms</span>
+                    </div>
+                 </div>
+               </Card>
 
-          <Card className="p-8 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--primary)]/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-[var(--primary)]/10 transition-all" />
-            <h3 className="text-xs font-black text-[var(--primary)] flex items-center gap-2 mb-4 uppercase italic tracking-widest">
-              <AlertTriangle size={16} />
-              Nota Técnica
-            </h3>
-            <p className="text-[10px] text-slate-500 leading-relaxed font-bold uppercase italic tracking-tight">
-              Sincronização via DBLink ativa. Último heartbeat processado com sucesso. Para atualização forçada de índices, utilize o comando sincronizar.
-            </p>
-          </Card>
-        </div>
+               <Card className="p-8 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--primary-light)]/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-[var(--primary-light)]/10 transition-all" />
+                <h3 className="text-xs font-black text-[var(--primary-light)] flex items-center gap-2 mb-4 uppercase italic tracking-widest">
+                  <Database size={16} />
+                  INFO UNIDADE
+                </h3>
+                <p className="text-[10px] text-slate-500 leading-relaxed font-bold uppercase italic tracking-tight">
+                  Dados segmentados pelas 7 principais unidades hospitalares da ACSC. Sincronização granular via DBLink.
+                </p>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'qualidade' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+             <Card className="relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-emerald-600" />
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-500">Taxa de Assinatura</CardTitle>
+                </CardHeader>
+                <CardContent>
+                   <div className="text-4xl font-black text-slate-900 tracking-tighter">
+                     {loadingMap['assinados'] ? <Skeleton className="h-10 w-24" /> : stats?.assinadosPercent}
+                   </div>
+                   
+                   <div className="flex gap-4 mt-6 border-t border-slate-50 pt-4">
+                      <div>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Assinados</p>
+                        <div className="text-lg font-black text-emerald-600 tracking-tighter leading-none">
+                          {loadingMap['assinados'] ? <Skeleton className="h-5 w-12" /> : stats?.assinadosRaw || '0'}
+                        </div>
+                      </div>
+                      <div className="w-[1px] h-8 bg-slate-100" />
+                      <div>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total</p>
+                        <div className="text-lg font-black text-slate-700 tracking-tighter leading-none">
+                          {loadingMap['assinados'] ? <Skeleton className="h-5 w-12" /> : stats?.totalRaw || '0'}
+                        </div>
+                      </div>
+                   </div>
+                </CardContent>
+             </Card>
+
+
+             <Card className="relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-rose-600" />
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-500">Docs Ociosos</CardTitle>
+                </CardHeader>
+                <CardContent>
+                   <div className="text-4xl font-black text-slate-900 tracking-tighter">
+                     {loadingMap['idle'] ? <Skeleton className="h-10 w-24" /> : Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR')}
+                   </div>
+
+                   <div className="flex gap-4 mt-6 border-t border-slate-50 pt-4">
+                      <div>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Ociosos</p>
+                        <div className="text-lg font-black text-rose-600 tracking-tighter leading-none">
+                          {loadingMap['idle'] ? <Skeleton className="h-5 w-12" /> : Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR')}
+                        </div>
+                      </div>
+                      <div className="w-[1px] h-8 bg-slate-100" />
+                      <div>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Modelos</p>
+                        <div className="text-lg font-black text-slate-700 tracking-tighter leading-none">
+                          {loadingMap['idle'] ? <Skeleton className="h-5 w-12" /> : Number(analytics?.idle?.[0]?.TOTAL_TEMPLATES || 0).toLocaleString('pt-BR')}
+                        </div>
+                      </div>
+                   </div>
+                </CardContent>
+             </Card>
+
+          </div>
+        )}
       </div>
     </div>
   );

@@ -74,9 +74,10 @@ export async function getPool(connection: DbConnection) {
     password: connection.password,
     connectString: connectString,
     poolMin: 2,
-    poolMax: 10,
+    poolMax: 15,
     poolIncrement: 2,
     poolTimeout: 60,
+    stmtCacheSize: 60,
   });
   
   // Marcamos o pool com o ID da conexão atual
@@ -85,18 +86,25 @@ export async function getPool(connection: DbConnection) {
   return globalWithOracle.oraclePool;
 }
 
-export async function executeQuery(connection: DbConnection, sql: string) {
+export async function executeQuery(connection: DbConnection, sql: string, binds: any = []) {
   let conn;
   try {
     const pool = await getPool(connection);
     conn = await pool.getConnection();
-
-    // O driver Oracle Thick v5 não aceita semicolon no final de statements simples.
-    const cleanSql = sql.trim().replace(/;[\s\n]*(--.*)?$/, '');
     
-    // Log para depuração de tempo (opcional)
+    if (!sql) {
+      throw new Error('A query SQL fornecida é nula ou indefinida. Verifique o arquivo storage.json.');
+    }
+    
+    // Remove ponto e vírgula final se houver
+    const cleanSql = sql.trim().replace(/;$/, '');
+    
     const start = Date.now();
-    const result = await conn.execute(cleanSql, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+    const result = await conn.execute(cleanSql, binds, { 
+        outFormat: oracledb.OUT_FORMAT_OBJECT,
+        prefetchRows: 100,
+        fetchArraySize: 100
+    });
     const end = Date.now();
     
     if (end - start > 5000) {

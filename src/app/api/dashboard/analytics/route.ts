@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getData, INITIAL_DATA } from '@/lib/storage';
+import { getData, INITIAL_DATA, STORAGE_FILE } from '@/lib/storage';
 import { executeQuery } from '@/lib/oracle';
 
 export async function GET(request: Request) {
@@ -7,10 +7,17 @@ export async function GET(request: Request) {
   const type = searchParams.get('type');
   
   const data = await getData();
-  const activeConn = data.connections.find(c => c.id === data.activeConnectionId);
-
+  const activeConn = data.connections.find(c => String(c.id) === String(data.activeConnectionId));
+  
   if (!activeConn) {
-    return NextResponse.json({ error: 'Nenhuma conexão ativa' }, { status: 400 });
+    const debugInfo = {
+      activeId: data.activeConnectionId,
+      availableIds: data.connections.map(c => c.id),
+      storageFile: STORAGE_FILE
+    };
+    return NextResponse.json({ 
+      error: `Nenhuma conexão ativa encontrada. Info: ${JSON.stringify(debugInfo)}` 
+    }, { status: 400 });
   }
 
   try {
@@ -45,18 +52,24 @@ export async function GET(request: Request) {
           break;
         case 'unitAdherence': result = await safeExecute(activeConn, analyticQueries.unitAdherence, 'unitAdherence'); break;
         case 'unitInactivity': result = await safeExecute(activeConn, analyticQueries.unitInactivity, 'unitInactivity'); break;
+        case 'volumeTurno': result = await safeExecute(activeConn, analyticQueries.volumeTurno, 'volumeTurno'); break;
+        case 'slaAssinatura': result = await safeExecute(activeConn, analyticQueries.slaAssinatura, 'slaAssinatura'); break;
+        case 'similarityStats': result = await safeExecute(activeConn, analyticQueries.similarityStats, 'similarityStats'); break;
         default: return NextResponse.json({ error: 'Tipo inválido' }, { status: 400 });
       }
       return NextResponse.json({ [type]: result });
     }
 
     // Execução total (comportamento original)
-    const [top10Res, idleRes, volume3mRes, adherenceRes, inactivityRes] = await Promise.all([
+    const [top10Res, idleRes, volume3mRes, adherenceRes, inactivityRes, turnoRes, slaRes, similarityRes] = await Promise.all([
       safeExecute(activeConn, analyticQueries.top10, 'top10'),
       safeExecute(activeConn, analyticQueries.idle, 'idle'),
       safeExecute(activeConn, analyticQueries.volume3m, 'volume3m', [{ TOTAL: 0 }]),
       safeExecute(activeConn, analyticQueries.unitAdherence, 'unitAdherence'),
-      safeExecute(activeConn, analyticQueries.unitInactivity, 'unitInactivity')
+      safeExecute(activeConn, analyticQueries.unitInactivity, 'unitInactivity'),
+      safeExecute(activeConn, analyticQueries.volumeTurno, 'volumeTurno'),
+      safeExecute(activeConn, analyticQueries.slaAssinatura, 'slaAssinatura'),
+      safeExecute(activeConn, analyticQueries.similarityStats, 'similarityStats')
     ]);
 
     return NextResponse.json({
@@ -65,6 +78,9 @@ export async function GET(request: Request) {
       volume3m: volume3mRes?.[0]?.[Object.keys(volume3mRes[0])[0]] || 0,
       unitAdherence: adherenceRes || [],
       unitInactivity: inactivityRes || [],
+      volumeTurno: turnoRes || [],
+      slaAssinatura: slaRes?.[0] || {},
+      similarityStats: similarityRes?.[0] || {},
     });
   } catch (error: any) {
     console.error('Erro ao buscar Analytics do Dashboard:', error);

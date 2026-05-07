@@ -1,22 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  /* === Core Palette (UI UX Pro Max: Healthcare Dashboard) === */
-  --background: #F8FAFC;
-  --foreground: #0F172A;
+  /* === Core Palette (Premium SaaS/Healthtech: Medlytics Pro) === */
+  --background: #F5F7FA;
+  --foreground: #0A1F44;
   --card: #FFFFFF;
-  --primary: #3B82F6;
-  --primary-light: #60A5FA;
-  --primary-dark: #2563EB;
-  --accent: #F1F5F9;
+  --primary: #0A1F44;       /* Navy Profundo */
+  --primary-light: #14C8D4; /* Cyan Vibrante */
+  --primary-dark: #071530;  /* Navy Escuro */
+  --accent: #F5F7FA;        /* Background Suave */
   --border: #E2E8F0;
+  --teal: #0FA3B1;          /* Teal para variações */
 
   /* === Semantic Tokens === */
-  --cta: #F97316;
+  --cta: #14C8D4;           /* Cyan para Call to Action */
   --destructive: #EF4444;
   --warning: #F59E0B;
   --success: #10B981;
-  --muted: #94A3B8;
+  --muted: #5E6B7A;         /* Slate Gray */
 
   /* === Geometry === */
   --radius: 6px;
@@ -25,14 +26,53 @@
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
-  --shadow-primary: 0 4px 14px -3px rgba(59, 130, 246, 0.35);
+  --shadow-primary: 0 4px 14px -3px rgba(10, 31, 68, 0.35);
 }
 
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), sans-serif;
+  font-family: var(--font-inter), sans-serif;
   overflow-x: hidden;
+}
+
+h1 {
+  font-family: var(--font-manrope), sans-serif;
+  font-weight: 800;
+  font-size: 1.125rem; /* text-lg */
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+  font-style: italic;
+  line-height: 1.2;
+}
+
+h2 {
+  font-family: var(--font-manrope), sans-serif;
+  font-weight: 700;
+  font-size: 1rem; /* text-base */
+  letter-spacing: -0.02em;
+}
+
+h3 {
+  font-family: var(--font-manrope), sans-serif;
+  font-weight: 700;
+  font-size: 0.875rem; /* text-sm */
+  letter-spacing: -0.01em;
+}
+
+h4 {
+  font-family: var(--font-inter), sans-serif;
+  font-weight: 800;
+  font-size: 0.75rem; /* text-xs */
+  letter-spacing: 0.1em;
+}
+
+.tracking-tighter {
+  letter-spacing: -0.05em;
+}
+
+.font-logo {
+  font-family: var(--font-manrope), sans-serif;
 }
 
 @layer base {

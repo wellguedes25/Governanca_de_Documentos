@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { LayoutDashboard, FileText, Settings, Database, ChevronLeft, ChevronRight, ScanEye, BookOpen } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, Database, ChevronLeft, ChevronRight, ScanEye, BookOpen, Building2 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useUI } from '@/context/UIContext';
 import { cn } from '@/lib/utils';
@@ -11,6 +11,7 @@ const navItems = [
     group: 'Principal',
     items: [
       { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/hospitais', label: 'Hospitais', icon: Building2 },
       { href: '/documentos', label: 'Documentos', icon: FileText },
       { href: '/similaridade', label: 'Similaridade', icon: ScanEye },
       { href: '/auditoria-siglario', label: 'Siglário', icon: BookOpen },
@@ -66,9 +67,9 @@ export default function Sidebar() {
         {navItems.map((section) => (
           <div key={section.group}>
             {sidebarOpen && (
-              <h3 className="px-4 text-[10px] font-bold text-[var(--muted)] uppercase tracking-[0.2em] mb-3 animate-in fade-in">
+              <h4 className="px-4 text-[11px] font-extrabold text-[var(--muted)] uppercase tracking-[0.2em] mb-3 animate-in fade-in font-inter">
                 {section.group}
-              </h3>
+              </h4>
             )}
             <ul className="space-y-1">
               {section.items.map((item) => {
@@ -92,7 +93,7 @@ export default function Sidebar() {
                         !isActive && "group-hover/link:scale-110"
                       )} />
                       {sidebarOpen && (
-                        <span className="font-semibold text-sm animate-in slide-in-from-left-2">
+                        <span className="font-bold text-xs tracking-tight animate-in slide-in-from-left-2">
                           {item.label}
                         </span>
                       )}

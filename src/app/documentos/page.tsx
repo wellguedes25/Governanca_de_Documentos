@@ -12,7 +12,7 @@ export default function DocumentosPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [columnFilters, setColumnFilters] = useState({ CÓDIGO: '', NOME: '', EMPRESA: '' });
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({ key: '', direction: null });
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({ key: 'ÚLTIMO USO', direction: 'desc' });
   const pageSize = 20;
 
   // Estados para Detalhamento de Perfil (Drill-down)
@@ -344,11 +344,23 @@ export default function DocumentosPage() {
     if (sortConfig.key && sortConfig.direction) {
       const sortKey = sortConfig.key;
       data.sort((a, b) => {
-        const valA = a[sortKey];
-        const valB = b[sortKey];
+        let valA = a[sortKey];
+        let valB = b[sortKey];
+
         if (valA === valB) return 0;
         if (valA === null || valA === undefined) return 1;
         if (valB === null || valB === undefined) return -1;
+
+        // Tentar converter para data se parecer uma data
+        const isDateA = !isNaN(Date.parse(String(valA)));
+        const isDateB = !isNaN(Date.parse(String(valB)));
+
+        if (isDateA && isDateB) {
+          const timeA = new Date(valA).getTime();
+          const timeB = new Date(valB).getTime();
+          return sortConfig.direction === 'asc' ? timeA - timeB : timeB - timeA;
+        }
+
         const isNumeric = !isNaN(Number(valA)) && !isNaN(Number(valB));
         if (isNumeric) {
           return sortConfig.direction === 'asc' ? Number(valA) - Number(valB) : Number(valB) - Number(valA);
@@ -422,10 +434,10 @@ export default function DocumentosPage() {
       <div className="print:hidden space-y-6">
         <header className="flex justify-between items-center gap-4 border-b border-slate-200 pb-6">
           <div className="flex-1">
-            <h2 className="text-3xl font-black text-slate-900 flex items-center gap-3 uppercase italic tracking-tighter">
+            <h1 className="text-slate-900 flex items-center gap-3">
               <FileText className="text-[var(--primary)]" size={28} />
               Repositório de Documentos
-            </h2>
+            </h1>
             <div className="flex items-center gap-3 mt-1">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Oracle DBAMV Infrastructure</span>
               <span className={`px-2 py-0.5 rounded-[var(--radius)] text-[9px] font-black uppercase border ${activeConnName ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-rose-50 text-rose-600 border-rose-200 italic'}`}>
@@ -521,34 +533,48 @@ export default function DocumentosPage() {
               <table className="w-full text-left border-collapse table-auto select-none min-w-max">
                 <thead className="sticky top-0 z-10">
                    <tr className="bg-slate-50 shadow-sm border-b border-slate-200">
-                    <th className="px-4 py-3 w-10 border-r border-slate-100 italic font-black text-slate-300 text-[9px] text-center">INFO</th>
-                    {Object.keys(paginatedData[0]).map((key) => {
-                      const cleanKey = key.replace(/"/g, '');
-                      const isName = cleanKey.toUpperCase() === 'NOME';
-                      const width = columnWidths[key] || (isName ? 150 : 65);
-                      return (
-                        <th 
-                          key={key} 
-                          style={{ width, minWidth: width, maxWidth: isName ? 150 : 'none' }}
-                          onClick={() => handleSort(key)}
-                          className={`relative px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] hover:text-[var(--primary)] transition-colors border-r border-slate-100 whitespace-nowrap cursor-pointer group/th ${isName ? 'overflow-hidden text-ellipsis' : 'text-center'} ${sortConfig.key === key ? 'bg-[var(--primary)]/5 text-[var(--primary)]' : ''}`}
-                        >
-                          <div className={`flex items-center gap-2 ${!isName ? 'justify-center' : ''}`}>
-                            <Filter size={10} className={`transition-colors ${sortConfig.key === key ? 'text-[var(--primary)]' : 'text-slate-300 group-hover/th:text-slate-500'}`} />
-                            {cleanKey}
-                            {sortConfig.key === key && (
-                              <span className="text-[var(--primary)]">
-                                {sortConfig.direction === 'asc' ? <ChevronUp size={10} strokeWidth={4} /> : <ChevronDown size={10} strokeWidth={4} />}
-                              </span>
-                            )}
-                          </div>
-                          <div 
-                            onMouseDown={(e) => handleMouseDown(e, key)}
-                            className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-[var(--primary)]/20 group/resizer transition-colors"
-                          ></div>
-                        </th>
-                      );
-                    })}
+                    <th className="px-2 py-3 w-8 border-r border-slate-100 italic font-black text-slate-300 text-[9px] text-center">INFO</th>
+                    {(() => {
+                      const keys = Object.keys(paginatedData[0]);
+                      const order = ['CÓDIGO', 'NOME', 'CSSJ', 'HST', 'HSC', 'HSJ', 'HMRP', 'HCNSC', 'HR', 'ÚLTIMO USO', 'TOTAL'];
+                      const sortedKeys = keys.sort((a, b) => {
+                        const indexA = order.indexOf(a.replace(/"/g, '').toUpperCase());
+                        const indexB = order.indexOf(b.replace(/"/g, '').toUpperCase());
+                        if (indexA === -1 && indexB === -1) return 0;
+                        if (indexA === -1) return 1;
+                        if (indexB === -1) return -1;
+                        return indexA - indexB;
+                      });
+                      
+                      return sortedKeys.map((key) => {
+                        const cleanKey = key.replace(/"/g, '').toUpperCase();
+                        const isName = cleanKey === 'NOME';
+                        const isCodigo = cleanKey === 'CÓDIGO';
+                        const width = columnWidths[key] || (isName ? 350 : isCodigo ? 50 : 65);
+                        return (
+                          <th 
+                            key={key} 
+                            style={{ width, minWidth: width }}
+                            onClick={() => handleSort(key)}
+                            className={`relative px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] hover:text-[var(--primary)] transition-colors border-r border-slate-100 whitespace-nowrap cursor-pointer group/th ${isName ? 'overflow-hidden text-ellipsis' : 'text-center'} ${sortConfig.key === key ? 'bg-[var(--primary)]/5 text-[var(--primary)]' : ''}`}
+                          >
+                            <div className={`flex items-center gap-2 ${!isName ? 'justify-center' : ''}`}>
+                              <Filter size={10} className={`transition-colors ${sortConfig.key === key ? 'text-[var(--primary)]' : 'text-slate-300 group-hover/th:text-slate-500'}`} />
+                              {cleanKey}
+                              {sortConfig.key === key && (
+                                <span className="text-[var(--primary)]">
+                                  {sortConfig.direction === 'asc' ? <ChevronUp size={10} strokeWidth={4} /> : <ChevronDown size={10} strokeWidth={4} />}
+                                </span>
+                              )}
+                            </div>
+                            <div 
+                              onMouseDown={(e) => handleMouseDown(e, key)}
+                              className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-[var(--primary)]/20 group/resizer transition-colors"
+                            ></div>
+                          </th>
+                        );
+                      });
+                    })()}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
@@ -572,33 +598,48 @@ export default function DocumentosPage() {
                             <Info size={14} />
                           </button>
                         </td>
-                        {Object.entries(row).map(([key, val], vIdx) => {
-                          const isName = key.replace(/"/g, '').toUpperCase() === 'NOME';
-                          const width = columnWidths[key] || (isName ? 150 : 65);
-                          const renderValue = () => {
-                            if (val === null || val === undefined) return <span className="text-slate-300 italic opacity-50">--</span>;
-                            const strVal = String(val);
+                        {(() => {
+                          const entries = Object.entries(row);
+                          const order = ['CÓDIGO', 'NOME', 'CSSJ', 'HST', 'HSC', 'HSJ', 'HMRP', 'HCNSC', 'HR', 'ÚLTIMO USO', 'TOTAL'];
+                          const sortedEntries = entries.sort((a, b) => {
+                            const indexA = order.indexOf(a[0].replace(/"/g, '').toUpperCase());
+                            const indexB = order.indexOf(b[0].replace(/"/g, '').toUpperCase());
+                            if (indexA === -1 && indexB === -1) return 0;
+                            if (indexA === -1) return 1;
+                            if (indexB === -1) return -1;
+                            return indexA - indexB;
+                          });
+
+                          return sortedEntries.map(([key, val], vIdx) => {
                             const cleanKey = key.replace(/"/g, '').toUpperCase();
-                            const companyCols = ['HSC', 'CSSJ', 'HST', 'HSJ', 'HCNSC', 'HMRP', 'HR'];
-                            if (companyCols.includes(cleanKey)) {
-                              if (strVal === '1') return <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mx-auto" />;
-                              if (strVal === '0') return <div className="w-1.5 h-1.5 rounded-full bg-[var(--destructive)] mx-auto" />;
-                            }
-                            if (strVal.includes('T') && !isNaN(Date.parse(strVal))) {
-                              return <span suppressHydrationWarning className="font-mono text-[9px]">{new Date(strVal).toLocaleString('pt-BR')}</span>;
-                            }
-                            return strVal;
-                          };
-                          return (
-                            <td 
-                              key={vIdx} 
-                              style={{ width, minWidth: width, maxWidth: isName ? 150 : 'none' }}
-                              className={`px-4 py-2 text-[10px] border-r border-slate-50 last:border-r-0 transition-colors whitespace-nowrap overflow-hidden text-ellipsis ${!isName ? 'text-center font-bold' : ''}`}
-                            >
-                              {renderValue()}
-                            </td>
-                          );
-                        })}
+                            const isName = cleanKey === 'NOME';
+                            const isCodigo = cleanKey === 'CÓDIGO';
+                            const width = columnWidths[key] || (isName ? 350 : isCodigo ? 50 : 65);
+                            const renderValue = () => {
+                              if (val === null || val === undefined) return <span className="text-slate-300 italic opacity-50">--</span>;
+                              const strVal = String(val);
+                              const cleanKey = key.replace(/"/g, '').toUpperCase();
+                              const companyCols = ['HSC', 'CSSJ', 'HST', 'HSJ', 'HCNSC', 'HMRP', 'HR'];
+                              if (companyCols.includes(cleanKey)) {
+                                if (strVal === '1') return <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mx-auto" />;
+                                if (strVal === '0') return <div className="w-1.5 h-1.5 rounded-full bg-[var(--destructive)] mx-auto" />;
+                              }
+                              if (strVal.includes('T') && !isNaN(Date.parse(strVal))) {
+                                return <span suppressHydrationWarning className="font-mono text-[9px]">{new Date(strVal).toLocaleString('pt-BR')}</span>;
+                              }
+                              return strVal;
+                            };
+                            return (
+                              <td 
+                                key={vIdx} 
+                                style={{ width, minWidth: width }}
+                                className={`px-4 py-2 text-[10px] border-r border-slate-50 last:border-r-0 transition-colors whitespace-nowrap overflow-hidden text-ellipsis ${!isName ? 'text-center font-bold' : ''}`}
+                              >
+                                {renderValue()}
+                              </td>
+                            );
+                          });
+                        })()}
                       </tr>
                     );
                   })}

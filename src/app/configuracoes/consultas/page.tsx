@@ -358,10 +358,10 @@ export default function ConfigConsultasPage() {
     <div className="space-y-3 animate-in slide-in-from-bottom-5 duration-700 pb-12 text-slate-800">
       <header className="flex justify-between items-end border-b border-slate-200 pb-2">
         <div className="max-w-4xl">
-          <h2 className="text-3xl font-black text-slate-900 flex items-center gap-3 uppercase italic tracking-tighter">
+          <h1 className="text-slate-900 flex items-center gap-3">
             <Database className="text-[var(--primary)]" size={32} />
             Motor de Inteligência SQL
-          </h2>
+          </h1>
           <p className="text-slate-500 mt-1 font-medium text-sm tracking-tight">
             Gestão de algoritmos de extração e telemetria. Ambiente ativo: 
             <span className="text-[var(--primary)] font-black ml-2 uppercase italic tracking-widest bg-slate-100 px-3 py-1 border border-slate-200">{activeConnName}</span>
@@ -375,139 +375,12 @@ export default function ConfigConsultasPage() {
         )}
       </header>
 
-      {/* Seção de Cards Customizados */}
-      <section className="bg-white border border-slate-200 rounded-[var(--radius)] p-4 shadow-sm relative overflow-hidden group">
-        <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-600"></div>
-        <div className="absolute top-0 right-0 p-4 opacity-[0.03] grayscale pointer-events-none">
-          <Palette size={160} />
-        </div>
-        
-        <div className="flex justify-between items-center mb-3 relative z-10">
-          <div>
-            <h3 className="text-xl font-black text-slate-900 flex items-center gap-3 tracking-tighter uppercase italic">
-              <LayoutIcon className="text-blue-600" size={24} />
-              Indicadores Customizados (KPI/Analytics)
-            </h3>
-            <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest mt-1">Expansão de telemetria via queries dinâmicas</p>
-          </div>
-          <button 
-            onClick={() => setIsAddingCard(true)}
-            className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-6 py-2.5 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-lg"
-          >
-            <Plus size={16} />
-            Provisionar Card
-          </button>
-        </div>
-
-        {(isAddingCard || editingCard) && (
-          <div className="mb-10 p-8 bg-slate-50 border border-slate-200 rounded-[var(--radius)] relative animate-in zoom-in-98 duration-500 shadow-inner">
-            <h4 className="text-[10px] font-black text-slate-400 mb-6 uppercase tracking-[0.3em] border-b border-slate-200 pb-3">
-              {editingCard ? 'Modificar Registro de Card' : 'Configurar Novo Ativo de Telemetria'}
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div>
-                <label className="text-[9px] text-slate-400 uppercase font-black tracking-widest mb-1.5 block">Identificação Visual</label>
-                <input 
-                  type="text" 
-                  placeholder="Ex: TAXA DE OCUPAÇÃO" 
-                  className="bg-white border border-slate-200 rounded-[var(--radius)] px-4 py-3 text-[11px] font-bold text-slate-900 focus:border-blue-500 outline-none w-full shadow-sm"
-                  value={editingCard ? editingCard.title : newCard.title}
-                  onChange={e => editingCard ? setEditingCard({...editingCard, title: e.target.value}) : setNewCard({...newCard, title: e.target.value})}
-                />
-              </div>
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="text-[9px] text-slate-400 uppercase font-black tracking-widest mb-1.5 block">Símbolo</label>
-                  <select 
-                    className="bg-white border border-slate-200 rounded-[var(--radius)] px-4 py-2.5 text-[11px] font-bold text-slate-900 focus:border-blue-600 outline-none w-full"
-                    value={editingCard ? editingCard.icon : newCard.icon}
-                    onChange={e => editingCard ? setEditingCard({...editingCard, icon: e.target.value}) : setNewCard({...newCard, icon: e.target.value})}
-                  >
-                    <option value="FileText">DADOS TXT</option>
-                    <option value="Users">VETOR USUÁRIOS</option>
-                    <option value="Activity">PULSO ATIVIDADE</option>
-                    <option value="TrendingUp">VETOR TENDÊNCIA</option>
-                    <option value="AlertTriangle">ALERTA CRÍTICO</option>
-                  </select>
-                </div>
-                <div className="flex-1">
-                   <label className="text-[9px] text-slate-400 uppercase font-black tracking-widest mb-1.5 block">Formatação</label>
-                   <select 
-                    className="bg-white border border-slate-200 rounded-[var(--radius)] px-4 py-2.5 text-[11px] font-bold text-slate-900 focus:border-blue-600 outline-none w-full"
-                    value={editingCard ? (editingCard.valueType || 'number') : newCard.valueType}
-                    onChange={e => editingCard ? setEditingCard({...editingCard, valueType: e.target.value}) : setNewCard({...newCard, valueType: e.target.value})}
-                  >
-                    <option value="number">QUANTIDADE ABSOLUTA</option>
-                    <option value="percent">PERCENTUAL (%)</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div className="mb-6">
-              <label className="text-[9px] text-slate-400 uppercase font-black tracking-widest mb-1.5 block">Código SQL de Extração</label>
-              <textarea 
-                placeholder="SELECT COUNT(*) AS TOTAL FROM ..." 
-                className="bg-white border border-slate-200 rounded-[var(--radius)] px-6 py-6 text-[11px] font-mono font-bold text-slate-700 focus:border-blue-500 outline-none w-full h-40 shadow-inner"
-                value={editingCard ? editingCard.query : newCard.query}
-                onChange={e => editingCard ? setEditingCard({...editingCard, query: e.target.value}) : setNewCard({...newCard, query: e.target.value})}
-              />
-            </div>
-            <div className="flex justify-end gap-3 items-center pt-4 border-t border-slate-200">
-              <button 
-                onClick={() => { setIsAddingCard(false); setEditingCard(null); }}
-                className="px-6 py-2.5 text-[10px] font-black text-slate-400 hover:text-rose-600 transition-all uppercase tracking-widest"
-              >
-                Abortar
-              </button>
-              <button 
-                onClick={handleSaveCustomCard}
-                className="flex items-center gap-3 bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-2.5 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-lg"
-              >
-                <Check size={16} />
-                Confirmar Implantação
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 relative z-10">
-          {customCards.map(card => (
-            <div key={card.id} className="p-4 rounded-[var(--radius)] bg-slate-50 border border-slate-100 hover:border-[var(--primary)] transition-all flex flex-col justify-between group shadow-sm">
-              <div>
-                <div className="flex justify-between items-start mb-6">
-                  <div className={`p-3 rounded-[var(--radius)] bg-white border border-slate-200 text-slate-900 shadow-sm`}>
-                   <BarChart3 size={20} className="text-blue-600" />
-                  </div>
-                  <div className="flex gap-1">
-                    <button onClick={() => setEditingCard(card)} className="p-2 hover:bg-white rounded-[var(--radius)] text-slate-400 hover:text-blue-600 transition-all border border-transparent hover:border-slate-100"><Edit3 size={16}/></button>
-                    <button onClick={() => handleDeleteCustomCard(card.id)} className="p-2 hover:bg-rose-50 rounded-[var(--radius)] text-slate-300 hover:text-rose-600 transition-all border border-transparent hover:border-rose-100"><Trash2 size={16}/></button>
-                  </div>
-                </div>
-                <h4 className="text-slate-900 font-black text-sm uppercase tracking-tighter italic mb-3">{card.title}</h4>
-                <div className="text-[10px] text-slate-400 font-mono truncate bg-white p-3 rounded-[var(--radius)] border border-slate-100 font-bold">
-                  {card.query}
-                </div>
-              </div>
-              <div className="mt-6 pt-4 border-t border-slate-100 flex justify-between items-center px-1">
-                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 italic">User Defined KPI</span>
-                <div className={`w-2 h-2 rounded-none ${card.enabled ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
-              </div>
-            </div>
-          ))}
-          {customCards.length === 0 && !isAddingCard && (
-            <div className="col-span-full py-20 text-center border-4 border-dotted border-slate-100 rounded-[var(--radius)] bg-slate-50/50">
-              <p className="text-slate-300 font-black uppercase text-[10px] tracking-[0.4em] italic mb-2">Namespace de telemetria vazio</p>
-              <p className="text-slate-400 text-[10px] font-medium italic">Provisione um novo card para expandir a telemetria do dashboard.</p>
-            </div>
-          )}
-        </div>
-      </section>
 
       {/* Grid de Configurações Existentes */}
-      <h3 className="text-xl font-black text-slate-900 flex items-center gap-3 pt-2 uppercase italic tracking-tighter">
+      <h2 className="text-slate-900 flex items-center gap-3 pt-2">
         <Settings2 className="text-[var(--primary)]" size={24} />
         Algoritmos Nativos DocOracle
-      </h3>
+      </h2>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* KPI: Total de Documentos */}
         <div className="bg-white rounded-[var(--radius)] p-4 border border-slate-200 shadow-sm relative group overflow-hidden">

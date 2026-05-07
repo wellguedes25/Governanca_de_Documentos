@@ -1,8 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-const STORAGE_FILE = path.join(DATA_DIR, 'storage.json');
+const getStoragePaths = () => {
+  const root = process.cwd();
+  const dataDir = path.join(root, 'data');
+  const storageFile = path.join(dataDir, 'storage.json');
+  return { root, dataDir, storageFile };
+};
 
 export interface DbConnection {
   id: string;
@@ -278,17 +282,25 @@ ORDER BY
 };
 
 function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+  const { dataDir } = getStoragePaths();
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
   }
 }
 
 export async function getData(): Promise<StorageData> {
+  const { storageFile, root } = getStoragePaths();
   ensureDataDir();
-  if (!fs.existsSync(STORAGE_FILE)) {
+  console.log('DEBUG: process.cwd():', root);
+  console.log('DEBUG: storageFile path:', storageFile);
+  
+  if (!fs.existsSync(storageFile)) {
+    console.log('DEBUG: storageFile not found, returning INITIAL_DATA');
     return INITIAL_DATA;
   }
-  const fileContent = fs.readFileSync(STORAGE_FILE, 'utf-8');
+  
+  const fileContent = fs.readFileSync(storageFile, 'utf-8');
+  console.log('DEBUG: storageFile size:', fileContent.length);
   try {
     const data = JSON.parse(fileContent);
     return {
@@ -311,11 +323,16 @@ export async function getData(): Promise<StorageData> {
       auditDocId: typeof data.auditDocId === 'number' ? data.auditDocId : INITIAL_DATA.auditDocId
     };
   } catch (e) {
+    console.error('DEBUG: JSON parse error in storage.json:', e);
     return INITIAL_DATA;
   }
 }
 
 export async function saveData(data: StorageData) {
+  const { storageFile } = getStoragePaths();
   ensureDataDir();
-  fs.writeFileSync(STORAGE_FILE, JSON.stringify(data, null, 2));
+  fs.writeFileSync(storageFile, JSON.stringify(data, null, 2));
 }
+
+// Para exportação de debug
+export const STORAGE_FILE = getStoragePaths().storageFile;

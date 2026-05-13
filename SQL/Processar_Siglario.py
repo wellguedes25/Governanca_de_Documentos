@@ -36,10 +36,19 @@ def load_storage_data():
     with open(STORAGE_FILE, 'r', encoding='utf-8') as f:
         storage = json.load(f)
     
-    allowed    = set(s.lower() for s in storage.get('siglarioAllowed',   []))
-    forbidden  = set(s.lower() for s in storage.get('siglarioForbidden', []))
-    audit_days = storage.get('auditDays', 15)
-    audit_doc  = storage.get('auditDocId', 0)
+    # Novo formato: siglarioEntries (array de objetos com tipo)
+    entries = storage.get('siglarioEntries', [])
+    if entries:
+        allowed   = set(e['sigla'].lower() for e in entries if e.get('tipo') == 'allowed')
+        forbidden = set(e['sigla'].lower() for e in entries if e.get('tipo') == 'forbidden')
+    else:
+        # Fallback: formato legado (listas flat)
+        allowed   = set(s.lower() for s in storage.get('siglarioAllowed',   []))
+        forbidden = set(s.lower() for s in storage.get('siglarioForbidden', []))
+    
+    # Prioriza configurações específicas de siglário, fallback para globais
+    audit_days = storage.get('siglarioAuditDays', storage.get('auditDays', 15))
+    audit_doc  = storage.get('siglarioDocIds',    storage.get('auditDocId', 0))
     
     return allowed, forbidden, audit_days, audit_doc
 
@@ -168,8 +177,15 @@ def main():
             FROM DBAMV.V_AUDITORIA_COPIA_COLA
             WHERE DH_FECHAMENTO >= TRUNC(SYSDATE) - {DIAS_A_PROCESSAR}
         """
-        if CD_DOCUMENTO_ALVO:
-            query_ext += f" AND CD_DOCUMENTO = {CD_DOCUMENTO_ALVO}"
+        
+        # Lógica robusta de filtro
+        doc_filter = ""
+        if CD_DOCUMENTO_ALVO and str(CD_DOCUMENTO_ALVO).strip() not in ['0', '', 'None']:
+            # Suporta múltiplos IDs separados por vírgula
+            ids = [i.strip() for i in str(CD_DOCUMENTO_ALVO).split(',') if i.strip().isdigit()]
+            if ids:
+                doc_filter = f" AND CD_DOCUMENTO IN ({','.join(ids)})"
+                query_ext += doc_filter
 
         cursor.execute(query_ext)
         cols = [c[0] for c in cursor.description]
@@ -185,8 +201,8 @@ def main():
         # ----------------------------------------------------------
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Limpando registros do período na tabela...")
         del_q = f"DELETE FROM DBAMV.TB_AUDITORIA_SIGLARIO WHERE DH_FECHAMENTO >= TRUNC(SYSDATE) - {DIAS_A_PROCESSAR}"
-        if CD_DOCUMENTO_ALVO:
-            del_q += f" AND CD_DOCUMENTO = {CD_DOCUMENTO_ALVO}"
+        if doc_filter:
+            del_q += doc_filter
         cursor.execute(del_q)
 
         # ----------------------------------------------------------

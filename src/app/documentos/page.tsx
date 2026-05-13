@@ -5,14 +5,14 @@ import { Search, RefreshCw, Filter, FileText, Download, GripVertical, Check, X, 
 import { useUI } from '@/context/UIContext';
 
 export default function DocumentosPage() {
-  const { oracleData, setOracleData, columnWidths, setColumnWidth } = useUI();
+  const { oracleData, setOracleData, columnWidths, setColumnWidth, docVersion } = useUI();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [activeConnName, setActiveConnName] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [columnFilters, setColumnFilters] = useState({ CÓDIGO: '', NOME: '', EMPRESA: '' });
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({ key: 'ÚLTIMO USO', direction: 'desc' });
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({ key: docVersion === 'V3' ? 'ULT. GERAL' : 'ÚLTIMO USO', direction: 'desc' });
   const pageSize = 20;
 
   // Estados para Detalhamento de Perfil (Drill-down)
@@ -52,17 +52,29 @@ export default function DocumentosPage() {
   // Ref para controle de redimensionamento
   const resizingCol = useRef<{ name: string; startX: number; startWidth: number } | null>(null);
 
+  // Carregamento inicial único
   useEffect(() => {
-    // Só carregar automaticamente se não houver dados em cache
-    if (!oracleData) {
-      fetchInitialData();
-    } else {
-      // Re-verificar apenas o nome da conexão
-      fetch('/api/connections').then(res => res.json()).then(storage => {
-        const active = storage.connections.find((c: any) => c.id === storage.activeConnectionId);
-        if (active) setActiveConnName(active.name);
-      });
+    // Tenta recuperar do cache primeiro para velocidade
+    const cached = sessionStorage.getItem('oracle_documentos_data');
+    if (cached && !oracleData) {
+      try {
+        const parsed = JSON.parse(cached);
+        setOracleData(parsed);
+      } catch (e) {
+        console.error('Erro ao ler cache:', e);
+      }
     }
+    
+    // Sempre busca o nome da conexão ativa
+    fetch('/api/connections').then(res => res.json()).then(storage => {
+      const active = storage.connections.find((c: any) => c.id === storage.activeConnectionId);
+      if (active) setActiveConnName(active.name);
+      
+      // Se não tem dados, busca agora
+      if (!oracleData && !cached) {
+        fetchInitialData();
+      }
+    });
   }, []);
 
   // Dispara busca de perfis e metadados ao selecionar documento
@@ -198,39 +210,19 @@ export default function DocumentosPage() {
     window.print();
   };
 
-  useEffect(() => {
-    // 1. Tentar carregar do UIContext (in-memory)
-    if (oracleData && oracleData.length > 0) {
-      fetch('/api/connections').then(res => res.json()).then(storage => {
-        const active = storage.connections.find((c: any) => c.id === storage.activeConnectionId);
-        if (active) setActiveConnName(active.name);
-      });
-      return;
-    }
+  // Removido useEffect duplicado que estava no fim do bloco de estados
 
-    // 2. Tentar carregar do sessionStorage (persistência entre refresh/navegação)
-    const cached = sessionStorage.getItem('oracle_documentos_data');
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        setOracleData(parsed);
-        fetch('/api/connections').then(res => res.json()).then(storage => {
-          const active = storage.connections.find((c: any) => c.id === storage.activeConnectionId);
-          if (active) setActiveConnName(active.name);
-        });
-        return;
-      } catch (e) {
-        console.error('Erro ao ler cache de documentos:', e);
-      }
-    }
-
-    // 3. Caso contrário, buscar do servidor
-    fetchInitialData();
-  }, []);
-
-  async function fetchInitialData(isManual = false) {
+  async function fetchInitialData(isManual = false, versionOverride?: 'V2' | 'V3') {
+    if (loading) return; // Evita chamadas duplicadas
+    
+    const targetVersion = versionOverride || docVersion || 'V2';
     setLoading(true);
     setError('');
+    
+    if (isManual) {
+      setOracleData(null); // Limpa dados atuais para mostrar o spinner corretamente
+    }
+    
     try {
       const resData = await fetch('/api/connections');
       const storage = await resData.json();
@@ -247,7 +239,7 @@ export default function DocumentosPage() {
       const execRes = await fetch('/api/oracle/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'EXECUTE' }),
+        body: JSON.stringify({ type: 'EXECUTE', query: targetVersion }),
       });
       
       const result = await execRes.json();
@@ -434,16 +426,17 @@ export default function DocumentosPage() {
       <div className="print:hidden space-y-6">
         <header className="flex justify-between items-center gap-4 border-b border-slate-200 pb-6">
           <div className="flex-1">
-            <h1 className="text-slate-900 flex items-center gap-3">
+            <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3 uppercase italic tracking-tighter">
               <FileText className="text-[var(--primary)]" size={28} />
               Repositório de Documentos
             </h1>
             <div className="flex items-center gap-3 mt-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Oracle DBAMV Infrastructure</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Oracle DBAMV Infrastructure</span>
               <span className={`px-2 py-0.5 rounded-[var(--radius)] text-[9px] font-black uppercase border ${activeConnName ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-rose-50 text-rose-600 border-rose-200 italic'}`}>
                   {activeConnName || 'DISCONNECTED'}
               </span>
             </div>
+            
             {error && (
               <div className="mt-4 p-3 bg-rose-50 border border-rose-200 rounded-[var(--radius)] flex items-center gap-3 text-rose-600 animate-in slide-in-from-top-2">
                 <AlertTriangle size={16} />
@@ -536,7 +529,7 @@ export default function DocumentosPage() {
                     <th className="px-2 py-3 w-8 border-r border-slate-100 italic font-black text-slate-300 text-[9px] text-center">INFO</th>
                     {(() => {
                       const keys = Object.keys(paginatedData[0]);
-                      const order = ['CÓDIGO', 'NOME', 'CSSJ', 'HST', 'HSC', 'HSJ', 'HMRP', 'HCNSC', 'HR', 'ÚLTIMO USO', 'TOTAL'];
+                      const order = ['CÓDIGO', 'NOME', 'VERSAO', 'CSSJ', 'HST', 'HSC', 'HSJ', 'HMRP', 'HCNSC', 'HR', 'ÚLTIMO USO', 'ULT. GERAL', 'TOTAL', 'ULTIMO REGISTRO'];
                       const sortedKeys = keys.sort((a, b) => {
                         const indexA = order.indexOf(a.replace(/"/g, '').toUpperCase());
                         const indexB = order.indexOf(b.replace(/"/g, '').toUpperCase());
@@ -600,7 +593,7 @@ export default function DocumentosPage() {
                         </td>
                         {(() => {
                           const entries = Object.entries(row);
-                          const order = ['CÓDIGO', 'NOME', 'CSSJ', 'HST', 'HSC', 'HSJ', 'HMRP', 'HCNSC', 'HR', 'ÚLTIMO USO', 'TOTAL'];
+                          const order = ['CÓDIGO', 'NOME', 'VERSAO', 'CSSJ', 'HST', 'HSC', 'HSJ', 'HMRP', 'HCNSC', 'HR', 'ÚLTIMO USO', 'ULT. GERAL', 'TOTAL', 'ULTIMO REGISTRO'];
                           const sortedEntries = entries.sort((a, b) => {
                             const indexA = order.indexOf(a[0].replace(/"/g, '').toUpperCase());
                             const indexB = order.indexOf(b[0].replace(/"/g, '').toUpperCase());
@@ -620,12 +613,32 @@ export default function DocumentosPage() {
                               const strVal = String(val);
                               const cleanKey = key.replace(/"/g, '').toUpperCase();
                               const companyCols = ['HSC', 'CSSJ', 'HST', 'HSJ', 'HCNSC', 'HMRP', 'HR'];
+                              const usageCols = ['USO HSC', 'USO CSSJ', 'USO HST', 'USO HSJ', 'USO HCNSC', 'USO HMRP', 'USO HR', 'TOTAL'];
+                              
                               if (companyCols.includes(cleanKey)) {
-                                if (strVal === '1') return <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mx-auto" />;
-                                if (strVal === '0') return <div className="w-1.5 h-1.5 rounded-full bg-[var(--destructive)] mx-auto" />;
+                                if (strVal === '1') return <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mx-auto shadow-[0_0_8px_rgba(16,185,129,0.5)]" title="Ativo" />;
+                                if (strVal === '0') return <div className="w-1.5 h-1.5 rounded-full bg-slate-200 mx-auto" title="Inativo" />;
                               }
-                              if (strVal.includes('T') && !isNaN(Date.parse(strVal))) {
-                                return <span suppressHydrationWarning className="font-mono text-[9px]">{new Date(strVal).toLocaleString('pt-BR')}</span>;
+
+                              if (usageCols.includes(cleanKey)) {
+                                const num = Number(val);
+                                if (num > 0) return <span className="font-black text-[var(--primary)] bg-[var(--primary)]/5 px-2 py-0.5 rounded-lg border border-[var(--primary)]/10">{num.toLocaleString('pt-BR')}</span>;
+                                return <span className="text-slate-300 font-normal">0</span>;
+                              }
+
+                              const isNameOrCode = cleanKey === 'NOME' || cleanKey === 'CÓDIGO' || cleanKey === 'NM_TITULO' || cleanKey === 'CD_DOCUMENTO';
+
+                              if (!isNameOrCode && (strVal.includes('T') || cleanKey.startsWith('ULT.') || cleanKey.startsWith('DH_')) && !isNaN(Date.parse(strVal))) {
+                                return (
+                                  <div className="flex flex-col items-center">
+                                    <span suppressHydrationWarning className="font-mono text-[9px] text-slate-900 font-black tracking-tighter">
+                                      {new Date(strVal).toLocaleDateString('pt-BR')}
+                                    </span>
+                                    <span suppressHydrationWarning className="font-mono text-[8px] text-slate-400 font-bold leading-none">
+                                      {new Date(strVal).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                );
                               }
                               return strVal;
                             };

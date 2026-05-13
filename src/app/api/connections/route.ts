@@ -58,8 +58,8 @@ export async function POST(request: Request) {
   } else if (body.type === 'SAVE_REPORT_URL') {
     data.reportBaseUrl = body.url;
   } else if (body.type === 'SAVE_AUDIT_PARAMS') {
-    if (typeof body.auditDays === 'number') data.auditDays = body.auditDays;
-    if (typeof body.auditDocId === 'number') data.auditDocId = body.auditDocId;
+    if (body.auditDays !== undefined) data.auditDays = Number(body.auditDays);
+    if (body.auditDocId !== undefined) data.auditDocId = body.auditDocId;
   }
 
   if (body.enabledQueries) {

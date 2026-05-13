@@ -14,31 +14,35 @@ export async function POST(request: Request) {
 
   try {
     if (body.type === 'TEST') {
-        const result = await testConnection(connection);
-        return NextResponse.json(result);
+      const result = await testConnection(connection);
+      return NextResponse.json(result);
     }
-    
+
     // Busca a query correspondente no storage
-    let sql;
+    let sql: string;
     if (body.query === 'PROFILE') {
       sql = data.profileQuery;
     } else if (body.query === 'METADATA') {
       sql = data.docMetadataQuery;
     } else if (body.query === 'ACTIONS') {
       sql = data.docActionsQuery;
+    } else if (body.query === 'V3') {
+      sql = data.activeQueryV3;
+    } else if (body.query === 'V2') {
+      sql = data.activeQuery;
     } else {
       sql = body.query || data.activeQuery;
     }
-    
-    // Substituição de parâmetros (ex: :CD_DOCUMENTO -> '1050')
-    if (body.params) {
-      Object.entries(body.params).forEach(([key, value]) => {
-        const regex = new RegExp(`:${key}`, 'g');
-        sql = sql.replace(regex, `'${value}'`);
-      });
+
+    if (!sql) {
+      return NextResponse.json({ error: 'Query SQL não encontrada.' }, { status: 400 });
     }
 
-    const rows = await executeQuery(connection, sql);
+    // Usa bind variables nomeados do oracledb — elimina SQL Injection.
+    // O oracledb aceita um objeto { KEY: value } para placeholders :KEY na query.
+    const binds = body.params && typeof body.params === 'object' ? body.params : {};
+
+    const rows = await executeQuery(connection, sql, binds);
     return NextResponse.json({ rows });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

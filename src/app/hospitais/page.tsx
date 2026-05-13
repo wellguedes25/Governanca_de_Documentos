@@ -19,6 +19,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { useUI } from '@/context/UIContext';
+import { useRouter } from 'next/navigation';
 
 const HOSPITALS = [
   { id: '7', sigla: 'HSC', nome: 'Hospital Santa Catarina', color: 'from-[var(--primary)] to-[var(--primary-light)]' },
@@ -31,10 +33,20 @@ const HOSPITALS = [
 ];
 
 export default function HospitaisPage() {
+  const { docVersion } = useUI();
+  const router = useRouter();
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<any>(null);
+
+  // Proteção de rota
+  useEffect(() => {
+    const savedVersion = sessionStorage.getItem('app_doc_version');
+    if (!docVersion && !savedVersion) {
+      router.push('/');
+    }
+  }, [docVersion, router]);
 
   const selectedHospital = HOSPITALS[selectedIdx];
 
@@ -72,13 +84,13 @@ export default function HospitaisPage() {
             <div className={cn("p-2 rounded-xl bg-gradient-to-br shadow-lg", selectedHospital.color)}>
               <Building2 className="w-6 h-6 text-white" />
             </div>
-            <h1 className="text-slate-900 flex items-center gap-4">
-              Painel por Unidade
+            <h1 className="text-3xl font-black text-slate-900 flex items-center gap-4 uppercase italic tracking-tighter">
+              <Building2 className="text-[var(--primary)]" size={32} />
+              Hospitais & Unidades
             </h1>
           </div>
-          <p className="text-slate-400 text-xs font-black uppercase tracking-widest mt-2 flex items-center gap-2">
-            <span className="w-8 h-[2px] bg-slate-200" />
-            Segmentação Hospitalar Detalhada
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-2">
+            Gestão de produtividade e conformidade por unidade hospitalar
           </p>
         </div>
         <Link href="/">

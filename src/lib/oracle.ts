@@ -2,15 +2,40 @@
 import * as oracledb from 'oracledb';
 import { getData, DbConnection } from './storage';
 
-// Usamos o globalThis para persistir o pool e o estado de inicialização entre hot-reloads do Next.js
-const globalWithOracle = global as any;
+// Tipagem explícita do global em vez de `global as any` — mais seguro em multi-worker
+declare global {
+  var oraclePool: any | undefined;
+  var clientInitialized: boolean | undefined;
+  var __oracleShutdownRegistered: boolean | undefined;
+}
+
+// Handler de shutdown gracioso — fecha o pool ao encerrar o servidor
+// Garante que conexões Oracle não fiquem abertas após hot-reload ou SIGTERM
+if (typeof process !== 'undefined' && !globalThis.__oracleShutdownRegistered) {
+  const closePool = async () => {
+    if (globalThis.oraclePool) {
+      try {
+        console.log('[Oracle] Fechando pool de conexões (shutdown)...');
+        await globalThis.oraclePool.close(5);
+        globalThis.oraclePool = undefined;
+        console.log('[Oracle] Pool fechado com sucesso.');
+      } catch (err) {
+        console.error('[Oracle] Erro ao fechar pool no shutdown:', err);
+      }
+    }
+  };
+  process.on('SIGTERM', closePool);
+  process.on('SIGINT', closePool);
+  // Flag para evitar múltiplos registros em hot-reloads
+  (globalThis as any).__oracleShutdownRegistered = true;
+}
 
 async function initOracle() {
-  if (!globalWithOracle.clientInitialized) {
+  if (!globalThis.clientInitialized) {
     try {
       const data = await getData();
       const libDir = data.oracleClientPath;
-      
+
       if (!libDir) {
         console.error('❌ Oracle Client Path is not defined in storage.');
         return;
@@ -18,12 +43,12 @@ async function initOracle() {
 
       console.log(`Attempting to initialize Oracle Client (v5 Thick) with libDir: ${libDir}`);
       oracledb.initOracleClient({ libDir });
-      globalWithOracle.clientInitialized = true;
+      globalThis.clientInitialized = true;
       console.log('✅ Oracle Client initialized successfully (Thick Mode v5).');
     } catch (err: any) {
-      // Se já estiver inicializado (NJS-011 ou NJS-077), ignoramos o erro em hot-reloads.
+      // NJS-011 / NJS-077: já inicializado em hot-reloads — comportamento esperado
       if (err.message.includes('NJS-011') || err.message.includes('NJS-077')) {
-        globalWithOracle.clientInitialized = true;
+        globalThis.clientInitialized = true;
         return;
       }
       console.error('❌ Error initializing Oracle Client:', err.message);
@@ -33,14 +58,12 @@ async function initOracle() {
 }
 
 function normalizeConnectString(connectString: string): string {
-    // Normalização básica: se houver dois colons e nenhuma barra, 
-    // provavelmente é o formato antigo host:port:SID.
-    // O Easy Connect prefere host:port/service_name
-    const parts = connectString.split(':');
-    if (parts.length === 3 && !connectString.includes('/')) {
-        return `${parts[0]}:${parts[1]}/${parts[2]}`;
-    }
-    return connectString;
+  // Normalização: converte host:port:SID para host:port/service_name (Easy Connect)
+  const parts = connectString.split(':');
+  if (parts.length === 3 && !connectString.includes('/')) {
+    return `${parts[0]}:${parts[1]}/${parts[2]}`;
+  }
+  return connectString;
 }
 
 /**
@@ -49,27 +72,27 @@ function normalizeConnectString(connectString: string): string {
  */
 export async function getPool(connection: DbConnection) {
   await initOracle();
-  
+
   const alias = connection.id;
   const connectString = normalizeConnectString(connection.connectString);
-  
-  // Se já existe um pool e o alias (ID da conexão) é o mesmo, retorna o pool existente
-  if (globalWithOracle.oraclePool && globalWithOracle.oraclePool.currentAlias === alias) {
-    return globalWithOracle.oraclePool;
+
+  // Reutiliza pool existente se for da mesma conexão
+  if (globalThis.oraclePool && (globalThis.oraclePool as any).currentAlias === alias) {
+    return globalThis.oraclePool;
   }
-  
-  // Se existe um pool antigo com alias diferente, tentamos fechar antes de criar o novo
-  if (globalWithOracle.oraclePool) {
-    console.log(`[Oracle] Closing old pool (${globalWithOracle.oraclePool.currentAlias}) to switch to ${alias}`);
+
+  // Fecha pool antigo antes de criar um novo
+  if (globalThis.oraclePool) {
+    console.log(`[Oracle] Closing old pool (${(globalThis.oraclePool as any).currentAlias}) to switch to ${alias}`);
     try {
-      await globalWithOracle.oraclePool.close(5);
+      await globalThis.oraclePool.close(5);
     } catch (err) {
       console.error('[Oracle] Error closing old pool:', err);
     }
   }
-  
+
   console.log(`[Oracle] Creating new pool for: ${connection.name} (${alias})`);
-  globalWithOracle.oraclePool = await oracledb.createPool({
+  globalThis.oraclePool = await oracledb.createPool({
     user: connection.user,
     password: connection.password,
     connectString: connectString,
@@ -79,71 +102,84 @@ export async function getPool(connection: DbConnection) {
     poolTimeout: 60,
     stmtCacheSize: 60,
   });
-  
-  // Marcamos o pool com o ID da conexão atual
-  globalWithOracle.oraclePool.currentAlias = alias;
-  
-  return globalWithOracle.oraclePool;
+
+  (globalThis.oraclePool as any).currentAlias = alias;
+
+  return globalThis.oraclePool;
 }
 
-export async function executeQuery(connection: DbConnection, sql: string, binds: any = []) {
+export async function executeQuery(connection: DbConnection, sql: string, binds: Record<string, any> | any[] = {}) {
   let conn;
   try {
     const pool = await getPool(connection);
     conn = await pool.getConnection();
-    
+
     if (!sql) {
       throw new Error('A query SQL fornecida é nula ou indefinida. Verifique o arquivo storage.json.');
     }
-    
+
     // Remove ponto e vírgula final se houver
     const cleanSql = sql.trim().replace(/;$/, '');
-    
+
     const start = Date.now();
-    const result = await conn.execute(cleanSql, binds, { 
-        outFormat: oracledb.OUT_FORMAT_OBJECT,
-        prefetchRows: 100,
-        fetchArraySize: 100
+    const result = await conn.execute(cleanSql, binds, {
+      outFormat: oracledb.OUT_FORMAT_OBJECT,
+      prefetchRows: 100,
+      fetchArraySize: 100,
     });
-    const end = Date.now();
-    
-    if (end - start > 5000) {
-        console.warn(`[Oracle] Slow query (${end - start}ms): ${cleanSql.substring(0, 100)}...`);
+    const elapsed = Date.now() - start;
+
+    if (elapsed > 5000) {
+      console.warn(`[Oracle] Slow query (${elapsed}ms): ${cleanSql.substring(0, 100)}...`);
     }
 
     return result.rows;
   } catch (err) {
-    console.error('Database error:', err);
+    console.error('[Oracle] Database error:', err);
     throw err;
   } finally {
     if (conn) {
       try {
-        await conn.close(); // Retorna ao pool
+        await conn.close();
       } catch (err) {
-        console.error('Error returning connection to pool:', err);
+        console.error('[Oracle] Error returning connection to pool:', err);
       }
     }
   }
 }
 
 export async function testConnection(connection: DbConnection) {
-    await initOracle();
-    let conn;
-    try {
-      const connectString = normalizeConnectString(connection.connectString);
-      conn = await oracledb.getConnection({
-        user: connection.user,
-        password: connection.password,
-        connectString: connectString,
-      });
-      return { success: true };
-    } catch (err: any) {
-      return { success: false, error: err.message };
-    } finally {
-      if (conn) {
-        try {
-          await conn.close();
-        } catch (err) {}
-      }
+  await initOracle();
+  let conn;
+  try {
+    const connectString = normalizeConnectString(connection.connectString);
+    conn = await oracledb.getConnection({
+      user: connection.user,
+      password: connection.password,
+      connectString: connectString,
+    });
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  } finally {
+    if (conn) {
+      try {
+        await conn.close();
+      } catch (err) {}
     }
+  }
+}
+
+/** Retorna o status atual do pool para o healthcheck da Sidebar */
+export function getPoolStatus(): { active: boolean; alias?: string; poolMin?: number; poolMax?: number } {
+  if (!globalThis.oraclePool) {
+    return { active: false };
+  }
+  const pool = globalThis.oraclePool as any;
+  return {
+    active: true,
+    alias: pool.currentAlias,
+    poolMin: pool.poolMin,
+    poolMax: pool.poolMax,
+  };
 }

@@ -39,10 +39,19 @@ export interface DocMapping {
   fields: FieldMapping[];
 }
 
+export interface SiglarioEntry {
+  id: string;
+  sigla: string;
+  tipo: 'allowed' | 'forbidden';
+  significado?: string;
+  criadoEm: string;
+}
+
 export interface StorageData {
   connections: DbConnection[];
   activeConnectionId: string | null;
   activeQuery: string;
+  activeQueryV3: string;
   profileQuery: string;
   oracleClientPath: string;
   kpiQueries: {
@@ -56,6 +65,9 @@ export interface StorageData {
     volume3m: string;
     unitAdherence: string;
     unitInactivity: string;
+    volumeTurno: string;
+    slaAssinatura: string;
+    similarityStats: string;
   };
   similarityQuery: string;
   docMetadataQuery: string;
@@ -67,14 +79,18 @@ export interface StorageData {
   reportBaseUrl?: string;
   siglarioAllowed?: string[];
   siglarioForbidden?: string[];
+  siglarioEntries: SiglarioEntry[];
+  siglarioDocIds?: string;
+  siglarioAuditDays?: number;
   auditDays?: number;
-  auditDocId?: number;
+  auditDocId?: string | number;
 }
 
 export const INITIAL_DATA: StorageData = {
   connections: [],
   activeConnectionId: null,
   activeQuery: 'SELECT * FROM DUAL',
+  activeQueryV3: 'SELECT * FROM DUAL',
   profileQuery: 'SELECT * FROM DUAL',
   oracleClientPath: 'C:\\orant\\Client\\instantclient_23_0',
   kpiQueries: {
@@ -171,7 +187,11 @@ SELECT CAST(ED.CD_DOCUMENTO AS NUMBER) AS CD_DOCUMENTO,
  GROUP BY CAST(ED.CD_DOCUMENTO AS NUMBER),
           UPPER(ED.DS_DOCUMENTO),
           A.CD_MULTI_EMPRESA
- ORDER BY DIAS_SEM_USO DESC`
+ ORDER BY DIAS_SEM_USO DESC`,
+    // Queries opcionais — usadas pela rota de analytics avançado
+    volumeTurno: '',
+    slaAssinatura: '',
+    similarityStats: '',
   },
   similarityQuery: `SELECT 
     T.CD_ATENDIMENTO as ATENDIMENTO,
@@ -272,13 +292,30 @@ ORDER BY
       fields: [
         { id: 'EVOLUCAO', name: 'Evolução Clínica' }
       ] 
+    },
+    { 
+      id: '1048', 
+      name: 'Evolução Médica - 1048', 
+      fields: [
+        { id: 'EVOLUCAO', name: 'Evolução Clínica' }
+      ] 
+    },
+    { 
+      id: '772', 
+      name: 'Evolução Médica - 772', 
+      fields: [
+        { id: 'EVOLUCAO', name: 'Evolução Clínica' }
+      ] 
     }
   ],
   reportBaseUrl: 'http://dev3-mvh5.acsc.org.br:84/mveditor/report?regId=',
   siglarioAllowed: [],
   siglarioForbidden: [],
+  siglarioEntries: [],
+  siglarioDocIds: "916,1048,772",
+  siglarioAuditDays: 15,
   auditDays: 15,
-  auditDocId: 0
+  auditDocId: "916,1048,772"
 };
 
 function ensureDataDir() {
@@ -289,23 +326,20 @@ function ensureDataDir() {
 }
 
 export async function getData(): Promise<StorageData> {
-  const { storageFile, root } = getStoragePaths();
+  const { storageFile } = getStoragePaths();
   ensureDataDir();
-  console.log('DEBUG: process.cwd():', root);
-  console.log('DEBUG: storageFile path:', storageFile);
-  
+
   if (!fs.existsSync(storageFile)) {
-    console.log('DEBUG: storageFile not found, returning INITIAL_DATA');
     return INITIAL_DATA;
   }
   
   const fileContent = fs.readFileSync(storageFile, 'utf-8');
-  console.log('DEBUG: storageFile size:', fileContent.length);
   try {
     const data = JSON.parse(fileContent);
     return {
       ...INITIAL_DATA,
       ...data,
+      activeQueryV3: data.activeQueryV3 || INITIAL_DATA.activeQueryV3,
       enabledQueries: {
         ...INITIAL_DATA.enabledQueries,
         ...(data.enabledQueries || {})
@@ -319,11 +353,14 @@ export async function getData(): Promise<StorageData> {
       reportBaseUrl: data.reportBaseUrl || INITIAL_DATA.reportBaseUrl,
       siglarioAllowed: data.siglarioAllowed || INITIAL_DATA.siglarioAllowed,
       siglarioForbidden: data.siglarioForbidden || INITIAL_DATA.siglarioForbidden,
-      auditDays: typeof data.auditDays === 'number' ? data.auditDays : INITIAL_DATA.auditDays,
-      auditDocId: typeof data.auditDocId === 'number' ? data.auditDocId : INITIAL_DATA.auditDocId
+      siglarioEntries: data.siglarioEntries || INITIAL_DATA.siglarioEntries,
+      siglarioDocIds: data.siglarioDocIds || INITIAL_DATA.siglarioDocIds,
+      siglarioAuditDays: data.siglarioAuditDays !== undefined ? Number(data.siglarioAuditDays) : INITIAL_DATA.siglarioAuditDays,
+      auditDays: data.auditDays !== undefined ? Number(data.auditDays) : INITIAL_DATA.auditDays,
+      auditDocId: data.auditDocId !== undefined ? data.auditDocId : INITIAL_DATA.auditDocId
     };
   } catch (e) {
-    console.error('DEBUG: JSON parse error in storage.json:', e);
+    console.error('[Storage] Erro ao parsear storage.json:', e);
     return INITIAL_DATA;
   }
 }

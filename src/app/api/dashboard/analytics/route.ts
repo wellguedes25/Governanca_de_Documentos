@@ -5,6 +5,7 @@ import { executeQuery } from '@/lib/oracle';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get('type');
+  const version = searchParams.get('version') || 'V2';
   
   const data = await getData();
   const activeConn = data.connections.find(c => String(c.id) === String(data.activeConnectionId));
@@ -21,7 +22,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    const analyticQueries = data.analyticQueries || INITIAL_DATA.analyticQueries;
+    const analyticQueriesBase = version === 'V3' ? (data.analyticQueriesV3 || data.analyticQueries) : data.analyticQueries;
+    const analyticQueries = analyticQueriesBase || INITIAL_DATA.analyticQueries;
     const enabledQueries = data.enabledQueries || {};
     
     if (!analyticQueries) {

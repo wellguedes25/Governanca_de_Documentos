@@ -13,12 +13,20 @@
       "user": "dbamv",
       "password": "dbamv",
       "connectString": "EXACCHML-SCAN:1521/MVDEV3.acsc.local"
+    },
+    {
+      "id": "1cs741i9t",
+      "name": "DEV1",
+      "user": "DBAMV",
+      "password": "dbamv",
+      "connectString": "EXACCHML-SCAN:1521/MVDEV1.acsc.local"
     }
   ],
-  "activeConnectionId": "rq3v1tbeq",
-  "oracleClientPath": "C:\\orant\\Client\\instantclient_23_0",
+  "activeConnectionId": "1cs741i9t",
   "activeQuery": "SELECT CD_DOCUMENTO AS \"CÓDIGO\", NM_TITULO AS \"NOME\", COUNT(1) AS \"TOTAL\", MAX(DH_CRIACAO) AS \"ÚLTIMO USO\", MAX(CASE WHEN CD_MULTI_EMPRESA = 3 THEN '1' ELSE '0' END) AS \"CSSJ\", MAX(CASE WHEN CD_MULTI_EMPRESA = 4 THEN '1' ELSE '0' END) AS \"HST\", MAX(CASE WHEN CD_MULTI_EMPRESA = 7 THEN '1' ELSE '0' END) AS \"HSC\", MAX(CASE WHEN CD_MULTI_EMPRESA = 10 THEN '1' ELSE '0' END) AS \"HSJ\", MAX(CASE WHEN CD_MULTI_EMPRESA = 11 THEN '1' ELSE '0' END) AS \"HMRP\", MAX(CASE WHEN CD_MULTI_EMPRESA = 25 THEN '1' ELSE '0' END) AS \"HCNSC\", MAX(CASE WHEN CD_MULTI_EMPRESA = 63 THEN '1' ELSE '0' END) AS \"HR\" FROM (SELECT DISTINCT ED.CD_DOCUMENTO, UPPER(ED.DS_DOCUMENTO) AS NM_TITULO, A.CD_MULTI_EMPRESA, PDC.DH_CRIACAO FROM DBAMV.PW_EDITOR_CLINICO PEC JOIN DBAMV.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.PW_DOCUMENTO_CLINICO PDC ON PDC.CD_DOCUMENTO_CLINICO = PEC.CD_DOCUMENTO_CLINICO JOIN DBAMV.ATENDIME A ON A.CD_ATENDIMENTO = PDC.CD_ATENDIMENTO WHERE ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90) GROUP BY CD_DOCUMENTO, NM_TITULO ORDER BY NM_TITULO",
+  "activeQueryV3": "SELECT CD_DOCUMENTO AS \"CÓDIGO\", NM_TITULO AS \"NOME\", COUNT(1) AS \"TOTAL\", MAX(DH_CRIACAO) AS \"ÚLTIMO USO\", MAX(CASE WHEN CD_MULTI_EMPRESA = 3 THEN '1' ELSE '0' END) AS \"CSSJ\", MAX(CASE WHEN CD_MULTI_EMPRESA = 4 THEN '1' ELSE '0' END) AS \"HST\", MAX(CASE WHEN CD_MULTI_EMPRESA = 7 THEN '1' ELSE '0' END) AS \"HSC\", MAX(CASE WHEN CD_MULTI_EMPRESA = 10 THEN '1' ELSE '0' END) AS \"HSJ\", MAX(CASE WHEN CD_MULTI_EMPRESA = 11 THEN '1' ELSE '0' END) AS \"HMRP\", MAX(CASE WHEN CD_MULTI_EMPRESA = 25 THEN '1' ELSE '0' END) AS \"HCNSC\", MAX(CASE WHEN CD_MULTI_EMPRESA = 63 THEN '1' ELSE '0' END) AS \"HR\" FROM (SELECT DISTINCT ED.CD_DOCUMENTO, UPPER(ED.DS_DOCUMENTO) AS NM_TITULO, A.CD_MULTI_EMPRESA, PDC.DH_CRIACAO FROM DBAMV.PW_EDITOR_CLINICO PEC JOIN EDITOR.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.PW_DOCUMENTO_CLINICO PDC ON PDC.CD_DOCUMENTO_CLINICO = PEC.CD_DOCUMENTO_CLINICO JOIN DBAMV.ATENDIME A ON A.CD_ATENDIMENTO = PDC.CD_ATENDIMENTO WHERE ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90) GROUP BY CD_DOCUMENTO, NM_TITULO ORDER BY NM_TITULO",
   "profileQuery": "SELECT DISTINCT CD_DOCUMENTO, NM_TITULO, DS_PERFIL_AMBULATORIAL, EMPRESA FROM (SELECT PMP.NM_VALOR AS CD_DOCUMENTO, PM.NM_TITULO, PA.DS_PERFIL_AMBULATORIAL, Decode(NVL(PA.CD_MULTI_EMPRESA, PAE.CD_MULTI_EMPRESA),3, 'CSSJ',4,'HST',7,'HSC',10,'HSJ',11,'HMRP',25,'HCNSC',63,'HR') AS EMPRESA FROM DBAMV.PERFIL_AMBULATORIAL PA JOIN DBAMV.PW_PERFIL_MODULO PM ON PA.CD_PERFIL_AMBULATORIAL = PM.CD_PERFIL_AMBULATORIAL JOIN DBAMV.PW_PERFIL_MODULO_PARAMETRO PMP ON PM.CD_PERFIL_MODULO = PMP.CD_PERFIL_MODULO LEFT JOIN DBAMV.PERFIL_AMBULATORIAL_EMPRESA PAE ON PA.CD_PERFIL_AMBULATORIAL = PAE.CD_PERFIL_AMBULATORIAL WHERE PMP.CD_PARAMETRO = 'CD_DOCUMENTO' AND PA.SN_ATIVO = 'S' AND PA.TP_PERFIL = 'SIS' AND PMP.NM_VALOR = :CD_DOCUMENTO UNION ALL SELECT TB_OBJETO.CD_DOCUMENTO, PM.NM_TITULO, PA.DS_PERFIL_AMBULATORIAL, Decode(NVL(PA.CD_MULTI_EMPRESA, PAE.CD_MULTI_EMPRESA),3, 'CSSJ',4,'HST',7,'HSC',10,'HSJ',11,'HMRP',25,'HCNSC',63,'HR') AS EMPRESA FROM DBAMV.PERFIL_AMBULATORIAL PA JOIN DBAMV.PW_PERFIL_MODULO PM ON PA.CD_PERFIL_AMBULATORIAL = PM.CD_PERFIL_AMBULATORIAL JOIN DBAMV.PW_PERFIL_MODULO_PARAMETRO PMP ON PM.CD_PERFIL_MODULO = PMP.CD_PERFIL_MODULO LEFT JOIN DBAMV.PERFIL_AMBULATORIAL_EMPRESA PAE ON PA.CD_PERFIL_AMBULATORIAL = PAE.CD_PERFIL_AMBULATORIAL JOIN (SELECT NM_VALOR AS CD_DOCUMENTO, TO_CHAR(PTDC.CD_OBJETO) AS CD_OBJETO FROM DBAMV.PW_TIPO_DOCUMENTO_CONSULTA PTDC JOIN DBAMV.PW_TIPO_DOCUMENTO_MODULO PTDM ON PTDC.CD_TIPO_DOCUMENTO_CONSULTA = PTDM.CD_TIPO_DOCUMENTO_CONSULTA JOIN DBAMV.PW_TIPO_DOCUMENTO_MODULO_PARAM PTDMP ON PTDM.CD_TIPO_DOCUMENTO_MODULO = PTDMP.CD_TIPO_DOCUMENTO_MODULO WHERE PTDMP.CD_PARAMETRO = 'CD_DOCUMENTO' AND NM_VALOR = :CD_DOCUMENTO) TB_OBJETO ON PMP.NM_VALOR = TB_OBJETO.CD_OBJETO WHERE PA.SN_ATIVO = 'S' AND PA.TP_PERFIL = 'SIS')",
+  "oracleClientPath": "C:\\orant\\Client\\instantclient_23_0",
   "kpiQueries": {
     "total": "SELECT /*+ PARALLEL(4) */ COUNT(1) AS TOTAL_GERAL_PREENCHIDO FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO WHERE PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90 AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO') AND A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63) AND ED.CD_TIPO_ITEM = 13",
     "prod24h": "SELECT /*+ PARALLEL(4) */ COUNT(1) AS TOTAL_GERAL, SUM(CASE WHEN PDC.TP_STATUS = 'ASSINADO' THEN 1 ELSE 0 END) AS QTD_ASSINADO, SUM(CASE WHEN PDC.TP_STATUS = 'FECHADO' THEN 1 ELSE 0 END) AS QTD_FECHADO FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63) AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO') AND ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= SYSDATE - 1",
@@ -32,12 +40,7 @@
     "unitInactivity": "SELECT /*+ PARALLEL(4) */ CAST(ED.CD_DOCUMENTO AS NUMBER) AS CD_DOCUMENTO, UPPER(ED.DS_DOCUMENTO) AS DS_DOCUMENTO, CASE A.CD_MULTI_EMPRESA WHEN 3 THEN 'CSSJ' WHEN 4 THEN 'HST' WHEN 7 THEN 'HSC' WHEN 10 THEN 'HSJ' WHEN 11 THEN 'HMRP' WHEN 25 THEN 'HCNSC' WHEN 63 THEN 'HR' END AS SIGLA_UNIDADE, MAX(PDC.DH_CRIACAO) AS ULTIMA_DATA_USO, TRUNC(SYSDATE) - TRUNC(MAX(PDC.DH_CRIACAO)) AS DIAS_SEM_USO FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63) AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO') AND ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90 GROUP BY CAST(ED.CD_DOCUMENTO AS NUMBER), UPPER(ED.DS_DOCUMENTO), A.CD_MULTI_EMPRESA ORDER BY DIAS_SEM_USO DESC",
     "volumeTurno": "SELECT /*+ PARALLEL(4) */ CASE WHEN TO_NUMBER(TO_CHAR(PDC.DH_CRIACAO, 'HH24')) BETWEEN 7 AND 18 THEN 'DIA' ELSE 'NOITE' END AS TURNO, COUNT(1) AS QTD FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63) AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO') AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 7 GROUP BY CASE WHEN TO_NUMBER(TO_CHAR(PDC.DH_CRIACAO, 'HH24')) BETWEEN 7 AND 18 THEN 'DIA' ELSE 'NOITE' END"
   },
-  "hospitalQueries": {
-    "kpis": "SELECT /*+ PARALLEL(4) */ COUNT(1) AS TOTAL_DOCS, COUNT(DISTINCT PEC.CD_DOCUMENTO) AS DOCS_ATIVOS, MAX(PDC.DH_CRIACAO) AS ULTIMO_REGISTRO FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO WHERE A.CD_MULTI_EMPRESA = :ID AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO') AND ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90",
-    "detailTable": "SELECT * FROM (SELECT /*+ PARALLEL(4) */ ED.CD_DOCUMENTO, UPPER(ED.DS_DOCUMENTO) AS NOME, V.VL_VERSAO AS VERSAO, COUNT(1) AS USO_UNIDADE, MAX(PDC.DH_CRIACAO) AS ULTIMO_USO FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO LEFT JOIN (SELECT CD_DOCUMENTO, MAX(VL_VERSAO) VL_VERSAO FROM DBAMV.EDITOR_VERSAO_DOCUMENTO WHERE SN_ATIVO = 'S' GROUP BY CD_DOCUMENTO) V ON V.CD_DOCUMENTO = ED.CD_DOCUMENTO WHERE A.CD_MULTI_EMPRESA = :ID AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO') AND ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90 GROUP BY ED.CD_DOCUMENTO, UPPER(ED.DS_DOCUMENTO), V.VL_VERSAO ORDER BY ULTIMO_USO DESC) WHERE ROWNUM <= 5",
-    "top5": "SELECT * FROM (SELECT /*+ PARALLEL(4) */ UPPER(ED.DS_DOCUMENTO) AS NOME, COUNT(1) AS USO FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO WHERE A.CD_MULTI_EMPRESA = :ID AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO') AND ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90 GROUP BY UPPER(ED.DS_DOCUMENTO) ORDER BY USO DESC) WHERE ROWNUM <= 5"
-  },
-  "similarityQuery": "SELECT 0 AS ATENDIMENTO FROM DUAL",
+  "similarityQuery": "SELECT \n    A.CD_ATENDIMENTO as ATENDIMENTO,\n    A.CD_DOCUMENTO as DOCUMENTO,\n    A.DS_DOCUMENTO as NOME_DOCUMENTO,\n    A.IDENTIFICADOR_FILTRO as IDENTIFICADOR,\n    TO_CHAR(A.DH_FECHAMENTO, 'YYYY-MM-DD HH24:MI:SS') as DATA_HORA_ISO,\n    A.DH_FECHAMENTO as DATA_HORA,\n    A.CD_PRESTADOR as PRESTADOR,\n    P.NM_PRESTADOR as NOME_PRESTADOR,\n    A.LEITO,\n    A.UNIDADE,\n    A.GRAU_SIMILARIDADE as SCORE\nFROM \n    DBAMV.TB_AUDITORIA_SIMILARIDADE A\nLEFT JOIN\n    DBAMV.PRESTADOR P ON P.CD_PRESTADOR = A.CD_PRESTADOR\nWHERE \n    A.CD_DOCUMENTO = :CD_DOCUMENTO\n    AND A.IDENTIFICADOR_FILTRO = :IDENTIFICADOR\n    AND A.DH_FECHAMENTO BETWEEN TO_DATE(:DATA_INI, 'YYYY-MM-DD') AND TO_DATE(:DATA_FIM, 'YYYY-MM-DD') + 1\nORDER BY \n    A.CD_ATENDIMENTO DESC, A.DH_FECHAMENTO DESC",
   "docMetadataQuery": "SELECT DISTINCT edo.cd_documento AS Codigo_Documento, edo.ds_documento AS Descricao_Documento, edo.ds_identificador AS Identificador_Documento, evd.cd_versao_documento AS Codigo_Versao_Documento, etl.cd_tipo_layout AS Codigo_Tipo_Layout, etl.ds_identificador AS Identificador_Layout, etl.ds_tipo_layout AS Descricao_Tipo_Layout, evd.vl_versao AS Valor_Versao, evd.sn_ativo AS Status_Ativo, evd.cd_tipo_versao AS Codigo_Tipo_Versao, etv.ds_tipo_versao AS Descricao_Tipo_Versao, edl.cd_layout_cabecalho AS Codigo_Layout_Cabecalho, (SELECT evdo.cd_documento FROM dbamv.editor_layout el INNER JOIN dbamv.editor_versao_documento evdo ON el.cd_versao_documento = evdo.cd_versao_documento WHERE el.cd_layout = edl.cd_layout_cabecalho) AS Documento_Cabecalho, edl.cd_layout_rodape AS Codigo_Layout_Rodape FROM dbamv.editor_documento edo INNER JOIN dbamv.editor_versao_documento evd ON edo.cd_documento = evd.cd_documento INNER JOIN dbamv.editor_tipo_versao etv ON etv.cd_tipo_versao = evd.cd_tipo_versao INNER JOIN dbamv.editor_layout edl ON evd.cd_versao_documento = edl.cd_versao_documento INNER JOIN dbamv.editor_tipo_layout etl ON edl.cd_tipo_layout = etl.cd_tipo_layout WHERE etl.ds_identificador NOT IN ('CABECALHO', 'RODAPE') AND edo.cd_documento = :CD_DOCUMENTO ORDER BY Codigo_Documento",
   "docActionsQuery": "SELECT DISTINCT ed.cd_documento AS Codigo_Origem, ed.ds_documento AS Descricao_Origem, ec.cd_metadado AS Codigo_Metadado, ec.ds_campo AS Nome_Campo, ec.ds_identificador AS Identificador_Campo, CASE WHEN REGEXP_LIKE(DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1), 'CD_DOCUMENTO[[:space:]]+IN[[:space:]]*\\(', 'i') THEN REGEXP_SUBSTR(DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1), 'IN[[:space:]]*\\(([^)]+)\\)', 1, 1, 'i', 1) END AS Grupo_Docs_Relacionados, REGEXP_SUBSTR(DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1), 'CD_DOCUMENTO[[:space:]]*=[[:space:]]*([0-9]+)', 1, 1, 'i', 1) AS Documento_Relacionado, DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1) AS Script_Acao_Completo FROM dbamv.editor_documento ed INNER JOIN dbamv.editor_versao_documento evd ON ed.cd_documento = evd.cd_documento INNER JOIN dbamv.editor_layout el ON evd.cd_versao_documento = el.cd_versao_documento INNER JOIN dbamv.editor_layout_campo elc ON el.cd_layout = elc.cd_layout INNER JOIN dbamv.editor_campo ec ON elc.cd_campo = ec.cd_campo INNER JOIN dbamv.editor_campo_prop_val ev ON ec.cd_metadado = ev.cd_campo WHERE evd.cd_tipo_versao = 3 AND ev.cd_propriedade = 4 AND ev.lo_valor IS NOT NULL AND REGEXP_LIKE(DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1), 'CD_DOCUMENTO[[:space:]](=|IN[[:space:]]\\()', 'i') AND ed.cd_documento = :CD_DOCUMENTO ORDER BY ec.ds_identificador",
   "enabledQueries": {
@@ -66,11 +69,11 @@
       "fields": [
         {
           "id": "CX_TXT_CONDUTA_DIARIA_1",
-          "name": "Conduta"
+          "name": "Conduta Médica"
         },
         {
           "id": "CX_TXT_EVOLUCAO_1",
-          "name": "Evolução"
+          "name": "Evolução Médica"
         }
       ]
     },
@@ -80,22 +83,800 @@
       "fields": [
         {
           "id": "CXT_OUTROS_PLANOS_METAS_1",
-          "name": "Conduta"
+          "name": "Conduta Médica"
         },
         {
           "id": "CXT_IMPRESSAO_CLINICA_1",
-          "name": "Evolução"
+          "name": "Evolução/Impressão"
+        }
+      ]
+    },
+    {
+      "id": "772",
+      "name": "Evol Diurna UTI",
+      "fields": [
+        {
+          "id": "CXT_CONDUTA_MEDICA_1",
+          "name": "Conduta Médica"
+        },
+        {
+          "id": "CXT_IMPRESSAO_CLINICA_1",
+          "name": "Evolução/Impressão"
         }
       ]
     }
   ],
-  "reportBaseUrl": "http://dev3-mvh5.acsc.org.br:84/mveditor/report?regId=",
+  "reportBaseUrl": "http://dev1-mvh5.acsc.org.br:83/mveditor/report?regId=",
   "siglarioAllowed": [
-    "IP", "PSV", "ACV", "HTLV", "IGM", "HDI", "MVUA", "CVP", "BNF", "lgG,", "lgM", "H1N1", "RXP", "RXT", "D1", "D2", "D3", "USG", "RNM", "TC", "PVC", "PAM", "PIC", "SNG", "SNE", "SVD", "SVA", "NPP", "PTN", "EDA", "FCC", "ECG", "EEG", "DVE", "DVP", "AVC", "IAM", "ICC", "IRC", "IRA", "DPOC", "TEP", "TVP", "DM", "HAS", "SAHOS", "ITU", "PAV", "IPCS", "SCIRAS", "CH", "PFC", "CP", "PBE", "FA", "WPW", "AVT", "LRA", "SARA", "MODS", "CIVD", "PCR", "FV", "TV", "AESP", "GCS", "RASS", "CAM-ICU", "TISS", "SAPS", "APACHE", "SOFA", "BIA", "ECMO", "VMI", "VNI", "FR", "FC", "SAT", "FIO2", "PEEP", "PA", "T", "GLI", "HGT", "HB", "HT", "LEU", "PLT", "NA", "K", "CL", "CA", "MG", "P", "CR", "UREIA", "TGO", "TGP", "GGT", "FA", "BT", "BD", "BI", "AMILASE", "LIPASE", "LDH", "CK", "CK-MB", "TROPONINA", "PRO-BNP", "PCR", "PROC", "LACTATO", "GASO", "PH", "PCO2", "PO2", "HCO3", "BE", "SATV", "DVA", "NOR", "DOPA", "DOBU", "NIP", "TRIDIL", "FENT", "MIDAZ", "PROP", "PREC", "ETOM", "ROCU", "SUXI", "ATRO", "ADRE", "AMIO", "LIDO", "HIDAL", "FENOB", "DIAZ", "HALDOL", "QUETI", "OLAN", "RISP", "CLONA", "ALPRA", "LORA", "DEXA", "HIDRO", "METIL", "PRED", "INS", "GLUCO", "GLUC", "HEPA", "ENOXA", "WARFA", "RIVA", "APIX", "DABI", "ASA", "CLOPI", "TICAG", "PRASU", "ALTEP", "TNK", "CEFAZ", "CEFAL", "CEFTR", "CEFEP", "PIPTA", "MEROP", "ERTAP", "VANCO", "TEICO", "LINEZ", "DAPTO", "POLYB", "COLIS", "AMIKA", "GENTA", "CLINDA", "AZITRO", "CLARITRO", "CIPRO", "LEVO", "MOXI", "SULFA", "METRO", "FLUCO", "VORICO", "ANFOT", "CASPO", "MICA", "ACICLO", "OSELT", "REMD", "TOCI", "BARI", "HD", "CVVHD", "CVVHDF", "SLED", "UF", "DP", "DIU", "BH", "R", "L", "F", "P", "M", "S", "C", "A", "O", "T", "V", "E", "G", "H", "I", "J", "K", "N", "Q", "U", "W", "X", "Y", "Z"
+    "iam",
+    "a + i",
+    "a/c",
+    "aa",
+    "aaa",
+    "aas",
+    "aasi",
+    "abd",
+    "abo",
+    "acm",
+    "acv",
+    "acth",
+    "ad",
+    "adh",
+    "adm",
+    "adp",
+    "adnpm",
+    "ae",
+    "aero",
+    "aesp",
+    "age",
+    "ai",
+    "aids",
+    "aig",
+    "aih",
+    "aines",
+    "ait",
+    "alb",
+    "alerg",
+    "amp",
+    "anti",
+    "anvisa",
+    "ao",
+    "aoe",
+    "ap",
+    "apache",
+    "aplv",
+    "ar",
+    "asa",
+    "atb",
+    "atm",
+    "atp",
+    "av",
+    "avc",
+    "avch",
+    "avci",
+    "ave",
+    "avp",
+    "baar",
+    "bap",
+    "bav",
+    "bavt",
+    "bcnf",
+    "bcg",
+    "bcp",
+    "bd",
+    "be",
+    "bfp",
+    "bgn",
+    "bgp",
+    "bh",
+    "bhcg",
+    "bi",
+    "bia",
+    "bic",
+    "bipap",
+    "bleo",
+    "bnf",
+    "bnp",
+    "boop",
+    "bp",
+    "bpm",
+    "bpp",
+    "has",
+    "dm",
+    "snc",
+    "uti"
   ],
   "siglarioForbidden": [
-    "D", "U", "C", "CC", "QD", "QOD", "MS", "MSO4", "MgSO4", "µg", "OD", "OS", "OU", "AD", "AS", "AU", "SID", "SC", "SQ", "IU", "X3D", "BID", "TID", "QID", "HS", "PRN", "BT", "QD", "QOD", "PER", "ORAL", "SL", "NG", "GT", "IV", "IM", "SQ", "TOP", "INH", "REC", "VAG", "ID", "IC", "IA", "IO", "IT", "IP", "AB", "AC", "AD", "AF", "AL", "AM", "AN", "AO", "AP", "AQ", "AR", "AS", "AT", "AV", "AX", "AZ", "BA", "BE", "BI", "BK", "BL", "BM", "BN", "BO", "BP", "BQ", "BR", "BS", "BT", "BU", "BV", "BW", "BX", "BY", "BZ", "CA", "CB", "CC", "CD", "CE", "CF", "CG", "CH", "CI", "CJ", "CK", "CL", "CM", "CN", "CO", "CP", "CQ", "CR", "CS", "CT", "CU", "CV", "CW", "CX", "CY", "CZ", "DA", "DB", "DC", "DD", "DE", "DF", "DG", "DH", "DI", "DJ", "DK", "DL", "DM", "DN", "DO", "DP", "DQ", "DR", "DS", "DT", "DU", "DV", "DW", "DX", "DY", "DZ", "EA", "EB", "EC", "ED", "EE", "EF", "EG", "EH", "EI", "EJ", "EK", "EL", "EM", "EN", "EO", "EP", "EQ", "ER", "ES", "ET", "EU", "EV", "EW", "EX", "EY", "EZ", "FA", "FB", "FC", "FD", "FE", "FF", "FG", "FH", "FI", "FJ", "FK", "FL", "FM", "FN", "FO", "FP", "FQ", "FR", "FS", "FT", "FU", "FV", "FW", "FX", "FY", "FZ", "GA", "GB", "GC", "GD", "GE", "GF", "GG", "GH", "GI", "GJ", "GK", "GL", "GM", "GN", "GO", "GP", "GQ", "GR", "GS", "GT", "GU", "GV", "GW", "GX", "GY", "GZ", "HA", "HB", "HC", "HD", "HE", "HF", "HG", "HH", "HI", "HJ", "HK", "HL", "HM", "HN", "HO", "HP", "HQ", "HR", "HS", "HT", "HU", "HV", "HW", "HX", "HY", "HZ", "IA", "IB", "IC", "ID", "IE", "IF", "IG", "IH", "II", "IJ", "IK", "IL", "IM", "IN", "IO", "IP", "IQ", "IR", "IS", "IT", "IU", "IV", "IW", "IX", "IY", "IZ", "JA", "JB", "JC", "JD", "JE", "JF", "JG", "JH", "JI", "JJ", "JK", "JL", "JM", "JN", "JO", "JP", "JQ", "JR", "JS", "JT", "JU", "JV", "JW", "JX", "JY", "JZ", "KA", "KB", "KC", "KD", "KE", "KF", "KG", "KH", "KI", "KJ", "KK", "KL", "KM", "KN", "KO", "KP", "KQ", "KR", "KS", "KT", "KU", "KV", "KW", "KX", "KY", "KZ", "LA", "LB", "LC", "LD", "LE", "LF", "LG", "LH", "LI", "LJ", "LK", "LL", "LM", "LN", "LO", "LP", "LQ", "LR", "LS", "LT", "LU", "LV", "LW", "LX", "LY", "LZ", "MA", "MB", "MC", "MD", "ME", "MF", "MG", "MH", "MI", "MJ", "MK", "ML", "MM", "MN", "MO", "MP", "MQ", "MR", "MS", "MT", "MU", "MV", "MW", "MX", "MY", "MZ", "NA", "NB", "NC", "ND", "NE", "NF", "NG", "NH", "NI", "NJ", "NK", "NL", "NM", "NN", "NO", "NP", "NQ", "NR", "NS", "NT", "NU", "NV", "NW", "NX", "NY", "NZ", "OA", "OB", "OC", "OD", "OE", "OF", "OG", "OH", "OI", "OJ", "OK", "OL", "OM", "ON", "OO", "OP", "OQ", "OR", "OS", "OT", "OU", "OV", "OW", "OX", "OY", "OZ", "PA", "PB", "PC", "PD", "PE", "PF", "PG", "PH", "PI", "PJ", "PK", "PL", "PM", "PN", "PO", "PP", "PQ", "PR", "PS", "PT", "PU", "PV", "PW", "PX", "PY", "PZ", "QA", "QB", "QC", "QD", "QE", "QF", "QG", "QH", "QI", "QJ", "QK", "QL", "QM", "QN", "QO", "QP", "QQ", "QR", "QS", "QT", "QU", "QV", "QW", "QX", "QY", "QZ", "RA", "RB", "RC", "RD", "RE", "RF", "RG", "RH", "RI", "RJ", "RK", "RL", "RM", "RN", "RO", "RP", "RQ", "RR", "RS", "RT", "RU", "RV", "RW", "RX", "RY", "RZ", "SA", "SB", "SC", "SD", "SE", "SF", "SG", "SH", "SI", "SJ", "SK", "SL", "SM", "SN", "SO", "SP", "SQ", "SR", "SS", "ST", "SU", "SV", "SW", "SX", "SY", "SZ", "TA", "TB", "TC", "TD", "TE", "TF", "TG", "TH", "TI", "TJ", "TK", "TL", "TM", "TN", "TO", "TP", "TQ", "TR", "TS", "TT", "TU", "TV", "TW", "TX", "TY", "TZ", "UA", "UB", "UC", "UD", "UE", "UF", "UG", "UH", "UI", "UJ", "UK", "UL", "UM", "UN", "UO", "UP", "UQ", "UR", "US", "UT", "UU", "UV", "UW", "UX", "UY", "UZ", "VA", "VB", "VC", "VD", "VE", "VF", "VG", "VH", "VI", "VJ", "VK", "VL", "VM", "VN", "VO", "VP", "VQ", "VR", "VS", "VT", "VU", "VV", "VW", "VX", "VY", "VZ", "WA", "WB", "WC", "WD", "WE", "WF", "WG", "WH", "WI", "WJ", "WK", "WL", "WM", "WN", "WO", "WP", "WQ", "WR", "WS", "WT", "WU", "WV", "WW", "WX", "WY", "WZ", "XA", "XB", "XC", "XD", "XE", "XF", "XG", "XH", "XI", "XJ", "XK", "XL", "XM", "XN", "XO", "XP", "XQ", "XR", "XS", "XT", "XU", "XV", "XW", "XX", "XY", "XZ", "YA", "YB", "YC", "YD", "YE", "YF", "YG", "YH", "YI", "YJ", "YK", "YL", "YM", "YN", "YO", "YP", "YQ", "YR", "YS", "YT", "YU", "YV", "YW", "YX", "YY", "YZ", "ZA", "ZB", "ZC", "ZD", "ZE", "ZF", "ZG", "ZH", "ZI", "ZJ", "ZK", "ZL", "ZM", "ZN", "ZO", "ZP", "ZQ", "ZR", "ZS", "ZT", "ZU", "ZV", "ZW", "ZX", "ZY", "ZZ"
+    "ab",
+    "ba",
+    "co",
+    "cu",
+    "dpp",
+    "ic",
+    "p",
+    "pc",
+    "pv",
+    "tp",
+    "ts",
+    "bid",
+    "cc",
+    "comp",
+    "cp",
+    "cps"
   ],
-  "auditDays": 15,
-  "auditDocId": 0
+  "siglarioEntries": [
+    {
+      "id": "sig-1778669554010-4msrc",
+      "sigla": "IAM",
+      "tipo": "allowed",
+      "significado": "Infarto Agudo do Mioc",
+      "criadoEm": "2026-05-13T10:52:34.010Z"
+    },
+    {
+      "id": "pdf-55031431",
+      "sigla": "A + I",
+      "tipo": "allowed",
+      "significado": "Audiometria tonal / vocal + imitânciometria",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-5caf08b1",
+      "sigla": "A/C",
+      "tipo": "allowed",
+      "significado": "Assistida controlada (modo ventilatório)",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-5cd98d78",
+      "sigla": "aa",
+      "tipo": "allowed",
+      "significado": "Ar Ambiente",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-b7fef32f",
+      "sigla": "AAA",
+      "tipo": "allowed",
+      "significado": "Aneurisma de aorta abdominal",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-9f805440",
+      "sigla": "AAS",
+      "tipo": "allowed",
+      "significado": "Ácido Acetil Salicílico",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-1777a8b4",
+      "sigla": "AASI",
+      "tipo": "allowed",
+      "significado": "Aparelho de amplificação sonora individual",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-d352a7fa",
+      "sigla": "Abd",
+      "tipo": "allowed",
+      "significado": "Abdome",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-30c129ba",
+      "sigla": "ABO",
+      "tipo": "allowed",
+      "significado": "Grupos de Tipagem Sanguinea",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-4dc9dc46",
+      "sigla": "ACM",
+      "tipo": "allowed",
+      "significado": "A Critério Médico",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-785163a9",
+      "sigla": "ACV",
+      "tipo": "allowed",
+      "significado": "Aparelho Cardiovascular",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-0d49d10e",
+      "sigla": "ACTH",
+      "tipo": "allowed",
+      "significado": "Hormônio Adenocorticotrófico",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-9c95b788",
+      "sigla": "AD",
+      "tipo": "allowed",
+      "significado": "Átrio Direito referente a estrutura do coração",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-afcb47b1",
+      "sigla": "ADH",
+      "tipo": "allowed",
+      "significado": "Hormônio Antidiurético",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-6b883aa2",
+      "sigla": "ADM",
+      "tipo": "allowed",
+      "significado": "Arco de Movimento",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-815bed98",
+      "sigla": "ADP",
+      "tipo": "allowed",
+      "significado": "Adenosina Difosfato",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-6825b16a",
+      "sigla": "ADNPM",
+      "tipo": "allowed",
+      "significado": "Atraso do desenvolvimento neuropsicomotor",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-eb6c4480",
+      "sigla": "AE",
+      "tipo": "allowed",
+      "significado": "Átrio Esquerdo",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-2ae0af9a",
+      "sigla": "Aero",
+      "tipo": "allowed",
+      "significado": "Aeróbicos",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-52c374bb",
+      "sigla": "AESP",
+      "tipo": "allowed",
+      "significado": "Atividade elétrica sem pulso",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-bbfd5bd9",
+      "sigla": "AGE",
+      "tipo": "allowed",
+      "significado": "Ácidos Graxos Essenciais",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-5b1c179e",
+      "sigla": "AI",
+      "tipo": "allowed",
+      "significado": "Angina Instável",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-ea87db51",
+      "sigla": "AIDS",
+      "tipo": "allowed",
+      "significado": "Síndrome de Imunodeficiência Adquirida",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-156c7a62",
+      "sigla": "AIG",
+      "tipo": "allowed",
+      "significado": "Adequado para Idade Gestacional",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-e6c597ac",
+      "sigla": "AIH",
+      "tipo": "allowed",
+      "significado": "Autorização de Internação Hospitalar",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-9c07e889",
+      "sigla": "AINES",
+      "tipo": "allowed",
+      "significado": "Anti Inflamatório Não Esteroidais",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-05ea1050",
+      "sigla": "AIT",
+      "tipo": "allowed",
+      "significado": "Acidente isquêmico transitório",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-3e036ca4",
+      "sigla": "Alb",
+      "tipo": "allowed",
+      "significado": "Albumina",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-a49f87da",
+      "sigla": "Alerg",
+      "tipo": "allowed",
+      "significado": "Alergias",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-c369cfb5",
+      "sigla": "AMP",
+      "tipo": "allowed",
+      "significado": "Antecedente Pessoal",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-2e710ab9",
+      "sigla": "ANTI",
+      "tipo": "allowed",
+      "significado": "Antibiograma",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-c502a37a",
+      "sigla": "Anvisa",
+      "tipo": "allowed",
+      "significado": "Agência Nacional de Vigilância Sanitária",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-415be935",
+      "sigla": "AO",
+      "tipo": "allowed",
+      "significado": "Abertura Ocular (ambos os olhos)",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-fb0fd852",
+      "sigla": "AOE",
+      "tipo": "allowed",
+      "significado": "Abertura Ocular Espontânea",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-eee2902f",
+      "sigla": "AP",
+      "tipo": "allowed",
+      "significado": "Ântero- posterior",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-b762540b",
+      "sigla": "APACHE",
+      "tipo": "allowed",
+      "significado": "Acute Physiologic and Chronic health evaluation",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-9e9c24f3",
+      "sigla": "APLV",
+      "tipo": "allowed",
+      "significado": "Alergia a proteína do leite de vaca",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-4a848590",
+      "sigla": "AR",
+      "tipo": "allowed",
+      "significado": "Aparelho Respiratório",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-8c0aa131",
+      "sigla": "ASA",
+      "tipo": "allowed",
+      "significado": "Escala utilizada para avaliar risco cirúrgico",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-456d5fae",
+      "sigla": "ATB",
+      "tipo": "allowed",
+      "significado": "Antibiótico",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-88607286",
+      "sigla": "ATM",
+      "tipo": "allowed",
+      "significado": "Articulação Têmporo Mandibular",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-a3752c82",
+      "sigla": "ATP",
+      "tipo": "allowed",
+      "significado": "Adenosina Trifosfato",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-a0c0f5d0",
+      "sigla": "AV",
+      "tipo": "allowed",
+      "significado": "Átrio Ventricular",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-6d0be853",
+      "sigla": "AVC",
+      "tipo": "allowed",
+      "significado": "Acidente Vascular Cerebral",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-4ba79752",
+      "sigla": "AVCH",
+      "tipo": "allowed",
+      "significado": "Acidente Vascular Cerebral Hemorrágico",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-73622344",
+      "sigla": "AVCI",
+      "tipo": "allowed",
+      "significado": "Acidente Vascular Cerebral Isquêmico",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-f34af477",
+      "sigla": "AVE",
+      "tipo": "allowed",
+      "significado": "Acidente Vascular Encefálico",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-9737eef9",
+      "sigla": "AVP",
+      "tipo": "allowed",
+      "significado": "Acesso Venoso Periférico",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-9310fc0f",
+      "sigla": "BAAR",
+      "tipo": "allowed",
+      "significado": "Bacilo Álcool- Ácido Resistente",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-9d19bf1a",
+      "sigla": "BAP",
+      "tipo": "allowed",
+      "significado": "Broncoaspirado",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-55918348",
+      "sigla": "BAV",
+      "tipo": "allowed",
+      "significado": "Bloqueio Átrio Ventricular",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-ecfa2ab4",
+      "sigla": "BAVT",
+      "tipo": "allowed",
+      "significado": "Bloqueio Atrioventricular Total",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-99e183d8",
+      "sigla": "BCNF",
+      "tipo": "allowed",
+      "significado": "Bulhas cardíacas normofonéticas",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-555422e7",
+      "sigla": "BCG",
+      "tipo": "allowed",
+      "significado": "Vacina contra Tuberculose",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-6797194f",
+      "sigla": "BCP",
+      "tipo": "allowed",
+      "significado": "Broncopneumonia",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-35bca1a6",
+      "sigla": "BD",
+      "tipo": "allowed",
+      "significado": "Bilirrubina Direta",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-a3e01996",
+      "sigla": "BE",
+      "tipo": "allowed",
+      "significado": "Base Excesso/ Excesso de Bases",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-3fabbd2d",
+      "sigla": "BFP",
+      "tipo": "allowed",
+      "significado": "Broncofibroscopia",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-8c4a132d",
+      "sigla": "BGN",
+      "tipo": "allowed",
+      "significado": "Bacilo Gram Negativo",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-6c9f10d9",
+      "sigla": "BGP",
+      "tipo": "allowed",
+      "significado": "Bacilo Gram Positivo",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-a47fdab0",
+      "sigla": "BH",
+      "tipo": "allowed",
+      "significado": "Balanço Hídrico",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-c22e2a34",
+      "sigla": "BHCG",
+      "tipo": "allowed",
+      "significado": "Gonadotrofina coriônica humana",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-eb3e725e",
+      "sigla": "BI",
+      "tipo": "allowed",
+      "significado": "Bilirrubina Indireta",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-85794122",
+      "sigla": "BIA",
+      "tipo": "allowed",
+      "significado": "Balão Intra-aórtico",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-70f1391a",
+      "sigla": "Bic",
+      "tipo": "allowed",
+      "significado": "Bicarbonato de Sódio",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-6399c742",
+      "sigla": "BIPAP",
+      "tipo": "allowed",
+      "significado": "Bilevel Positive Airway Pressure",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-99196f4c",
+      "sigla": "BLEO",
+      "tipo": "allowed",
+      "significado": "Bleomicina",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-b4ebf8d4",
+      "sigla": "BNF",
+      "tipo": "allowed",
+      "significado": "Bulhas normofonéticas",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-6ac0f9cf",
+      "sigla": "BNP",
+      "tipo": "allowed",
+      "significado": "Peptídio Natriurético Cerebral",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-6e3a583f",
+      "sigla": "BOOP",
+      "tipo": "allowed",
+      "significado": "Bronquiolite obliterante com pneumonia em organização",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-869fbf11",
+      "sigla": "BP",
+      "tipo": "allowed",
+      "significado": "Baixo Peso",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-9e7e9ffd",
+      "sigla": "bpm",
+      "tipo": "allowed",
+      "significado": "Batimento por minuto",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-6d147a40",
+      "sigla": "BPP",
+      "tipo": "allowed",
+      "significado": "Boa perfusão periférica",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-f34a59d5",
+      "sigla": "HAS",
+      "tipo": "allowed",
+      "significado": "Hipertensão Arterial Sistêmica",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-48e0d9e6",
+      "sigla": "DM",
+      "tipo": "allowed",
+      "significado": "Diabetes Mellitus",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-edfd357a",
+      "sigla": "SNC",
+      "tipo": "allowed",
+      "significado": "Sistema Nervoso Central",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-e62361bb",
+      "sigla": "UTI",
+      "tipo": "allowed",
+      "significado": "Unidade de Terapia Intensiva",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-469d82e7",
+      "sigla": "AB",
+      "tipo": "forbidden",
+      "significado": "Aborto - Escrever a palavra completa",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-59cfc2ab",
+      "sigla": "BA",
+      "tipo": "forbidden",
+      "significado": "Bom Aspecto - Escrever a palavra completa",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-9da516cd",
+      "sigla": "CO",
+      "tipo": "forbidden",
+      "significado": "Corada - Escrever a palavra completa",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-5ab4beb8",
+      "sigla": "CU",
+      "tipo": "forbidden",
+      "significado": "Cicatriz Umbilical - Escrever a palavra completa",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-a7158484",
+      "sigla": "DPP",
+      "tipo": "forbidden",
+      "significado": "Deslocamento Prematuro de Placenta - Escrever a palavra completa",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-88ba9345",
+      "sigla": "IC",
+      "tipo": "forbidden",
+      "significado": "Incisão Cirúrgica - Escrever a palavra completa",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-098f17b2",
+      "sigla": "P",
+      "tipo": "forbidden",
+      "significado": "Parto - Escrever a palavra completa",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-a9599cf4",
+      "sigla": "PC",
+      "tipo": "forbidden",
+      "significado": "Parto Cesáreo - Escrever a palavra completa",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-0d017cf4",
+      "sigla": "PV",
+      "tipo": "forbidden",
+      "significado": "Perdas Vaginais - Escrever a palavra completa",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-6a89d863",
+      "sigla": "TP",
+      "tipo": "forbidden",
+      "significado": "Trabalho de Parto - Escrever a palavra completa",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-ded8bbf0",
+      "sigla": "TS",
+      "tipo": "forbidden",
+      "significado": "Tipagem Sanguínea - Escrever a palavra completa",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-daf6469c",
+      "sigla": "BID",
+      "tipo": "forbidden",
+      "significado": "2 vezes por dia - Escrever a expressão completa",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-066ca918",
+      "sigla": "cc",
+      "tipo": "forbidden",
+      "significado": "Centimetro cúbico - Usar mililitro",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-cdad0d08",
+      "sigla": "Comp",
+      "tipo": "forbidden",
+      "significado": "Comprimido - Escrever a palavra completa",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-46fc5794",
+      "sigla": "cp",
+      "tipo": "forbidden",
+      "significado": "Cápsula ou comprimido - Escrever a palavra completa",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    },
+    {
+      "id": "pdf-18dc9c0e",
+      "sigla": "cps",
+      "tipo": "forbidden",
+      "significado": "Cápsula ou comprimido - Escrever a palavra completa",
+      "criadoEm": "2026-05-13T07:54:11.901034"
+    }
+  ],
+  "siglarioDocIds": "0",
+  "siglarioAuditDays": 15,
+  "auditDays": 7,
+  "auditDocId": "916,1048,772",
+  "kpiQueriesV3": {
+    "total": "SELECT /*+ PARALLEL(4) */ COUNT(1) AS TOTAL_GERAL_PREENCHIDO FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN EDITOR.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO WHERE PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90 AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO') AND A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63) AND ED.CD_TIPO_ITEM = 13",
+    "prod24h": "SELECT /*+ PARALLEL(4) */ COUNT(1) AS TOTAL_GERAL, SUM(CASE WHEN PDC.TP_STATUS = 'ASSINADO' THEN 1 ELSE 0 END) AS QTD_ASSINADO, SUM(CASE WHEN PDC.TP_STATUS = 'FECHADO' THEN 1 ELSE 0 END) AS QTD_FECHADO FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN EDITOR.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63) AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO') AND ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= SYSDATE - 1",
+    "assinados": "SELECT /*+ PARALLEL(4) */ COUNT(1) AS TOTAL_GERAL, SUM(CASE WHEN PDC.TP_STATUS = 'ASSINADO' THEN 1 ELSE 0 END) AS QTD_ASSINADO, SUM(CASE WHEN PDC.TP_STATUS = 'FECHADO' THEN 1 ELSE 0 END) AS QTD_FECHADO FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN EDITOR.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63) AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO') AND ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90"
+  },
+  "analyticQueriesV3": {
+    "top10": "SELECT * FROM (SELECT /*+ PARALLEL(4) */ CAST(ED.CD_DOCUMENTO AS NUMBER) AS CD_DOCUMENTO, UPPER(ED.DS_DOCUMENTO) AS DS_DOCUMENTO, COUNT(1) AS QTD_TOTAL FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN EDITOR.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63) AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO') AND ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90 GROUP BY CAST(ED.CD_DOCUMENTO AS NUMBER), UPPER(ED.DS_DOCUMENTO) ORDER BY QTD_TOTAL DESC) WHERE ROWNUM <= 10",
+    "idle": "WITH FT_DOC_USO AS (SELECT /*+ PARALLEL(4) */ PEC.CD_DOCUMENTO FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63) AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO') AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90 GROUP BY PEC.CD_DOCUMENTO) SELECT COUNT(1) AS TOTAL_TEMPLATES, SUM(CASE WHEN F.CD_DOCUMENTO IS NULL THEN 1 ELSE 0 END) AS TOTAL_DOCS_OCIOSOS FROM EDITOR.EDITOR_DOCUMENTO ED LEFT JOIN FT_DOC_USO F ON F.CD_DOCUMENTO = ED.CD_DOCUMENTO WHERE ED.CD_TIPO_ITEM = 13",
+    "volume3m": "SELECT /*+ PARALLEL(4) */ COUNT(DISTINCT PDC.CD_PRESTADOR) AS TOTAL_PRESTADORES FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN EDITOR.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO WHERE PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90 AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO') AND A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63) AND ED.CD_TIPO_ITEM = 13",
+    "unitAdherence": "SELECT /*+ PARALLEL(4) */ A.CD_MULTI_EMPRESA, CASE A.CD_MULTI_EMPRESA WHEN 3 THEN 'CSSJ' WHEN 4 THEN 'HST' WHEN 7 THEN 'HSC' WHEN 10 THEN 'HSJ' WHEN 11 THEN 'HMRP' WHEN 25 THEN 'HCNSC' WHEN 63 THEN 'HR' END AS SIGLA_UNIDADE, COUNT(1) AS QTD_TOTAL_PREENCHIDA FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN EDITOR.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63) AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO') AND ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90 GROUP BY A.CD_MULTI_EMPRESA ORDER BY QTD_TOTAL_PREENCHIDA DESC",
+    "unitInactivity": "SELECT /*+ PARALLEL(4) */ CAST(ED.CD_DOCUMENTO AS NUMBER) AS CD_DOCUMENTO, UPPER(ED.DS_DOCUMENTO) AS DS_DOCUMENTO, CASE A.CD_MULTI_EMPRESA WHEN 3 THEN 'CSSJ' WHEN 4 THEN 'HST' WHEN 7 THEN 'HSC' WHEN 10 THEN 'HSJ' WHEN 11 THEN 'HMRP' WHEN 25 THEN 'HCNSC' WHEN 63 THEN 'HR' END AS SIGLA_UNIDADE, MAX(PDC.DH_CRIACAO) AS ULTIMA_DATA_USO, TRUNC(SYSDATE) - TRUNC(MAX(PDC.DH_CRIACAO)) AS DIAS_SEM_USO FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN EDITOR.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63) AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO') AND ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90 GROUP BY CAST(ED.CD_DOCUMENTO AS NUMBER), UPPER(ED.DS_DOCUMENTO), A.CD_MULTI_EMPRESA ORDER BY DIAS_SEM_USO DESC",
+    "volumeTurno": "SELECT /*+ PARALLEL(4) */ CASE WHEN TO_NUMBER(TO_CHAR(PDC.DH_CRIACAO, 'HH24')) BETWEEN 7 AND 18 THEN 'DIA' ELSE 'NOITE' END AS TURNO, COUNT(1) AS QTD FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63) AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO') AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 7 GROUP BY CASE WHEN TO_NUMBER(TO_CHAR(PDC.DH_CRIACAO, 'HH24')) BETWEEN 7 AND 18 THEN 'DIA' ELSE 'NOITE' END"
+  },
+  "hospitalQueries": {
+    "kpis": "SELECT /*+ PARALLEL(4) */ COUNT(1) AS TOTAL_DOCS, COUNT(DISTINCT PEC.CD_DOCUMENTO) AS DOCS_ATIVOS, MAX(PDC.DH_CRIACAO) AS ULTIMO_REGISTRO FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO WHERE A.CD_MULTI_EMPRESA = :ID AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO') AND ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90",
+    "detailTable": "SELECT * FROM (SELECT /*+ PARALLEL(4) */ ED.CD_DOCUMENTO, UPPER(ED.DS_DOCUMENTO) AS NOME, V.VL_VERSAO AS VERSAO, COUNT(1) AS USO_UNIDADE, MAX(PDC.DH_CRIACAO) AS ULTIMO_USO FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO LEFT JOIN (SELECT CD_DOCUMENTO, MAX(VL_VERSAO) VL_VERSAO FROM DBAMV.EDITOR_VERSAO_DOCUMENTO WHERE SN_ATIVO = 'S' GROUP BY CD_DOCUMENTO) V ON V.CD_DOCUMENTO = ED.CD_DOCUMENTO WHERE A.CD_MULTI_EMPRESA = :ID AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO') AND ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90 GROUP BY ED.CD_DOCUMENTO, UPPER(ED.DS_DOCUMENTO), V.VL_VERSAO ORDER BY ULTIMO_USO DESC) WHERE ROWNUM <= 5",
+    "top5": "SELECT * FROM (SELECT /*+ PARALLEL(4) */ UPPER(ED.DS_DOCUMENTO) AS NOME, COUNT(1) AS USO FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO WHERE A.CD_MULTI_EMPRESA = :ID AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO') AND ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90 GROUP BY UPPER(ED.DS_DOCUMENTO) ORDER BY USO DESC) WHERE ROWNUM <= 5"
+  }
 }

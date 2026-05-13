@@ -5,16 +5,17 @@ import { LayoutDashboard, FileText, Settings, Database, ChevronLeft, ChevronRigh
 import { usePathname } from 'next/navigation';
 import { useUI } from '@/context/UIContext';
 import { cn } from '@/lib/utils';
+import { useEffect, useState } from 'react';
 
 const navItems = [
-  { 
+  {
     group: 'Principal',
     items: [
-      { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { href: '/hospitais', label: 'Hospitais', icon: Building2 },
       { href: '/documentos', label: 'Documentos', icon: FileText },
       { href: '/similaridade', label: 'Similaridade', icon: ScanEye },
-      { href: '/auditoria-siglario', label: 'Siglário', icon: BookOpen },
+      { href: '/siglario', label: 'Siglário', icon: BookOpen },
     ]
   },
   {
@@ -26,9 +27,52 @@ const navItems = [
   }
 ];
 
+type OracleStatus = 'unknown' | 'active' | 'inactive' | 'error';
+
 export default function Sidebar() {
   const pathname = usePathname();
-  const { sidebarOpen, setSidebarOpen } = useUI();
+  const { sidebarOpen, setSidebarOpen, docVersion } = useUI();
+
+  const [oracleStatus, setOracleStatus] = useState<OracleStatus>('unknown');
+  const [connName, setConnName] = useState<string>('');
+
+  // Verifica o status real do pool Oracle a cada 30 segundos
+  useEffect(() => {
+    let mounted = true;
+
+    async function checkHealth() {
+      try {
+        const res = await fetch('/api/oracle/health');
+        if (!res.ok) {
+          if (mounted) setOracleStatus('error');
+          return;
+        }
+        const data = await res.json();
+        if (mounted) {
+          setOracleStatus(data.pool?.active ? 'active' : 'inactive');
+          setConnName(data.connection?.name || '');
+        }
+      } catch {
+        if (mounted) setOracleStatus('error');
+      }
+    }
+
+    checkHealth();
+    const interval = setInterval(checkHealth, 30_000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const statusConfig: Record<OracleStatus, { color: string; label: string; dot: string }> = {
+    unknown:  { color: 'text-slate-400',  label: 'Verificando...',  dot: 'bg-slate-300 animate-pulse' },
+    active:   { color: 'text-emerald-600', label: 'Pool Ativo',     dot: 'bg-emerald-500 animate-pulse' },
+    inactive: { color: 'text-amber-600',  label: 'Pool Inativo',    dot: 'bg-amber-400' },
+    error:    { color: 'text-rose-600',   label: 'Erro de Conexão', dot: 'bg-rose-500' },
+  };
+
+  const status = statusConfig[oracleStatus];
 
   return (
     <aside className={cn(
@@ -42,14 +86,14 @@ export default function Sidebar() {
           "flex items-center justify-center transition-all duration-500 animate-in zoom-in-95",
           sidebarOpen ? 'w-48' : 'w-12'
         )}>
-           <img 
-             src="/brand/logo.png" 
-             alt="Medlytics Pro" 
-             className="w-full h-auto object-contain transition-transform hover:scale-105 duration-300" 
-           />
+          <img
+            src="/brand/logo.png"
+            alt="Medlytics Pro"
+            className="w-full h-auto object-contain transition-transform hover:scale-105 duration-300"
+          />
         </div>
-        
-        <button 
+
+        <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className={cn(
             "absolute -right-0 top-2 p-1.5 rounded-l-[var(--radius)] bg-slate-50 border border-slate-200",
@@ -60,6 +104,20 @@ export default function Sidebar() {
         >
           {sidebarOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
         </button>
+
+        {docVersion && (
+          <div className={cn(
+            "mt-4 flex items-center gap-2 px-3 py-1 bg-slate-900 rounded-full border border-slate-700 shadow-lg animate-in fade-in zoom-in-95",
+            !sidebarOpen && "px-1.5"
+          )}>
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            {sidebarOpen ? (
+              <span className="text-[9px] font-black text-white uppercase tracking-[0.2em]">{docVersion} Mode</span>
+            ) : (
+              <span className="text-[9px] font-black text-white">{docVersion}</span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Navigation */}
@@ -77,13 +135,13 @@ export default function Sidebar() {
                 const Icon = item.icon;
                 return (
                   <li key={item.href}>
-                    <Link 
-                      href={item.href} 
+                    <Link
+                      href={item.href}
                       title={!sidebarOpen ? item.label : ''}
                       className={cn(
                         "flex items-center gap-3 px-4 py-2.5 rounded-[var(--radius)] transition-all cursor-pointer group/link",
-                        isActive 
-                          ? "bg-[var(--primary)] text-white shadow-[var(--shadow-primary)]" 
+                        isActive
+                          ? "bg-[var(--primary)] text-white shadow-[var(--shadow-primary)]"
                           : "text-slate-500 hover:bg-[var(--primary)]/5 hover:text-[var(--primary)]",
                         !sidebarOpen && 'justify-center'
                       )}
@@ -107,17 +165,43 @@ export default function Sidebar() {
             </ul>
           </div>
         ))}
+        
+        {/* Switch Version Action */}
+        <div className="pt-4 border-t border-slate-100">
+          <Link
+            href="/"
+            title={!sidebarOpen ? 'Trocar Versão' : ''}
+            className={cn(
+              "flex items-center gap-3 px-4 py-2.5 rounded-[var(--radius)] transition-all cursor-pointer group/link",
+              "text-slate-400 hover:bg-rose-50 hover:text-rose-600",
+              !sidebarOpen && 'justify-center'
+            )}
+          >
+            <LayoutDashboard size={18} className="shrink-0 transition-transform group-hover/link:rotate-12" />
+            {sidebarOpen && (
+              <span className="font-bold text-xs tracking-tight">Trocar Versão</span>
+            )}
+          </Link>
+        </div>
       </nav>
 
-      {/* Footer Status */}
+      {/* Footer Status — status real do pool Oracle */}
       {sidebarOpen && (
         <div className="p-5">
           <div className="p-4 rounded-[var(--radius)] bg-[var(--accent)] border border-[var(--border)] text-[9px] text-slate-400 space-y-2">
             <div className="flex items-center justify-between">
               <span className="font-bold tracking-wider">ESTADO ORACLE</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)] animate-pulse"></span>
+              <span className={cn('w-1.5 h-1.5 rounded-full', status.dot)} />
             </div>
-            <p className="font-mono text-slate-600">v5.5.0 Thick Mode</p>
+            <p className={cn('font-mono font-bold text-[10px]', status.color)}>
+              {status.label}
+            </p>
+            {connName && (
+              <p className="font-mono text-slate-500 truncate" title={connName}>
+                {connName}
+              </p>
+            )}
+            <p className="font-mono text-slate-400">v5.5.0 Thick Mode</p>
           </div>
         </div>
       )}

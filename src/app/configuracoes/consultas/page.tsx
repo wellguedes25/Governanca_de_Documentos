@@ -5,8 +5,9 @@ import {
   Database, Play, Save, Info, AlertTriangle, RefreshCw, 
   Loader2, BarChart3, Search, TrendingUp, Users, Clock, 
   FileText, Plus, Trash2, Edit3, Check, X, Palette, 
-  Settings2, LayoutIcon, ScanEye, Printer, Terminal, SquarePlay, CircleCheck, CircleX, Download
+  Settings2, LayoutIcon, ScanEye, Printer, Terminal, SquarePlay, CircleCheck, CircleX, Download, Sparkles
 } from 'lucide-react';
+import { AIQueryAssistant } from '@/components/AIQueryAssistant';
 
 export default function ConfigConsultasPage() {
   // Queries Padrão
@@ -25,7 +26,7 @@ export default function ConfigConsultasPage() {
   
   // Auditoria Params
   const [auditDays, setAuditDays] = useState(15);
-  const [auditDocId, setAuditDocId] = useState(0);
+  const [auditDocId, setAuditDocId] = useState<string | number>("0");
   
   // Custom Cards e Metadados
   const [customCards, setCustomCards] = useState<any[]>([]);
@@ -56,6 +57,7 @@ export default function ConfigConsultasPage() {
   const [scriptRunning, setScriptRunning] = useState<string | null>(null);
   const [scriptLog, setScriptLog] = useState<Record<string, string>>({});
   const [scriptStatus, setScriptStatus] = useState<Record<string, 'idle' | 'running' | 'success' | 'error'>>({});
+  const [scriptProgress, setScriptProgress] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetchData();
@@ -65,28 +67,63 @@ export default function ConfigConsultasPage() {
     setScriptRunning(script);
     setScriptStatus(prev => ({ ...prev, [script]: 'running' }));
     setScriptLog(prev => ({ ...prev, [script]: '' }));
+    setScriptProgress(prev => ({ ...prev, [script]: 0 }));
 
     try {
+      // Auto-save: Garante que os parâmetros de auditoria sejam salvos antes de rodar
+      if (script === 'similaridade') {
+        await fetch('/api/connections', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            type: 'SAVE_AUDIT_PARAMS', 
+            auditDays,
+            auditDocId
+          }),
+        });
+      }
+
       const res = await fetch('/api/scripts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ script }),
       });
-      const data = await res.json();
+      
+      if (!res.body) throw new Error('Falha ao iniciar stream de logs.');
+      
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
 
-      if (data.success) {
-        setScriptLog(prev => ({ ...prev, [script]: data.output || 'Processo concluído sem saída.' }));
-        setScriptStatus(prev => ({ ...prev, [script]: 'success' }));
-        setMessage('Processamento concluído com sucesso!');
-      } else {
-        setScriptLog(prev => ({ ...prev, [script]: data.error || 'Erro desconhecido.' }));
-        setScriptStatus(prev => ({ ...prev, [script]: 'error' }));
-        setMessage('Erro durante o processamento.');
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        if (value) {
+          const chunk = decoder.decode(value, { stream: true });
+          
+          // Parsing de progresso [PROGRESS] 45.2
+          const progressMatch = chunk.match(/\[PROGRESS\]\s+([\d.]+)/);
+          if (progressMatch) {
+            const p = parseFloat(progressMatch[1]);
+            setScriptProgress(prev => ({ ...prev, [script]: p }));
+          }
+
+          setScriptLog(prev => ({
+            ...prev,
+            [script]: (prev[script] || '') + chunk
+          }));
+        }
       }
+
+      setScriptStatus(prev => ({ ...prev, [script]: 'success' }));
+      setMessage('Processamento concluído!');
     } catch (err: any) {
-      setScriptLog(prev => ({ ...prev, [script]: `Erro de conexão: ${err.message}` }));
+      setScriptLog(prev => ({ 
+        ...prev, 
+        [script]: (prev[script] || '') + `\n[ERRO FATAL] ${err.message}` 
+      }));
       setScriptStatus(prev => ({ ...prev, [script]: 'error' }));
-      setMessage('Falha ao comunicar com a API.');
+      setMessage('Erro durante o processamento.');
     } finally {
       setScriptRunning(null);
       setTimeout(() => setMessage(''), 4000);
@@ -118,7 +155,7 @@ export default function ConfigConsultasPage() {
       }
 
       setAuditDays(storage.auditDays || 15);
-      setAuditDocId(storage.auditDocId || 0);
+      setAuditDocId(storage.auditDocId !== undefined ? String(storage.auditDocId) : "0");
 
       setEnabledQueries(storage.enabledQueries || {});
       setCustomCards(storage.customCards || []);
@@ -256,20 +293,17 @@ export default function ConfigConsultasPage() {
 
   async function handleDeleteCustomCard(id: string) {
     if (!confirm('Tem certeza que deseja excluir este card?')) return;
-    console.log('Frontend: Solicitando exclusão do card:', id);
     try {
       const res = await fetch(`/api/dashboard/custom?id=${id}`, { method: 'DELETE' });
       const data = await res.json();
-      console.log('Frontend: Resposta da exclusão:', data);
       
       if (!res.ok) throw new Error(data.error || 'Falha ao excluir card');
       
       setMessage('Card excluído com sucesso!');
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      // Recarrega apenas os dados — sem reload de página completo
+      await fetchData();
+      setTimeout(() => setMessage(''), 3000);
     } catch (err: any) {
-      console.error('Frontend: Erro ao excluir card:', err);
       setMessage(`Erro ao excluir card: ${err.message}`);
     }
   }
@@ -369,8 +403,15 @@ export default function ConfigConsultasPage() {
         </div>
 
         {message && (
-          <div className="bg-emerald-600 text-white px-6 py-3 rounded-[var(--radius)] shadow-xl animate-in zoom-in duration-300 text-[10px] font-black uppercase tracking-widest">
-            {message}
+          <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-6 py-3 rounded-full shadow-2xl border animate-in slide-in-from-top-4 duration-300 ${
+            message.includes('Erro') 
+              ? 'bg-rose-600 border-rose-500 text-white' 
+              : 'bg-emerald-600 border-emerald-500 text-white'
+          }`}>
+            {message.includes('Erro') ? <CircleX size={18} /> : <CircleCheck size={18} className="animate-bounce" />}
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] whitespace-nowrap">
+              {message}
+            </span>
           </div>
         )}
       </header>
@@ -393,7 +434,12 @@ export default function ConfigConsultasPage() {
             value={kpiTotal}
             onChange={(e) => setKpiTotal(e.target.value)}
           />
-          <div className="flex justify-end mt-4">
+          <div className="flex justify-between items-center mt-4">
+            <AIQueryAssistant 
+              currentQuery={kpiTotal} 
+              onApply={setKpiTotal} 
+              context="Contagem total de documentos preenchidos no banco Oracle" 
+            />
             <button 
               onClick={() => handleSave('KPI_TOTAL')}
               disabled={kpiLoading === 'KPI_TOTAL'}
@@ -416,7 +462,12 @@ export default function ConfigConsultasPage() {
             value={kpi24h}
             onChange={(e) => setKpi24h(e.target.value)}
           />
-          <div className="flex justify-end mt-4">
+          <div className="flex justify-between items-center mt-4">
+            <AIQueryAssistant 
+              currentQuery={kpi24h} 
+              onApply={setKpi24h} 
+              context="Volume de documentos preenchidos nas últimas 24 horas no banco Oracle" 
+            />
             <button onClick={() => handleSave('KPI_24H')} disabled={kpiLoading === 'KPI_24H'} title="Atualizar Motor Snapshot" className="flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white p-2.5 rounded-[var(--radius)] transition-all shadow-md group/btn">{kpiLoading === 'KPI_24H' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}</button>
           </div>
         </div>
@@ -432,7 +483,12 @@ export default function ConfigConsultasPage() {
              value={kpiAssinados}
              onChange={(e) => setKpiAssinados(e.target.value)}
           />
-          <div className="flex justify-end mt-4">
+          <div className="flex justify-between items-center mt-4">
+            <AIQueryAssistant 
+              currentQuery={kpiAssinados} 
+              onApply={setKpiAssinados} 
+              context="Taxa de documentos assinados vs total preenchido (compliance clínico)" 
+            />
             <button onClick={() => handleSave('KPI_ASSINADOS')} disabled={kpiLoading === 'KPI_ASSINADOS'} title="Atualizar Motor Compliance" className="flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white p-2.5 rounded-[var(--radius)] transition-all shadow-md group/btn">{kpiLoading === 'KPI_ASSINADOS' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}</button>
           </div>
         </div>
@@ -448,7 +504,12 @@ export default function ConfigConsultasPage() {
             value={kpiVolume3m}
             onChange={(e) => setKpiVolume3m(e.target.value)}
           />
-          <div className="flex justify-end mt-4">
+          <div className="flex justify-between items-center mt-4">
+            <AIQueryAssistant 
+              currentQuery={kpiVolume3m} 
+              onApply={setKpiVolume3m} 
+              context="Série histórica de volume de documentos nos últimos 90 dias" 
+            />
             <button onClick={() => handleSave('KPI_VOLUME3M')} disabled={kpiLoading === 'KPI_VOLUME3M'} title="Atualizar Motor Global" className="flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white p-2.5 rounded-[var(--radius)] transition-all shadow-md group/btn">{kpiLoading === 'KPI_VOLUME3M' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}</button>
           </div>
         </div>
@@ -466,7 +527,12 @@ export default function ConfigConsultasPage() {
              value={kpiTop10}
              onChange={(e) => setKpiTop10(e.target.value)}
           />
-          <div className="flex justify-end mt-2 pt-2 border-t border-slate-50">
+          <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-50">
+            <AIQueryAssistant 
+              currentQuery={kpiTop10} 
+              onApply={setKpiTop10} 
+              context="Ranking dos 10 documentos mais utilizados (Curva ABC)" 
+            />
             <button onClick={() => handleSave('KPI_TOP10')} disabled={kpiLoading === 'KPI_TOP10'} title="Salvar Algoritmo Analytics" className="flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white p-2.5 rounded-[var(--radius)] transition-all shadow-md group/btn">{kpiLoading === 'KPI_TOP10' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}</button>
           </div>
         </div>
@@ -484,7 +550,14 @@ export default function ConfigConsultasPage() {
             onChange={(e) => setProfileQuery(e.target.value)}
           />
           <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-50">
-            <p className="text-[10px] text-slate-400 font-bold uppercase italic italic-wider">Variável Requerida: <b className="text-emerald-600">:CD_DOCUMENTO</b></p>
+            <div className="flex flex-col">
+              <p className="text-[10px] text-slate-400 font-bold uppercase italic italic-wider">Variável Requerida: <b className="text-emerald-600">:CD_DOCUMENTO</b></p>
+              <AIQueryAssistant 
+                currentQuery={profileQuery} 
+                onApply={setProfileQuery} 
+                context="Busca de perfis de atendimento vinculados a um documento específico usando :CD_DOCUMENTO" 
+              />
+            </div>
             <button onClick={() => handleSave('PROFILE')} disabled={profileLoading} title="Salvar Motor de Vínculo" className="flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white p-2.5 rounded-[var(--radius)] transition-all shadow-md group/btn">
               {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
             </button>
@@ -679,13 +752,48 @@ export default function ConfigConsultasPage() {
                     <p className="text-[9px] text-slate-500 font-bold mb-3 leading-relaxed">{meta.detail}</p>
 
                     {/* Log Terminal */}
-                    {log && (
-                      <div className="bg-slate-900 rounded-[var(--radius)] p-3 mb-3 max-h-40 overflow-y-auto">
-                        <pre className="text-[9px] font-mono text-emerald-400 leading-relaxed whitespace-pre-wrap break-words">
-                          {log}
+                    <div className={`mt-3 transition-all duration-500 ${(log || isRunning) ? 'opacity-100 h-auto' : 'opacity-0 h-0 overflow-hidden'}`}>
+                      {/* Barra de Progresso */}
+                      {isRunning && (
+                        <div className="mb-3">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-[8px] font-black uppercase tracking-widest text-[var(--primary)] animate-pulse">Processando Lotes...</span>
+                            <span className="text-[9px] font-black text-slate-600">{scriptProgress[script] || 0}%</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full bg-gradient-to-r ${meta.color} transition-all duration-500 ease-out`}
+                              style={{ width: `${scriptProgress[script] || 0}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between mb-1 px-1">
+                        <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1">
+                          <Terminal size={10} /> Console de Saída
+                        </span>
+                        {isRunning && (
+                          <span className="flex gap-1">
+                            <span className="w-1 h-1 rounded-full bg-emerald-500 animate-ping" />
+                            <span className="w-1 h-1 rounded-full bg-emerald-500 animate-ping delay-75" />
+                            <span className="w-1 h-1 rounded-full bg-emerald-500 animate-ping delay-150" />
+                          </span>
+                        )}
+                      </div>
+                      <div 
+                        className="bg-slate-900 rounded-[var(--radius)] p-3 max-h-48 overflow-y-auto border border-slate-800 shadow-inner group/console"
+                        ref={(el) => {
+                          if (el && isRunning) {
+                            el.scrollTop = el.scrollHeight;
+                          }
+                        }}
+                      >
+                        <pre className="text-[10px] font-mono text-emerald-400 leading-relaxed whitespace-pre-wrap break-words">
+                          {log || (isRunning ? '> Aguardando saída do motor...' : '')}
                         </pre>
                       </div>
-                    )}
+                    </div>
 
                     {/* Run button */}
                     <button
@@ -730,10 +838,11 @@ export default function ConfigConsultasPage() {
             <div>
               <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1 block">ID do Documento Alvo (Filtro)</label>
               <input 
-                type="number"
+                type="text"
+                placeholder="Ex: 916 ou 916, 917"
                 className="w-full bg-slate-50 border border-slate-200 rounded-[var(--radius)] px-3 py-2 text-[11px] font-bold text-slate-700 focus:outline-none focus:border-rose-500 transition-all"
                 value={auditDocId}
-                onChange={(e) => setAuditDocId(parseInt(e.target.value) || 0)}
+                onChange={(e) => setAuditDocId(e.target.value)}
               />
             </div>
           </div>

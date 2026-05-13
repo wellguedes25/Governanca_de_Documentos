@@ -9,6 +9,8 @@ interface UIContextType {
   setOracleData: (data: any[] | null) => void;
   columnWidths: Record<string, number>;
   setColumnWidth: (column: string, width: number) => void;
+  docVersion: 'V2' | 'V3' | null;
+  setDocVersion: (version: 'V2' | 'V3' | null) => void;
 }
 
 const UIContext = createContext<UIContextType | undefined>(undefined);
@@ -17,14 +19,31 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [oracleData, setOracleData] = useState<any[] | null>(null);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const [docVersion, setDocVersionState] = useState<'V2' | 'V3' | null>(null);
 
-  // Carregar estado da sidebar do localStorage no client
+  // Carregar estado do sessionStorage no client
   useEffect(() => {
-    const saved = localStorage.getItem('sidebarOpen');
-    if (saved !== null) {
-      setSidebarOpen(saved === 'true');
+    const savedSidebar = localStorage.getItem('sidebarOpen');
+    if (savedSidebar !== null) {
+      setSidebarOpen(savedSidebar === 'true');
+    }
+
+    const savedVersion = sessionStorage.getItem('app_doc_version') as 'V2' | 'V3' | null;
+    if (savedVersion) {
+      setDocVersionState(savedVersion);
     }
   }, []);
+
+  const setDocVersion = (version: 'V2' | 'V3' | null) => {
+    setDocVersionState(version);
+    if (version) {
+      sessionStorage.setItem('app_doc_version', version);
+      // Limpar cache de dados ao trocar de versão para forçar recarga
+      sessionStorage.removeItem('oracle_documentos_data');
+    } else {
+      sessionStorage.removeItem('app_doc_version');
+    }
+  };
 
   const handleSetSidebarOpen = (open: boolean) => {
     setSidebarOpen(open);
@@ -42,7 +61,9 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
       oracleData, 
       setOracleData,
       columnWidths,
-      setColumnWidth
+      setColumnWidth,
+      docVersion,
+      setDocVersion
     }}>
       {children}
     </UIContext.Provider>

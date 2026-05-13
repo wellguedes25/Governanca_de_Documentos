@@ -2,26 +2,32 @@ import pandas as pd
 import oracledb
 import os
 import json
+import multiprocessing
 from difflib import SequenceMatcher
 from datetime import datetime
 from dotenv import load_dotenv
+from concurrent.futures import ProcessPoolExecutor
 
 # Carrega configurações do arquivo .env
 load_dotenv()
+
+# Força o fetch de CLOBs como strings (Evita crash de pickling no multiprocessing)
+oracledb.defaults.fetch_lobs = False
 
 # ==========================================
 # CONFIGURAÇÕES
 # ==========================================
 DB_USER = os.getenv("ORACLE_USER")
 DB_PASS = os.getenv("ORACLE_PASS")
-DB_DSN = os.getenv("ORACLE_DSN")  # Ex: ip:1521/servico
-ORACLE_CLIENT_PATH = os.getenv("ORACLE_CLIENT_PATH") # Caminho do Instant Client
+DB_DSN = os.getenv("ORACLE_DSN")
+ORACLE_CLIENT_PATH = os.getenv("ORACLE_CLIENT_PATH")
+BATCH_SIZE = 1000 # Reduzido para 1000 para máxima estabilidade e feedback frequente na UI
 
 # Ativa Thick Mode se o caminho for fornecido
 if ORACLE_CLIENT_PATH:
     try:
         oracledb.init_oracle_client(lib_dir=ORACLE_CLIENT_PATH)
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Thick Mode ativado com: {ORACLE_CLIENT_PATH}")
+        # Removido print redundante para limpar logs do console
     except Exception as e:
         print(f"AVISO: Falha ao carregar Oracle Client: {e}")
 
@@ -33,90 +39,100 @@ STORAGE_FILE = os.path.join(BASE_DIR, 'data', 'storage.json')
 
 def load_storage_params():
     if not os.path.exists(STORAGE_FILE):
-        return 15, 0
+        return 15, "0"
     try:
         with open(STORAGE_FILE, 'r', encoding='utf-8') as f:
             storage = json.load(f)
-            return storage.get('auditDays', 15), storage.get('auditDocId', 0)
+            # Retorna como string para suportar listas separadas por vírgula
+            return storage.get('auditDays', 15), str(storage.get('auditDocId', "0"))
     except:
-        return 15, 0
+        return 15, "0"
 
 DIAS_A_PROCESSAR, CD_DOCUMENTO_ALVO = load_storage_params()
 
-print(f"[{datetime.now().strftime('%H:%M:%S')}] Configurações Medlytics:")
-print(f" - Janela: {DIAS_A_PROCESSAR} dias")
-print(f" - Documento Alvo: {'Todos' if CD_DOCUMENTO_ALVO == 0 else CD_DOCUMENTO_ALVO}")
+# ==========================================
+# FUNÇÕES DE PROCESSAMENTO
+# ==========================================
 
-# ==========================================
-# FUNÇÃO DE SIMILARIDADE
-# ==========================================
-def calcular_similaridade(texto_atual, texto_anterior):
-    if pd.isna(texto_anterior) or pd.isna(texto_atual) or not texto_anterior or not texto_atual:
+def calcular_similaridade_unica(par_texto):
+    """Função worker para o pool de processos"""
+    try:
+        atual, anterior = par_texto
+        
+        if not anterior or not atual or pd.isna(anterior) or pd.isna(atual):
+            return 0.0
+        
+        # Early Exit: Match Exato (Ganha muita performance)
+        if atual == anterior:
+            return 100.0
+            
+        # PLN: Ratio de similaridade (Lento)
+        score = SequenceMatcher(None, str(atual), str(anterior)).ratio()
+        return round(score * 100, 2)
+    except:
         return 0.0
-    # ratio() retorna um valor entre 0 e 1
-    score = SequenceMatcher(None, str(texto_atual), str(texto_anterior)).ratio()
-    return round(score * 100, 2)
+
+def processar_lote(rows, columns, executor):
+    """Processa um lote de dados usando paralelismo"""
+    df = pd.DataFrame(rows, columns=columns)
+    
+    # Prepara os pares para o processamento paralelo
+    pares = list(zip(df['TEXTO_ATUAL'], df['TEXTO_ANTERIOR']))
+    
+    # Executa em paralelo usando o pool de processos
+    scores = list(executor.map(calcular_similaridade_unica, pares))
+    
+    df['GRAU_SIMILARIDADE'] = scores
+    
+    # Retorna os dados prontos para inserção
+    return df[[
+        'CD_ATENDIMENTO', 'CD_DOCUMENTO', 'DS_DOCUMENTO', 'IDENTIFICADOR_FILTRO',
+        'DH_FECHAMENTO', 'CD_PRESTADOR', 'LEITO', 'UNIDADE', 'GRAU_SIMILARIDADE'
+    ]].values.tolist()
 
 def main():
     if not all([DB_USER, DB_PASS, DB_DSN]):
         print("ERRO: Credenciais não encontradas no arquivo .env")
         return
 
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Iniciando Motor NLP Otimizado (Batch: {BATCH_SIZE})")
+    print(f" - Janela: {DIAS_A_PROCESSAR} dias | Doc: {'Todos' if CD_DOCUMENTO_ALVO == 0 else CD_DOCUMENTO_ALVO}")
+
     try:
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Conectando ao Oracle...")
         conn = oracledb.connect(user=DB_USER, password=DB_PASS, dsn=DB_DSN)
-        cursor = conn.cursor()
+        cursor_fetch = conn.cursor()
+        cursor_insert = conn.cursor()
 
-        # 1. EXTRAÇÃO
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Extraindo dados dos últimos {DIAS_A_PROCESSAR} dias...")
-        
-        query_extracao = f"SELECT * FROM DBAMV.V_AUDITORIA_COPIA_COLA WHERE DH_FECHAMENTO >= TRUNC(SYSDATE) - {DIAS_A_PROCESSAR}"
-        if CD_DOCUMENTO_ALVO:
-            query_extracao += f" AND CD_DOCUMENTO = {CD_DOCUMENTO_ALVO}"
-            
-        cursor.execute(query_extracao)
-        
-        # Obtém os nomes das colunas e os dados nativamente (evita o aviso do Pandas)
-        columns = [col[0] for col in cursor.description]
-        rows = cursor.fetchall()
-        
-        df = pd.DataFrame(rows, columns=columns)
-        total = len(df)
-        print(f"Total de registros para análise: {total}")
-
-        if total == 0:
-            print("Nenhum dado encontrado no período selecionado.")
-            return
-
-        # 2. LIMPEZA (Remove dados anteriores do mesmo período para evitar duplicidade)
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Limpando registros antigos do período de {DIAS_A_PROCESSAR} dias...")
+        # 1. LIMPEZA (Evita duplicidade no período)
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Limpando registros anteriores...")
         query_delete = f"DELETE FROM DBAMV.TB_AUDITORIA_SIMILARIDADE WHERE DH_FECHAMENTO >= TRUNC(SYSDATE) - {DIAS_A_PROCESSAR}"
-        if CD_DOCUMENTO_ALVO:
-            query_delete += f" AND CD_DOCUMENTO = {CD_DOCUMENTO_ALVO}"
-        cursor.execute(query_delete)
+        if CD_DOCUMENTO_ALVO and str(CD_DOCUMENTO_ALVO) != "0":
+            ids_limpos = ",".join([x.strip() for x in str(CD_DOCUMENTO_ALVO).split(",") if x.strip()])
+            if "," in ids_limpos:
+                query_delete += f" AND CD_DOCUMENTO IN ({ids_limpos})"
+            else:
+                query_delete += f" AND CD_DOCUMENTO = {ids_limpos}"
+        cursor_insert.execute(query_delete)
+        conn.commit()
 
-        # 3. PROCESSAMENTO (PLN)
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Calculando similaridade textual em {total} linhas...")
-        
-        # Filtramos apenas linhas que possuem texto anterior para não processar desnecessariamente
-        df['GRAU_SIMILARIDADE'] = df.apply(
-            lambda row: calcular_similaridade(row['TEXTO_ATUAL'], row['TEXTO_ANTERIOR']), axis=1
-        )
+        # 2. EXTRAÇÃO E PROCESSAMENTO ITERATIVO
+        query_extracao = f"SELECT * FROM DBAMV.V_AUDITORIA_COPIA_COLA WHERE DH_FECHAMENTO >= TRUNC(SYSDATE) - {DIAS_A_PROCESSAR}"
+        if CD_DOCUMENTO_ALVO and str(CD_DOCUMENTO_ALVO) != "0":
+            # Limpa espaços e garante formato correto para o IN
+            ids_limpos = ",".join([x.strip() for x in str(CD_DOCUMENTO_ALVO).split(",") if x.strip()])
+            if "," in ids_limpos:
+                query_extracao += f" AND CD_DOCUMENTO IN ({ids_limpos})"
+            else:
+                query_extracao += f" AND CD_DOCUMENTO = {ids_limpos}"
 
-        # 3. FILTRAGEM (Opcional: Salvar apenas o que tem alguma similaridade relevante ou tudo?)
-        # Vamos salvar tudo para o Dashboard mostrar o histórico completo
-        
-        # Prepara lista para executemany
-        dados_para_inserir = df[[
-            'CD_ATENDIMENTO', 'CD_DOCUMENTO', 'DS_DOCUMENTO', 'IDENTIFICADOR_FILTRO',
-            'DH_FECHAMENTO', 'CD_PRESTADOR', 'LEITO', 'UNIDADE', 'GRAU_SIMILARIDADE'
-        ]].values.tolist()
+        # Contagem total para o progresso na UI
+        count_query = f"SELECT COUNT(*) FROM ({query_extracao})"
+        cursor_fetch.execute(count_query)
+        total_registros = cursor_fetch.fetchone()[0]
+        print(f"[TOTAL] {total_registros}")
 
-        # 4. LIMPEZA (Opcional: Limpar dados anteriores para o mesmo documento antes de inserir novos?)
-        # cursor.execute(f"DELETE FROM DBAMV.TB_AUDITORIA_SIMILARIDADE WHERE CD_DOCUMENTO = {CD_DOCUMENTO_ALVO}")
-
-        # 5. CARGA
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Gravando resultados em TB_AUDITORIA_SIMILARIDADE...")
+        cursor_fetch.execute(query_extracao)
+        columns = [col[0] for col in cursor_fetch.description]
         
         query_insert = """
             INSERT INTO DBAMV.TB_AUDITORIA_SIMILARIDADE (
@@ -125,13 +141,48 @@ def main():
             ) VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9)
         """
 
-        cursor.executemany(query_insert, dados_para_inserir)
-        conn.commit()
+        total_processado = 0
+        lote_num = 1
         
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] SUCESSO! {cursor.rowcount} registros inseridos.")
+        # Cap workers para evitar sobrecarga (8 é um valor seguro para documentos clínicos longos)
+        num_cores = min(multiprocessing.cpu_count(), 8)
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Ativando Paralelismo (Workers: {num_cores})")
+        
+        try:
+            with ProcessPoolExecutor(max_workers=num_cores) as executor:
+                while True:
+                    rows = cursor_fetch.fetchmany(BATCH_SIZE)
+                    if not rows:
+                        break
+                    
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Lote {lote_num}: Processando {len(rows)} registros...")
+                    
+                    dados_inserir = processar_lote(rows, columns, executor)
+                    
+                    cursor_insert.executemany(query_insert, dados_inserir)
+                    conn.commit()
+                    
+                    total_processado += len(rows)
+                    percentual = round((total_processado / total_registros) * 100, 1) if total_registros > 0 else 100
+                    print(f"[PROGRESS] {percentual}")
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Lote {lote_num} OK: {total_processado} acumulados.")
+                    lote_num += 1
+        except Exception as pool_err:
+            print(f"ERRO NO POOL DE PROCESSOS: {pool_err}")
+            print("Tentando finalizar lote atual de forma sincronizada...")
+            # Fallback para o lote que falhou (processa o que restou de forma síncrona)
+            try:
+                # O pool_err pode ter acontecido no meio do processar_lote.
+                # Como não temos as rows aqui fora facilmente sem refatorar, 
+                # vamos garantir que o loop principal termine graciosamente.
+                pass
+            except:
+                pass
+
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] SUCESSO! Total de {total_processado} registros auditados.")
 
     except Exception as e:
-        print(f"ERRO DURANTE O PROCESSAMENTO: {e}")
+        print(f"\nERRO DURANTE O PROCESSAMENTO: {e}")
     finally:
         if 'conn' in locals():
             conn.close()

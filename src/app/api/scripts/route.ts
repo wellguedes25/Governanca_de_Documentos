@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { spawn } from 'child_process';
 import path from 'path';
+import { getData } from '@/lib/storage';
 
 const SCRIPTS: Record<string, { file: string; label: string }> = {
   siglario: { file: 'Processar_Siglario.py', label: 'Auditoria de Siglário' },
@@ -18,61 +19,74 @@ export async function POST(request: Request) {
       );
     }
 
-    const { file, label } = SCRIPTS[script];
+    const { file } = SCRIPTS[script];
     const sqlDir = path.join(process.cwd(), 'SQL');
     const scriptPath = path.join(sqlDir, file);
 
-    const output = await new Promise<string>((resolve, reject) => {
-      const chunks: string[] = [];
-      const proc = spawn('python', [scriptPath], {
-        cwd: sqlDir,
-        env: { ...process.env },
-        shell: true,
-      });
+    const storageData = await getData();
+    const activeConn = storageData.connections.find(c => c.id === storageData.activeConnectionId);
+    
+    const procEnv: Record<string, string | undefined> = { ...process.env };
+    if (activeConn) {
+      procEnv.ORACLE_USER = activeConn.user;
+      if (activeConn.password) procEnv.ORACLE_PASS = activeConn.password;
+      procEnv.ORACLE_DSN = activeConn.connectString;
+    }
+    if (storageData.oracleClientPath) {
+      procEnv.ORACLE_CLIENT_PATH = storageData.oracleClientPath;
+    }
 
-      proc.stdout.on('data', (data) => {
-        chunks.push(data.toString());
-      });
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        const proc = spawn('python', ['-u', scriptPath], {
+          cwd: sqlDir,
+          env: procEnv as NodeJS.ProcessEnv,
+          shell: true,
+        });
 
-      proc.stderr.on('data', (data) => {
-        chunks.push(`[STDERR] ${data.toString()}`);
-      });
+        const send = (data: string) => {
+          controller.enqueue(encoder.encode(data));
+        };
 
-      proc.on('close', (code) => {
-        const fullOutput = chunks.join('');
-        if (code === 0) {
-          resolve(fullOutput);
-        } else {
-          reject(new Error(`Processo encerrado com código ${code}\n${fullOutput}`));
-        }
-      });
+        proc.stdout.on('data', (data) => {
+          send(data.toString());
+        });
 
-      proc.on('error', (err) => {
-        reject(new Error(`Falha ao iniciar processo: ${err.message}`));
-      });
+        proc.stderr.on('data', (data) => {
+          send(`[ERRO] ${data.toString()}`);
+        });
 
-      // Timeout de 5 minutos (scripts pesados contra Oracle)
-      setTimeout(() => {
-        proc.kill('SIGTERM');
-        reject(new Error('Timeout: Processo excedeu 5 minutos'));
-      }, 5 * 60 * 1000);
+        proc.on('close', (code) => {
+          if (code === 0) {
+            send('\n[FINISH] Processo concluído com sucesso.');
+          } else {
+            send(`\n[ERROR] Processo encerrado com código ${code}`);
+          }
+          controller.close();
+        });
+
+        proc.on('error', (err) => {
+          send(`\n[FATAL] Falha ao iniciar: ${err.message}`);
+          controller.close();
+        });
+
+        // Kill after 60 mins (Aumentado para suportar grandes volumes)
+        setTimeout(() => {
+          proc.kill('SIGTERM');
+          send('\n[TIMEOUT] Processo interrompido após 60 minutos.');
+          controller.close();
+        }, 60 * 60 * 1000);
+      }
     });
 
-    return NextResponse.json({
-      success: true,
-      script: label,
-      output,
-      timestamp: new Date().toISOString(),
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Transfer-Encoding': 'chunked',
+      },
     });
   } catch (error: any) {
-    console.error('Erro ao executar script Python:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message || 'Erro desconhecido',
-        timestamp: new Date().toISOString(),
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

@@ -14,10 +14,13 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get('type') || 'all';
   const force = searchParams.get('force') === 'true';
+  const version = searchParams.get('version') || 'V2';
+
+  const cacheKey = `${type}_${version}`;
 
   // Verifica cache (se não for force refresh)
   if (!force) {
-    const cached = globalCache.dashboardCache.get(type);
+    const cached = globalCache.dashboardCache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
       return NextResponse.json(cached.data);
     }
@@ -38,7 +41,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const kpiQueries = data.kpiQueries;
+    const kpiQueries = version === 'V3' ? (data.kpiQueriesV3 || data.kpiQueries) : data.kpiQueries;
     const enabledQueries = data.enabledQueries || {};
 
     const safeExecute = async (conn: any, sql: string, queryKey?: string) => {
@@ -115,7 +118,7 @@ export async function GET(request: Request) {
     }
 
     // Salva no cache
-    globalCache.dashboardCache.set(type, {
+    globalCache.dashboardCache.set(cacheKey, {
       timestamp: Date.now(),
       data: responseData
     });

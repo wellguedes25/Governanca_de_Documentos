@@ -350,7 +350,7 @@ export default function HospitaisPage() {
                   Insight Operacional
                 </h4>
                 <p className="text-[10px] text-muted leading-relaxed font-bold uppercase tracking-widest">
-                  Esta unidade representa <span className="text-foreground">{(data.globalTotal > 0 ? ((Number(data.kpis.TOTAL_DOCS) / Number(data.globalTotal)) * 100) : 0).toFixed(1)}%</span> do volume total transacionado na empresa <span className="text-foreground">{activeConnName || 'selecionada'}</span> nos últimos 90 dias.
+                  Esta unidade representa <span className="text-foreground">{(data.globalTotal > 0 ? ((Number(data.kpis.TOTAL_DOCS) / Number(data.globalTotal)) * 100) : 0).toFixed(1)}%</span> do volume total transacionado do ambiente <span className="text-foreground">{activeConnName || 'selecionado'}</span> nos últimos 90 dias.
                 </p>
               </div>
 

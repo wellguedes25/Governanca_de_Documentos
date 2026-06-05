@@ -32,7 +32,7 @@ export function PageHeader({
               {title}
             </h1>
             {badge && (
-              <Badge variant="secondary" className="px-2 py-1 text-[10px] font-black uppercase tracking-widest border bg-emerald-500/10 text-emerald-600 border-emerald-500/20 rounded-none">
+              <Badge variant="outline" className="px-2 py-1 text-[10px] font-black uppercase tracking-widest border bg-emerald-500/10 text-emerald-600 border-emerald-500/20 rounded-none">
                 {badge}
               </Badge>
             )}

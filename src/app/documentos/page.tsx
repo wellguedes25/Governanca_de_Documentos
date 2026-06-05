@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, RefreshCw, Filter, FileText, Download, GripVertical, Check, X, ChevronUp, ChevronDown, ListFilter, XCircle, FileSpreadsheet, Printer, AlertTriangle, Loader2, Info, History, Settings, ExternalLink, Zap, Unlink } from 'lucide-react';
+import { Search, RefreshCw, Filter, FileText, Download, GripVertical, Check, X, ChevronUp, ChevronDown, ListFilter, XCircle, FileSpreadsheet, Printer, AlertTriangle, Loader2, Info, History, Settings, ExternalLink, Zap, Unlink, Network } from 'lucide-react';
 import { useUI } from '@/context/UIContext';
 import { PageHeader } from '@/components/ui/PageHeader';
+import DocumentGraph from '@/components/DocumentGraph';
 
 export default function DocumentosPage() {
   const { oracleData, setOracleData, columnWidths, setColumnWidth, docVersion } = useUI();
@@ -35,7 +36,8 @@ export default function DocumentosPage() {
   const [metadataActions, setMetadataActions] = useState<any[]>([]);
   const [metadataActionsLoading, setMetadataActionsLoading] = useState(false);
   const [metadataActionsError, setMetadataActionsError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'specs' | 'history' | 'actions'>('specs');
+  const [activeTab, setActiveTab] = useState<'specs' | 'history' | 'actions' | 'map'>('specs');
+  const [graphFullscreen, setGraphFullscreen] = useState(false);
   const [actionsFilterDoc, setActionsFilterDoc] = useState<string | null>(null);
 
   // Extrair documentos únicos relacionados para filtros no topo
@@ -931,24 +933,30 @@ export default function DocumentosPage() {
                 </p>
               </div>
 
-              <div className="flex border-b border-border px-8">
+              <div className="flex border-b border-border px-8 overflow-x-auto scrollbar-none">
                 <button 
                   onClick={() => setActiveTab('specs')}
-                  className={`px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] border-b-2 transition-all ${activeTab === 'specs' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-muted -muted'}`}
+                  className={`px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] border-b-2 transition-all shrink-0 ${activeTab === 'specs' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-muted -muted'}`}
                 >
                   Especificações
                 </button>
                 <button 
                   onClick={() => setActiveTab('history')}
-                  className={`px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] border-b-2 transition-all ${activeTab === 'history' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-muted -muted'}`}
+                  className={`px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] border-b-2 transition-all shrink-0 ${activeTab === 'history' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-muted -muted'}`}
                 >
                   Histórico
                 </button>
                 <button 
                   onClick={() => setActiveTab('actions')}
-                  className={`px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] border-b-2 transition-all ${activeTab === 'actions' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-muted -muted'}`}
+                  className={`px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] border-b-2 transition-all shrink-0 ${activeTab === 'actions' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-muted -muted'}`}
                 >
                   Vínculos SQL
+                </button>
+                <button 
+                  onClick={() => setActiveTab('map')}
+                  className={`px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] border-b-2 transition-all shrink-0 ${activeTab === 'map' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-muted -muted'}`}
+                >
+                  Mapa
                 </button>
               </div>
 
@@ -1016,7 +1024,7 @@ export default function DocumentosPage() {
                        </div>
                      ))}
                   </div>
-                ) : (
+                ) : activeTab === 'actions' ? (
                   <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                     <div className="flex flex-col gap-4 mb-4">
                         <div className="flex items-center gap-2">
@@ -1137,12 +1145,94 @@ export default function DocumentosPage() {
                       </div>
                     )}
                   </div>
+                ) : (
+                  <div className="space-y-4 animate-in fade-in slide-in-from-right-4 h-full flex flex-col">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Network size={14} className="text-[var(--primary)]" />
+                        <h4 className="text-[11px] font-black text-foreground uppercase tracking-[0.2em]">Mapa de Relacionamentos</h4>
+                      </div>
+                      <button 
+                        onClick={() => setGraphFullscreen(true)}
+                        className="text-[8px] font-black text-[var(--primary)] uppercase underline hover:opacity-70"
+                      >
+                        Ver em Tela Cheia
+                      </button>
+                    </div>
+                    <div className="flex-1 min-h-[300px]">
+                      <DocumentGraph 
+                        documentId={sidebarDoc!}
+                        documentName={metadata[0]?.DESCRICAO_DOCUMENTO || 'Detalhes Técnicos'}
+                        metadata={metadata}
+                        activeSpecs={activeSpecs}
+                        metadataActions={metadataActions}
+                        profileData={profileData}
+                        isFullscreen={false}
+                        onToggleFullscreen={() => setGraphFullscreen(true)}
+                      />
+                    </div>
+                  </div>
                 )}
               </div>
             </>
           );
         })()}
       </div>
+
+      {/* Modal de Tela Cheia para o Grafo */}
+      {graphFullscreen && sidebarDoc && (
+        <div className="fixed inset-0 bg-background/98 backdrop-blur-lg z-[110] flex flex-col p-8 animate-in fade-in duration-300">
+          <div className="flex items-center justify-between mb-6 border-b border-border pb-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2 py-0.5 bg-[var(--primary)] text-foreground text-[9px] font-black rounded-none uppercase tracking-wider">
+                  Mapa de Dependências
+                </span>
+                <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest">
+                  Doc ID: {sidebarDoc}
+                </span>
+              </div>
+              <h3 className="text-2xl font-black text-foreground uppercase tracking-tight italic">
+                {metadata[0]?.DESCRICAO_DOCUMENTO || 'Grafo Técnico'}
+              </h3>
+            </div>
+            <button 
+              onClick={() => setGraphFullscreen(false)}
+              className="px-4 py-2 bg-foreground text-background text-[10px] font-black rounded-none uppercase hover:opacity-90 transition-all uppercase tracking-widest cursor-pointer"
+            >
+              Fechar Mapa
+            </button>
+          </div>
+          <div className="flex-1 w-full relative">
+            {(() => {
+              // Recalcular os metadados do layout para mesclar cabeçalho e rodapé
+              const telaSpecs = metadata.find(m => m.CODIGO_TIPO_VERSAO === 3 && m.CODIGO_TIPO_LAYOUT === 1);
+              const relatorioSpecs = metadata.find(m => m.CODIGO_TIPO_VERSAO === 3 && m.CODIGO_TIPO_LAYOUT === 2);
+              const fallbackSpecs = metadata.find(m => m.CODIGO_TIPO_VERSAO === 3) || metadata[0];
+              const baseSpecs = telaSpecs || relatorioSpecs || fallbackSpecs;
+              const activeSpecsCombined = baseSpecs ? {
+                ...baseSpecs,
+                CODIGO_LAYOUT_CABECALHO: relatorioSpecs?.CODIGO_LAYOUT_CABECALHO || baseSpecs.CODIGO_LAYOUT_CABECALHO,
+                DOCUMENTO_CABECALHO: relatorioSpecs?.DOCUMENTO_CABECALHO || baseSpecs.DOCUMENTO_CABECALHO,
+                CODIGO_LAYOUT_RODAPE: relatorioSpecs?.CODIGO_LAYOUT_RODAPE || baseSpecs.CODIGO_LAYOUT_RODAPE,
+              } : undefined;
+
+              return (
+                <DocumentGraph 
+                  documentId={sidebarDoc}
+                  documentName={metadata[0]?.DESCRICAO_DOCUMENTO || 'Detalhes Técnicos'}
+                  metadata={metadata}
+                  activeSpecs={activeSpecsCombined}
+                  metadataActions={metadataActions}
+                  profileData={profileData}
+                  isFullscreen={true}
+                  onToggleFullscreen={() => setGraphFullscreen(false)}
+                />
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       <div id="print-area" className="hidden print:block -background print:text-black w-full" style={{ position: 'absolute', top: 0, left: 0, zIndex: 9999 }}>
         <div className="p-8">

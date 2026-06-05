@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { BookOpen, ShieldAlert, Library } from 'lucide-react';
 import { useUI } from '@/context/UIContext';
 import { useRouter } from 'next/navigation';
+import { PageHeader } from '@/components/ui/PageHeader';
 import AuditoriaTab from './AuditoriaTab';
 import DicionarioTab from './DicionarioTab';
 
@@ -28,30 +29,24 @@ export default function SiglarioPage() {
   ];
 
   return (
-    <div className="space-y-8 animate-in slide-in-from-bottom-5 duration-700 pb-24 text-slate-800">
+    <div className="min-h-screen bg-card flex flex-col p-4 md:p-8 space-y-8 animate-in slide-in-from-bottom-5 duration-700 pb-24 text-foreground">
       {/* Header */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-end border-b border-slate-200 pb-8 gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3 uppercase italic tracking-tighter">
-            <BookOpen className="text-[var(--primary)]" size={32} />
-            Siglário Clínico
-          </h1>
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">
-            Gestão do dicionário de siglas e auditoria de conformidade em laudos.
-          </p>
-        </div>
-      </header>
+      <PageHeader 
+        title="Siglário Clínico"
+        subtitle="Gestão do dicionário de siglas e auditoria de conformidade em laudos."
+        icon={BookOpen}
+      />
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-[var(--radius)] w-fit">
+      <div className="flex gap-1 -background p-1 rounded-none w-fit">
         {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-[var(--radius)] text-[10px] font-black uppercase tracking-[0.15em] transition-all ${
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-none text-[10px] font-black uppercase tracking-[0.15em] transition-all ${
               activeTab === tab.id
-                ? 'bg-white text-[var(--primary)] shadow-sm border border-slate-200'
-                : 'text-slate-400 hover:text-slate-600'
+                ? 'bg-background text-[var(--primary)] shadow-none border border-border'
+                : 'text-muted -muted'
             }`}
           >
             {tab.icon}

@@ -71,13 +71,27 @@ export async function POST(request: NextRequest) {
       error += data.toString();
     });
 
-    const exitCode = await new Promise((resolve) => {
+    const exitCode = await new Promise((resolve, reject) => {
       pythonProcess.on('close', resolve);
+      pythonProcess.on('error', (err) => {
+        console.error('[API] Falha ao iniciar processo Python:', err);
+        reject(err);
+      });
+      
+      // Timeout de segurança: 10 minutos
+      setTimeout(() => {
+        pythonProcess.kill();
+        reject(new Error('Tempo limite de processamento (10 min) atingido.'));
+      }, 10 * 60 * 1000);
     });
 
     if (exitCode !== 0) {
       console.error(`[API] Erro no script Python (Code ${exitCode}):`, error);
-      return NextResponse.json({ error: 'Erro ao processar siglário no motor Python.', details: error }, { status: 500 });
+      return NextResponse.json({ 
+        error: 'Erro ao processar siglário no motor Python.', 
+        details: error,
+        output: output.substring(output.length - 1000) // Últimos 1000 caracteres do log
+      }, { status: 500 });
     }
 
     console.log('[API] Processamento concluído:', output);

@@ -3,12 +3,15 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, RefreshCw, Filter, FileText, Download, GripVertical, Check, X, ChevronUp, ChevronDown, ListFilter, XCircle, FileSpreadsheet, Printer, AlertTriangle, Loader2, Info, History, Settings, ExternalLink, Zap, Unlink } from 'lucide-react';
 import { useUI } from '@/context/UIContext';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 export default function DocumentosPage() {
   const { oracleData, setOracleData, columnWidths, setColumnWidth, docVersion } = useUI();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [activeConnName, setActiveConnName] = useState('');
+  const [activeHospitals, setActiveHospitals] = useState<{id: number, sigla: string}[]>([]);
+  const [inactiveHospitals, setInactiveHospitals] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [columnFilters, setColumnFilters] = useState({ CÓDIGO: '', NOME: '', EMPRESA: '' });
@@ -69,6 +72,10 @@ export default function DocumentosPage() {
     fetch('/api/connections').then(res => res.json()).then(storage => {
       const active = storage.connections.find((c: any) => c.id === storage.activeConnectionId);
       if (active) setActiveConnName(active.name);
+      if (storage.hospitalsMapping) {
+        setActiveHospitals(storage.hospitalsMapping.filter((h: any) => h.ativo));
+        setInactiveHospitals(storage.hospitalsMapping.filter((h: any) => !h.ativo).map((h: any) => h.sigla.toUpperCase()));
+      }
       
       // Se não tem dados, busca agora
       if (!oracleData && !cached) {
@@ -422,23 +429,18 @@ export default function DocumentosPage() {
   }, [filteredProfileData, profileCurrentPage]);
 
   return (
-    <div className="min-h-screen flex flex-col space-y-6 animate-in fade-in duration-500 pb-20 relative">
+    <div className="min-h-screen bg-card flex flex-col p-4 md:p-8 space-y-6 animate-in fade-in duration-500 pb-20 relative text-foreground font-mono">
       <div className="print:hidden space-y-6">
-        <header className="flex justify-between items-center gap-4 border-b border-slate-200 pb-6">
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 border-b border-border pb-6">
           <div className="flex-1">
-            <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3 uppercase italic tracking-tighter">
-              <FileText className="text-[var(--primary)]" size={28} />
-              Repositório de Documentos
-            </h1>
-            <div className="flex items-center gap-3 mt-1">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Oracle DBAMV Infrastructure</span>
-              <span className={`px-2 py-0.5 rounded-[var(--radius)] text-[9px] font-black uppercase border ${activeConnName ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-rose-50 text-rose-600 border-rose-200 italic'}`}>
-                  {activeConnName || 'DISCONNECTED'}
-              </span>
-            </div>
-            
+            <PageHeader 
+              title="Repositório de Documentos"
+              subtitle="Oracle DBAMV Infrastructure"
+              icon={FileText}
+              badge={activeConnName || 'DISCONNECTED'}
+            />
             {error && (
-              <div className="mt-4 p-3 bg-rose-50 border border-rose-200 rounded-[var(--radius)] flex items-center gap-3 text-rose-600 animate-in slide-in-from-top-2">
+              <div className="mt-4 p-3 bg-red-500/10 border border-red-500/50/20 rounded-none flex items-center gap-3 text-red-500 animate-in slide-in-from-top-2">
                 <AlertTriangle size={16} />
                 <span className="text-[11px] font-black uppercase tracking-tight">{error}</span>
               </div>
@@ -447,11 +449,11 @@ export default function DocumentosPage() {
 
           <div className="flex items-center gap-3">
             <div className="relative group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[var(--primary)] transition-colors" size={14} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted group-focus-within:text-[var(--primary)] transition-colors" size={14} />
               <input 
                 type="text" 
                 placeholder="Pesquisa global..."
-                className="bg-white border border-slate-200 rounded-[var(--radius)] pl-9 pr-4 py-2 text-xs text-slate-900 outline-none focus:border-[var(--primary)] w-72 transition-all shadow-sm"
+                className="bg-background border border-border rounded-none pl-9 pr-4 py-2 text-xs text-foreground outline-none focus:border-[var(--primary)] w-72 transition-all shadow-none"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -459,22 +461,22 @@ export default function DocumentosPage() {
             <button 
               onClick={() => fetchInitialData(true)}
               disabled={loading}
-              className="px-4 py-2 bg-[var(--primary)] hover:brightness-110 text-white rounded-[var(--radius)] transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-sm"
+              className="px-4 py-2 bg-[var(--primary)] hover:brightness-110 text-foreground rounded-none transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-none"
             >
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
               Sincronizar
             </button>
             <button 
               onClick={exportToCSV}
-              className="p-2 bg-white hover:bg-slate-50 text-slate-500 hover:text-[var(--primary)] rounded-[var(--radius)] border border-slate-200 transition-all shadow-sm"
+              className="p-2 bg-background -background text-muted hover:text-[var(--primary)] rounded-none border border-border transition-all shadow-none"
             >
               <Download size={16} />
             </button>
           </div>
-        </header>
+        </div>
         
-        <div className="bg-white border border-slate-200 rounded-[var(--radius)] p-4 flex flex-wrap items-center gap-6 shadow-sm animate-in slide-in-from-top duration-700 relative overflow-visible">
-          <div className="flex items-center gap-2 text-slate-500">
+        <div className="bg-background border border-border rounded-none p-4 flex flex-wrap items-center gap-6 shadow-none animate-in slide-in-from-top duration-700 relative overflow-visible">
+          <div className="flex items-center gap-2 text-muted">
             <ListFilter size={18} className="text-[var(--primary)]" />
             <span className="text-[10px] font-black uppercase tracking-[0.2em] min-w-fit">Filtros Técnicos</span>
           </div>
@@ -483,25 +485,25 @@ export default function DocumentosPage() {
             <input 
               type="text" 
               placeholder="CÓDIGO"
-              className="bg-slate-50 border border-slate-200 rounded-[var(--radius)] px-4 py-1.5 text-[11px] font-bold text-slate-700 outline-none focus:border-[var(--primary)] w-28 transition-all"
+              className="bg-card border border-border rounded-none px-4 py-1.5 text-[11px] font-bold text-foreground outline-none focus:border-[var(--primary)] w-28 transition-all"
               value={columnFilters.CÓDIGO}
               onChange={(e) => setColumnFilters(pf => ({ ...pf, CÓDIGO: e.target.value }))}
             />
             <input 
               type="text" 
               placeholder="NOME DO DOCUMENTO"
-              className="bg-slate-50 border border-slate-200 rounded-[var(--radius)] px-4 py-1.5 text-[11px] font-bold text-slate-700 outline-none focus:border-[var(--primary)] flex-1 min-w-[300px] transition-all"
+              className="bg-card border border-border rounded-none px-4 py-1.5 text-[11px] font-bold text-foreground outline-none focus:border-[var(--primary)] flex-1 min-w-[300px] transition-all"
               value={columnFilters.NOME}
               onChange={(e) => setColumnFilters(pf => ({ ...pf, NOME: e.target.value }))}
             />
             <select 
-              className="bg-slate-50 border border-slate-200 rounded-[var(--radius)] px-4 py-1.5 text-[11px] font-bold text-slate-700 outline-none focus:border-[var(--primary)] w-40 transition-all cursor-pointer"
+              className="bg-card border border-border rounded-none px-4 py-1.5 text-[11px] font-bold text-foreground outline-none focus:border-[var(--primary)] w-40 transition-all cursor-pointer"
               value={columnFilters.EMPRESA}
               onChange={(e) => setColumnFilters(pf => ({ ...pf, EMPRESA: e.target.value }))}
             >
               <option value="">EMPRESA (TODAS)</option>
-              {['HSC', 'CSSJ', 'HST', 'HSJ', 'HMRP', 'HCNSC', 'HR'].map(unit => (
-                <option key={unit} value={unit}>{unit}</option>
+              {activeHospitals.map(unit => (
+                <option key={unit.sigla} value={unit.sigla}>{unit.sigla}</option>
               ))}
             </select>
           </div>
@@ -513,24 +515,29 @@ export default function DocumentosPage() {
                 setSelectedDoc(null);
                 setProfileData([]);
               }}
-              className="px-4 py-1.5 text-[10px] font-black text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-[var(--radius)] transition-all flex items-center gap-2 uppercase tracking-tighter"
+              className="px-4 py-1.5 text-[10px] font-black text-red-500 bg-red-500/10 hover:bg-red-500/20 rounded-none transition-all flex items-center gap-2 uppercase tracking-tighter"
             >
               <XCircle size={14} /> Limpar Filtros
             </button>
           )}
         </div>
 
-        <div className={`bg-white rounded-[var(--radius)] border border-slate-200 flex flex-col overflow-hidden shadow-md w-full max-w-full transition-all duration-500 ease-in-out ${selectedDoc && !sidebarOpen ? 'min-h-[300px] max-h-[300px]' : 'min-h-[600px]'}`}>
+        <div className={`bg-background rounded-none border border-border flex flex-col overflow-hidden shadow-none w-full max-w-full transition-all duration-500 ease-in-out ${selectedDoc && !sidebarOpen ? 'min-h-[300px] max-h-[300px]' : 'min-h-[600px]'}`}>
           <div className="flex-1 overflow-x-auto overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 w-full relative">
             {paginatedData.length > 0 ? (
               <table className="w-full text-left border-collapse table-auto select-none min-w-max">
                 <thead className="sticky top-0 z-10">
-                   <tr className="bg-slate-50 shadow-sm border-b border-slate-200">
-                    <th className="px-2 py-3 w-8 border-r border-slate-100 italic font-black text-slate-300 text-[9px] text-center">INFO</th>
+                   <tr className="bg-card shadow-none border-b border-border">
+                    <th className="px-2 py-3 w-8 border-r border-border italic font-black -muted text-[9px] text-center">INFO</th>
                     {(() => {
                       const keys = Object.keys(paginatedData[0]);
-                      const order = ['CÓDIGO', 'NOME', 'VERSAO', 'CSSJ', 'HST', 'HSC', 'HSJ', 'HMRP', 'HCNSC', 'HR', 'ÚLTIMO USO', 'ULT. GERAL', 'TOTAL', 'ULTIMO REGISTRO'];
-                      const sortedKeys = keys.sort((a, b) => {
+                      const order = ['CÓDIGO', 'NOME', 'VERSAO', ...activeHospitals.map(h => h.sigla), 'ÚLTIMO USO', 'ULT. GERAL', 'TOTAL', 'ULTIMO REGISTRO'];
+                      const sortedKeys = keys.filter((key) => {
+                        const cleanKey = key.replace(/"/g, '').toUpperCase();
+                        if (inactiveHospitals.includes(cleanKey)) return false;
+                        if (inactiveHospitals.some(sigla => cleanKey === `USO ${sigla}`)) return false;
+                        return true;
+                      }).sort((a, b) => {
                         const indexA = order.indexOf(a.replace(/"/g, '').toUpperCase());
                         const indexB = order.indexOf(b.replace(/"/g, '').toUpperCase());
                         if (indexA === -1 && indexB === -1) return 0;
@@ -549,10 +556,10 @@ export default function DocumentosPage() {
                             key={key} 
                             style={{ width, minWidth: width }}
                             onClick={() => handleSort(key)}
-                            className={`relative px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] hover:text-[var(--primary)] transition-colors border-r border-slate-100 whitespace-nowrap cursor-pointer group/th ${isName ? 'overflow-hidden text-ellipsis' : 'text-center'} ${sortConfig.key === key ? 'bg-[var(--primary)]/5 text-[var(--primary)]' : ''}`}
+                            className={`relative px-4 py-3 text-[10px] font-black text-muted uppercase tracking-[0.2em] hover:text-[var(--primary)] transition-colors border-r border-border whitespace-nowrap cursor-pointer group/th ${isName ? 'overflow-hidden text-ellipsis' : 'text-center'} ${sortConfig.key === key ? 'bg-[var(--primary)]/5 text-[var(--primary)]' : ''}`}
                           >
                             <div className={`flex items-center gap-2 ${!isName ? 'justify-center' : ''}`}>
-                              <Filter size={10} className={`transition-colors ${sortConfig.key === key ? 'text-[var(--primary)]' : 'text-slate-300 group-hover/th:text-slate-500'}`} />
+                              <Filter size={10} className={`transition-colors ${sortConfig.key === key ? 'text-[var(--primary)]' : '-muted group-hover/-muted'}`} />
                               {cleanKey}
                               {sortConfig.key === key && (
                                 <span className="text-[var(--primary)]">
@@ -577,24 +584,31 @@ export default function DocumentosPage() {
                     return (
                        <tr 
                         key={idx} 
-                        className={`transition-all group cursor-pointer border-l-4 ${isSelected ? 'bg-[var(--primary)]/5 border-[var(--primary)] text-slate-900' : 'hover:bg-slate-50 border-transparent text-slate-600'}`}
+                        onClick={() => setSelectedDoc(docCode)}
+                        className={`transition-all group cursor-pointer border-l-4 ${isSelected ? 'bg-[var(--primary)]/5 border-[var(--primary)] text-foreground' : '-background border-transparent text-muted'}`}
                       >
-                        <td className="px-3 py-2 border-r border-slate-50 text-center">
+                        <td className="px-3 py-2 border-r -border text-center">
                           <button 
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedDoc(docCode);
                               setSidebarOpen(true);
                             }}
-                            className={`p-1.5 rounded-full transition-all ${isSelected && sidebarOpen ? 'bg-[var(--primary)] text-white' : 'text-slate-300 hover:text-[var(--primary)] hover:bg-[var(--primary)]/10'}`}
+                            className={`p-1.5 rounded-none transition-all ${isSelected && sidebarOpen ? 'bg-[var(--primary)] text-foreground' : '-muted hover:text-[var(--primary)] hover:bg-[var(--primary)]/10'}`}
                           >
                             <Info size={14} />
                           </button>
                         </td>
                         {(() => {
                           const entries = Object.entries(row);
-                          const order = ['CÓDIGO', 'NOME', 'VERSAO', 'CSSJ', 'HST', 'HSC', 'HSJ', 'HMRP', 'HCNSC', 'HR', 'ÚLTIMO USO', 'ULT. GERAL', 'TOTAL', 'ULTIMO REGISTRO'];
-                          const sortedEntries = entries.sort((a, b) => {
+                          const order = ['CÓDIGO', 'NOME', 'VERSAO', ...activeHospitals.map(h => h.sigla), 'ÚLTIMO USO', 'ULT. GERAL', 'TOTAL', 'ULTIMO REGISTRO'];
+                          const filteredEntries = entries.filter(([key]) => {
+                            const cleanKey = key.replace(/"/g, '').toUpperCase();
+                            if (inactiveHospitals.includes(cleanKey)) return false;
+                            if (inactiveHospitals.some(sigla => cleanKey === `USO ${sigla}`)) return false;
+                            return true;
+                          });
+                          const sortedEntries = filteredEntries.sort((a, b) => {
                             const indexA = order.indexOf(a[0].replace(/"/g, '').toUpperCase());
                             const indexB = order.indexOf(b[0].replace(/"/g, '').toUpperCase());
                             if (indexA === -1 && indexB === -1) return 0;
@@ -609,21 +623,21 @@ export default function DocumentosPage() {
                             const isCodigo = cleanKey === 'CÓDIGO';
                             const width = columnWidths[key] || (isName ? 350 : isCodigo ? 50 : 65);
                             const renderValue = () => {
-                              if (val === null || val === undefined) return <span className="text-slate-300 italic opacity-50">--</span>;
+                              if (val === null || val === undefined) return <span className="-muted italic opacity-50">--</span>;
                               const strVal = String(val);
                               const cleanKey = key.replace(/"/g, '').toUpperCase();
-                              const companyCols = ['HSC', 'CSSJ', 'HST', 'HSJ', 'HCNSC', 'HMRP', 'HR'];
-                              const usageCols = ['USO HSC', 'USO CSSJ', 'USO HST', 'USO HSJ', 'USO HCNSC', 'USO HMRP', 'USO HR', 'TOTAL'];
+                              const companyCols = activeHospitals.map(h => h.sigla);
+                              const usageCols = [...activeHospitals.map(h => `USO ${h.sigla}`), 'TOTAL'];
                               
                               if (companyCols.includes(cleanKey)) {
-                                if (strVal === '1') return <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mx-auto shadow-[0_0_8px_rgba(16,185,129,0.5)]" title="Ativo" />;
-                                if (strVal === '0') return <div className="w-1.5 h-1.5 rounded-full bg-slate-200 mx-auto" title="Inativo" />;
+                                if (strVal === '1') return <div className="w-1.5 h-1.5 rounded-none bg-emerald-500 mx-auto shadow-[0_0_8px_rgba(16,185,129,0.5)]" title="Ativo" />;
+                                if (strVal === '0') return <div className="w-1.5 h-1.5 rounded-none -card mx-auto" title="Inativo" />;
                               }
 
                               if (usageCols.includes(cleanKey)) {
                                 const num = Number(val);
-                                if (num > 0) return <span className="font-black text-[var(--primary)] bg-[var(--primary)]/5 px-2 py-0.5 rounded-lg border border-[var(--primary)]/10">{num.toLocaleString('pt-BR')}</span>;
-                                return <span className="text-slate-300 font-normal">0</span>;
+                                if (num > 0) return <span className="font-black text-[var(--primary)] bg-[var(--primary)]/5 px-2 py-0.5 rounded-none border border-[var(--primary)]/10">{num.toLocaleString('pt-BR')}</span>;
+                                return <span className="-muted font-normal">0</span>;
                               }
 
                               const isNameOrCode = cleanKey === 'NOME' || cleanKey === 'CÓDIGO' || cleanKey === 'NM_TITULO' || cleanKey === 'CD_DOCUMENTO';
@@ -631,10 +645,10 @@ export default function DocumentosPage() {
                               if (!isNameOrCode && (strVal.includes('T') || cleanKey.startsWith('ULT.') || cleanKey.startsWith('DH_')) && !isNaN(Date.parse(strVal))) {
                                 return (
                                   <div className="flex flex-col items-center">
-                                    <span suppressHydrationWarning className="font-mono text-[9px] text-slate-900 font-black tracking-tighter">
+                                    <span suppressHydrationWarning className="font-mono text-[9px] text-foreground font-black tracking-tighter">
                                       {new Date(strVal).toLocaleDateString('pt-BR')}
                                     </span>
-                                    <span suppressHydrationWarning className="font-mono text-[8px] text-slate-400 font-bold leading-none">
+                                    <span suppressHydrationWarning className="font-mono text-[8px] text-muted font-bold leading-none">
                                       {new Date(strVal).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                     </span>
                                   </div>
@@ -646,7 +660,7 @@ export default function DocumentosPage() {
                               <td 
                                 key={vIdx} 
                                 style={{ width, minWidth: width }}
-                                className={`px-4 py-2 text-[10px] border-r border-slate-50 last:border-r-0 transition-colors whitespace-nowrap overflow-hidden text-ellipsis ${!isName ? 'text-center font-bold' : ''}`}
+                                className={`px-4 py-2 text-[10px] border-r -border last:border-r-0 transition-colors whitespace-nowrap overflow-hidden text-ellipsis ${!isName ? 'text-center font-bold' : ''}`}
                               >
                                 {renderValue()}
                               </td>
@@ -660,9 +674,9 @@ export default function DocumentosPage() {
               </table>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center space-y-4 py-32">
-                <Loader2 className="animate-spin text-slate-200" size={48} />
+                <Loader2 className="animate-spin text-zinc-700" size={48} />
                 <div className="text-center">
-                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">
+                  <p className="text-[10px] text-muted font-black uppercase tracking-[0.3em]">
                     {loading ? 'Acessando Infraestrutura Oracle...' : 'Nenhum Registro Encontrado'}
                   </p>
                 </div>
@@ -670,14 +684,14 @@ export default function DocumentosPage() {
             )}
           </div>
           
-          <div className="flex items-center justify-between px-6 py-3 bg-slate-50 border-t border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          <div className="flex items-center justify-between px-6 py-3 bg-card border-t border-border text-[10px] font-bold text-muted uppercase tracking-widest">
             <div className="flex items-center gap-6">
               <span className="flex items-center gap-2">
-                PÁGINA <b className="text-slate-900">{currentPage}</b> DE <b className="text-slate-500">{totalPages || 1}</b>
+                PÁGINA <b className="text-foreground">{currentPage}</b> DE <b className="text-muted">{totalPages || 1}</b>
               </span>
-              <span className="text-slate-200 font-normal">|</span>
+              <span className="text-zinc-700 font-normal">|</span>
               <span className="tracking-tighter">
-                VOL. ATIVO <b className="text-slate-900">{filteredData.length}</b> REGISTROS
+                VOL. ATIVO <b className="text-foreground">{filteredData.length}</b> REGISTROS
               </span>
             </div>
 
@@ -686,19 +700,19 @@ export default function DocumentosPage() {
                 <button 
                   disabled={currentPage === 1}
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  className="px-4 py-1.5 rounded-[var(--radius)] bg-white border border-slate-200 text-slate-600 hover:text-[var(--primary)] hover:border-[var(--primary)] transition-all disabled:opacity-30"
+                  className="px-4 py-1.5 rounded-none bg-background border border-border text-muted hover:text-[var(--primary)] hover:border-[var(--primary)] transition-all disabled:opacity-30"
                 >
                   VOLTAR
                 </button>
                 <button 
                   disabled={currentPage === totalPages || totalPages === 0}
                   onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  className="px-4 py-1.5 rounded-[var(--radius)] bg-slate-900 text-white hover:bg-slate-800 transition-all disabled:opacity-30"
+                  className="px-4 py-1.5 rounded-none bg-card text-foreground -background transition-all disabled:opacity-30"
                 >
                   AVANÇAR
                 </button>
               </div>
-              <span className="text-slate-200 font-normal">|</span>
+              <span className="text-zinc-700 font-normal">|</span>
               <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-none bg-emerald-500"></span>
                   <span className="text-emerald-600 font-black">Sincronizado</span>
@@ -708,26 +722,26 @@ export default function DocumentosPage() {
         </div>
 
         {selectedDoc && (
-          <div id="perfil-detalhes" className="bg-white rounded-[var(--radius)] border border-slate-200 overflow-hidden animate-in slide-in-from-bottom-6 duration-500 shadow-xl relative">
+          <div id="perfil-detalhes" className="bg-background rounded-none border border-border overflow-hidden animate-in slide-in-from-bottom-6 duration-500 shadow-none relative">
             <div className="absolute top-0 left-0 w-full h-1 bg-[var(--primary)]"></div>
-            <div className="flex items-center justify-between px-8 py-5 border-b border-slate-100">
+            <div className="flex items-center justify-between px-8 py-5 border-b border-border">
               <div className="flex items-center gap-4">
-                <div className="p-3 rounded-[var(--radius)] bg-slate-50 text-[var(--primary)] border border-slate-100">
+                <div className="p-3 rounded-none bg-card text-[var(--primary)] border border-border">
                   <ListFilter size={20} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter italic">Vínculos de Perfil Automático</h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Hardware ID: <b className="text-[var(--primary)]">{selectedDoc}</b></p>
+                  <h3 className="text-lg font-black text-foreground uppercase tracking-tighter italic">Vínculos de Perfil Automático</h3>
+                  <p className="text-[10px] text-muted font-bold uppercase tracking-widest mt-0.5">Hardware ID: <b className="text-[var(--primary)]">{selectedDoc}</b></p>
                 </div>
               </div>
 
               <div className="flex items-center gap-4 flex-1 max-w-2xl px-8">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 -muted" size={12} />
                   <input 
                     type="text"
                     placeholder="Filtrar perfil..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-[var(--radius)] pl-9 pr-4 py-2 text-[10px] font-bold text-slate-700 outline-none focus:border-[var(--primary)] transition-all uppercase tracking-widest"
+                    className="w-full bg-card border border-border rounded-none pl-9 pr-4 py-2 text-[10px] font-bold text-foreground outline-none focus:border-[var(--primary)] transition-all uppercase tracking-widest"
                     value={profileSearchTerm}
                     onChange={(e) => {
                       setProfileSearchTerm(e.target.value);
@@ -736,7 +750,7 @@ export default function DocumentosPage() {
                   />
                 </div>
                 <select 
-                  className="bg-slate-50 border border-slate-200 rounded-[var(--radius)] px-4 py-2 text-[10px] font-bold text-slate-700 outline-none focus:border-[var(--primary)] w-32 transition-all cursor-pointer uppercase"
+                  className="bg-card border border-border rounded-none px-4 py-2 text-[10px] font-bold text-foreground outline-none focus:border-[var(--primary)] w-32 transition-all cursor-pointer uppercase"
                   value={profileUnitFilter}
                   onChange={(e) => {
                     setProfileUnitFilter(e.target.value);
@@ -744,8 +758,8 @@ export default function DocumentosPage() {
                   }}
                 >
                   <option value="">UNIDADE</option>
-                  {['HSC', 'CSSJ', 'HST', 'HSJ', 'HMRP', 'HCNSC', 'HR'].map(unit => (
-                    <option key={unit} value={unit}>{unit}</option>
+                  {activeHospitals.map(unit => (
+                    <option key={unit.sigla} value={unit.sigla}>{unit.sigla}</option>
                   ))}
                 </select>
               </div>
@@ -753,22 +767,22 @@ export default function DocumentosPage() {
               <div className="flex items-center gap-2">
                 <button 
                   onClick={exportToCSV}
-                  className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-600 rounded-[var(--radius)] border border-slate-200 transition-all text-[10px] font-black uppercase tracking-widest"
+                  className="flex items-center gap-2 px-4 py-2 bg-background -background text-muted rounded-none border border-border transition-all text-[10px] font-black uppercase tracking-widest"
                 >
                   <FileSpreadsheet size={16} className="text-emerald-600" />
                   Excel
                 </button>
                 <button 
                   onClick={exportToPDF}
-                  className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-600 rounded-[var(--radius)] border border-slate-200 transition-all text-[10px] font-black uppercase tracking-widest"
+                  className="flex items-center gap-2 px-4 py-2 bg-background -background text-muted rounded-none border border-border transition-all text-[10px] font-black uppercase tracking-widest"
                 >
-                  <Printer size={16} className="text-slate-400" />
+                  <Printer size={16} className="text-muted" />
                   Print
                 </button>
-                <div className="w-px h-8 bg-slate-100 mx-2"></div>
+                <div className="w-px h-8 -background mx-2"></div>
                 <button 
                   onClick={() => setSelectedDoc(null)}
-                  className="p-2 hover:bg-slate-50 rounded-full text-slate-400 hover:text-rose-600 transition-all"
+                  className="p-2 -background rounded-none text-muted hover:text-red-500 transition-all"
                 >
                   <X size={24} />
                 </button>
@@ -779,33 +793,33 @@ export default function DocumentosPage() {
               {profileLoading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-6">
                   <Loader2 className="text-[var(--primary)] animate-spin" size={48} />
-                  <span className="text-[10px] text-slate-400 font-black uppercase tracking-[0.4em] animate-pulse">Relacionando Registros...</span>
+                  <span className="text-[10px] text-muted font-black uppercase tracking-[0.4em] animate-pulse">Relacionando Registros...</span>
                 </div>
               ) : profileData.length > 0 ? (
                 <>
-                  <div className="overflow-x-auto border border-slate-200 rounded-[var(--radius)] bg-slate-50/30">
+                  <div className="overflow-x-auto border border-border rounded-none -background">
                     <table className="w-full text-left border-collapse table-auto min-w-max">
                       <thead>
-                        <tr className="bg-slate-50 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] border-b border-slate-200">
-                          <th className="px-8 py-4 border-r border-slate-100 whitespace-nowrap">Cód. Interno</th>
-                          <th className="px-8 py-4 border-r border-slate-100 whitespace-nowrap">Descrição Doc</th>
-                          <th className="px-8 py-4 border-r border-slate-100 whitespace-nowrap">Perfil Vinculado</th>
+                        <tr className="bg-card text-[10px] font-black text-muted uppercase tracking-[0.2em] border-b border-border">
+                          <th className="px-8 py-4 border-r border-border whitespace-nowrap">Cód. Interno</th>
+                          <th className="px-8 py-4 border-r border-border whitespace-nowrap">Descrição Doc</th>
+                          <th className="px-8 py-4 border-r border-border whitespace-nowrap">Perfil Vinculado</th>
                           <th className="px-8 py-4 text-center whitespace-nowrap">Unidade</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-bold">
                         {paginatedProfileData.map((perf, pIdx) => (
-                          <tr key={pIdx} className="hover:bg-white transition-all group bg-white/50">
-                            <td className="px-8 py-4 text-[11px] text-slate-400 group-hover:text-slate-900 border-r border-slate-50 whitespace-nowrap font-mono">{perf.CD_DOCUMENTO || selectedDoc}</td>
-                            <td className="px-8 py-4 text-[11px] text-slate-600 border-r border-slate-50 uppercase whitespace-nowrap tracking-tighter">{perf.NM_TITULO || '-'}</td>
-                            <td className="px-8 py-4 text-[12px] text-[var(--primary)] border-r border-slate-50 uppercase whitespace-nowrap">
+                          <tr key={pIdx} className="-background transition-all group -background">
+                            <td className="px-8 py-4 text-[11px] text-muted -foreground border-r -border whitespace-nowrap font-mono">{perf.CD_DOCUMENTO || selectedDoc}</td>
+                            <td className="px-8 py-4 text-[11px] text-muted border-r -border uppercase whitespace-nowrap tracking-tighter">{perf.NM_TITULO || '-'}</td>
+                            <td className="px-8 py-4 text-[12px] text-[var(--primary)] border-r -border uppercase whitespace-nowrap">
                                <div className="flex items-center gap-3">
                                  <div className="w-1.5 h-1.5 bg-[var(--primary)]"></div>
                                  {perf.DS_PERFIL_AMBULATORIAL || 'ACESSÍVEL'}
                                </div>
                             </td>
                             <td className="px-8 py-4 text-center whitespace-nowrap">
-                              <span className="bg-slate-100 px-3 py-1 text-slate-600 font-black text-[10px] border border-slate-200 italic">
+                              <span className="-background px-3 py-1 text-muted font-black text-[10px] border border-border italic">
                                 {perf.EMPRESA || '-'}
                               </span>
                             </td>
@@ -816,10 +830,10 @@ export default function DocumentosPage() {
                   </div>
 
                   {profileTotalPages > 1 && (
-                    <div className="mt-8 flex items-center justify-between px-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                    <div className="mt-8 flex items-center justify-between px-2 text-[10px] font-black text-muted uppercase tracking-[0.2em]">
                       <div className="flex items-center gap-8">
                         <span>Página {profileCurrentPage} de {profileTotalPages}</span>
-                        <span className="text-slate-200">|</span>
+                        <span className="text-zinc-700">|</span>
                         <span>{filteredProfileData.length} Correlações Encontradas</span>
                       </div>
 
@@ -827,14 +841,14 @@ export default function DocumentosPage() {
                         <button 
                           disabled={profileCurrentPage === 1}
                           onClick={() => setProfileCurrentPage(prev => Math.max(1, prev - 1))}
-                          className="px-6 py-2 bg-white border border-slate-200 text-slate-900 hover:text-[var(--primary)] transition-all disabled:opacity-30"
+                          className="px-6 py-2 bg-background border border-border text-foreground hover:text-[var(--primary)] transition-all disabled:opacity-30"
                         >
                           ANTERIOR
                         </button>
                         <button 
                           disabled={profileCurrentPage === profileTotalPages}
                           onClick={() => setProfileCurrentPage(prev => Math.min(profileTotalPages, prev + 1))}
-                          className="px-6 py-2 bg-slate-900 text-white font-black hover:bg-slate-800 transition-all disabled:opacity-30"
+                          className="px-6 py-2 bg-card text-foreground font-black -background transition-all disabled:opacity-30"
                         >
                           PRÓXIMO
                         </button>
@@ -844,8 +858,8 @@ export default function DocumentosPage() {
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 opacity-40 text-center">
-                  <XCircle size={64} className="text-slate-300 mb-6" />
-                  <p className="text-sm font-black uppercase tracking-[0.3em] text-slate-500 italic">Shadow Profile Indisponível</p>
+                  <XCircle size={64} className="-muted mb-6" />
+                  <p className="text-sm font-black uppercase tracking-[0.3em] text-muted italic">Shadow Profile Indisponível</p>
                 </div>
               )}
             </div>
@@ -855,60 +869,63 @@ export default function DocumentosPage() {
 
       {/* Sidebar Técnico (Opção B) */}
       <div 
-        className={`fixed top-0 right-0 h-full bg-white shadow-[-20px_0_50px_rgba(0,0,0,0.1)] z-[100] transition-all duration-500 ease-in-out transform flex flex-col ${sidebarOpen ? 'translate-x-0 w-[450px]' : 'translate-x-full w-[450px]'}`}
+        className={`fixed top-0 right-0 h-full bg-background border-l border-border z-[100] transition-all duration-500 ease-in-out transform flex flex-col ${sidebarOpen ? 'translate-x-0 w-[450px]' : 'translate-x-full w-[450px]'}`}
       >
         <button 
           onClick={() => setSidebarOpen(false)}
-          className="absolute -left-12 top-6 p-3 bg-white border border-slate-200 rounded-l-xl text-slate-400 hover:text-[var(--primary)] shadow-[-5px_0_15px_rgba(0,0,0,0.05)] transition-all"
+          className="absolute -left-12 top-6 p-3 bg-background border border-border rounded-none text-muted hover:text-[var(--primary)] shadow-[-5px_0_15px_rgba(0,0,0,0.05)] transition-all"
         >
           <X size={20} />
         </button>
 
         {/* Lógica de Extração de Metadados (Fix: Oracle Aliases in Uppercase) */}
         {(() => {
-          const activeSpecs = metadata.find(m => m.STATUS_ATIVO === 'S' && m.IDENTIFICADOR_LAYOUT === 'RELATORIO') 
-                           || metadata.find(m => m.STATUS_ATIVO === 'S');
+          // Busca a versão publicada (TIPO_VERSAO = 3) do layout TELA (TIPO_LAYOUT = 1)
+          const activeSpecs = metadata.find(m => m.CODIGO_TIPO_VERSAO === 3 && m.CODIGO_TIPO_LAYOUT === 1) 
+                           || metadata.find(m => m.CODIGO_TIPO_VERSAO === 3 && m.CODIGO_TIPO_LAYOUT === 2)
+                           || metadata.find(m => m.CODIGO_TIPO_VERSAO === 3)
+                           || metadata[0];
           
           const hasTestVersion = metadata.some(m => m.CODIGO_TIPO_VERSAO === 1);
           const publishedRow = metadata.find(m => m.CODIGO_TIPO_VERSAO === 3);
 
           return (
             <>
-              <div className="p-8 border-b border-slate-100 bg-slate-50/50">
+              <div className="p-8 border-b border-border -background">
                 <div className="flex items-center gap-3 mb-2">
-                  <span className="px-2 py-0.5 bg-[var(--primary)] text-white text-[9px] font-black rounded uppercase tracking-wider">
+                  <span className="px-2 py-0.5 bg-[var(--primary)] text-foreground text-[9px] font-black rounded uppercase tracking-wider">
                     Document Specs
                   </span>
                   {hasTestVersion && (
-                    <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[9px] font-black rounded uppercase tracking-wider flex items-center gap-1">
+                    <span className="px-2 py-0.5 bg-red-100 text-red-500 text-[9px] font-black rounded uppercase tracking-wider flex items-center gap-1">
                       <AlertTriangle size={10} /> Versão de Teste
                     </span>
                   )}
                 </div>
-                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter leading-tight italic">
+                <h3 className="text-xl font-black text-foreground uppercase tracking-tighter leading-tight italic">
                   {metadata[0]?.DESCRICAO_DOCUMENTO || 'Detalhes Técnicos'}
                 </h3>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">
+                <p className="text-[10px] text-muted font-bold uppercase tracking-[0.2em] mt-1">
                   Oracle Identifier: <b className="text-[var(--primary)]">{selectedDoc}</b>
                 </p>
               </div>
 
-              <div className="flex border-b border-slate-100 px-8">
+              <div className="flex border-b border-border px-8">
                 <button 
                   onClick={() => setActiveTab('specs')}
-                  className={`px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] border-b-2 transition-all ${activeTab === 'specs' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                  className={`px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] border-b-2 transition-all ${activeTab === 'specs' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-muted -muted'}`}
                 >
                   Especificações
                 </button>
                 <button 
                   onClick={() => setActiveTab('history')}
-                  className={`px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] border-b-2 transition-all ${activeTab === 'history' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                  className={`px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] border-b-2 transition-all ${activeTab === 'history' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-muted -muted'}`}
                 >
                   Histórico
                 </button>
                 <button 
                   onClick={() => setActiveTab('actions')}
-                  className={`px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] border-b-2 transition-all ${activeTab === 'actions' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                  className={`px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] border-b-2 transition-all ${activeTab === 'actions' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-muted -muted'}`}
                 >
                   Vínculos SQL
                 </button>
@@ -918,27 +935,28 @@ export default function DocumentosPage() {
                 {metadataLoading ? (
                   <div className="h-full flex flex-col items-center justify-center gap-4 opacity-50">
                     <Loader2 className="animate-spin text-[var(--primary)]" size={32} />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Consultando Banco...</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-muted">Consultando Banco...</span>
                   </div>
                 ) : activeTab === 'specs' ? (
                   <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
                     <section>
                       <div className="flex items-center gap-2 mb-4">
-                        <Settings size={14} className="text-slate-400" />
-                        <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Configurações da Versão</h4>
+                        <Settings size={14} className="text-muted" />
+                        <h4 className="text-[11px] font-black text-foreground uppercase tracking-[0.2em]">Configurações da Versão</h4>
                       </div>
                       <div className="grid grid-cols-1 gap-4">
                         {[
                           { label: 'Identificador do Documento', value: activeSpecs?.IDENTIFICADOR_DOCUMENTO },
-                          { label: 'Última Versão Publicada', value: publishedRow?.VALOR_VERSAO || 'N/A' },
-                          { label: 'Tipo de Layout Ativo', value: activeSpecs?.DESCRICAO_TIPO_LAYOUT },
+                          { label: 'Quantidade de Campos', value: activeSpecs?.QUANTIDADE_CAMPOS ?? 0 },
+                          { label: 'Quantidade de Regras', value: activeSpecs?.QUANTIDADE_REGRAS ?? 0 },
+                          { label: 'Última Versão Publicada', value: publishedRow?.VALOR_VERSAO },
                           { label: 'Código do Cabeçalho (Ativo)', value: activeSpecs?.CODIGO_LAYOUT_CABECALHO || 'Sem Cabeçalho' },
                           { label: 'Documento Origem Cabecalho', value: activeSpecs?.DOCUMENTO_CABECALHO },
                           { label: 'Código do Rodapé', value: activeSpecs?.CODIGO_LAYOUT_RODAPE || 'Sem Rodapé' },
-                        ].map((item, i) => (
-                          <div key={i} className="bg-slate-50 border border-slate-100 p-4 rounded-lg group hover:bg-white hover:border-[var(--primary)]/20 transition-all">
-                            <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{item.label}</span>
-                            <span className="block text-xs font-bold text-slate-700 font-mono">{item.value || '--'}</span>
+                        ].filter(item => item.value !== 'N/A' && item.value !== null && item.value !== undefined).map((item, i) => (
+                          <div key={i} className="bg-card border border-border p-4 rounded-none group -background hover:border-[var(--primary)]/20 transition-all">
+                            <span className="block text-[9px] font-black text-muted uppercase tracking-widest mb-1">{item.label}</span>
+                            <span className="block text-xs font-bold text-foreground font-mono">{item.value ?? '--'}</span>
                           </div>
                         ))}
                       </div>
@@ -947,25 +965,25 @@ export default function DocumentosPage() {
                 ) : activeTab === 'history' ? (
                   <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                      {metadata.sort((a, b) => b.VALOR_VERSAO - a.VALOR_VERSAO).map((v, idx) => (
-                       <div key={idx} className={`relative pl-8 pb-6 border-l-2 ${v.STATUS_ATIVO === 'S' ? 'border-[var(--primary)]' : 'border-slate-100'} last:pb-0`}>
-                         <div className={`absolute left-[-9px] top-0 w-4 h-4 rounded-full border-4 bg-white ${v.STATUS_ATIVO === 'S' ? 'border-[var(--primary)] scale-110 shadow-[0_0_10px_rgba(var(--primary-rgb),0.3)]' : 'border-slate-100'}`}></div>
+                       <div key={idx} className={`relative pl-8 pb-6 border-l-2 ${v.STATUS_ATIVO === 'S' ? 'border-[var(--primary)]' : 'border-border'} last:pb-0`}>
+                         <div className={`absolute left-[-9px] top-0 w-4 h-4 rounded-none border-4 bg-background ${v.STATUS_ATIVO === 'S' ? 'border-[var(--primary)] scale-110 shadow-[0_0_10px_rgba(var(--primary-rgb),0.3)]' : 'border-border'}`}></div>
                          <div className="flex items-center justify-between mb-1">
-                           <span className="text-[11px] font-black text-slate-900 uppercase tracking-tighter">
+                           <span className="text-[11px] font-black text-foreground uppercase tracking-tighter">
                              Versão {v.VALOR_VERSAO}
                            </span>
                            <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border transition-colors ${
-                             v.CODIGO_TIPO_VERSAO === 3 ? 'bg-emerald-50 text-emerald-600 border-emerald-500 ring-1 ring-emerald-500 shadow-sm' : 
-                             v.CODIGO_TIPO_VERSAO === 2 ? 'bg-blue-50 text-blue-600 border-blue-500 ring-1 ring-blue-500 shadow-sm' : 
-                             v.CODIGO_TIPO_VERSAO === 1 ? 'bg-red-50 text-red-600 border-red-500 ring-1 ring-red-500 shadow-sm' : 'bg-slate-50 text-slate-400 border-slate-100'
+                             v.CODIGO_TIPO_VERSAO === 3 ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500 ring-1 ring-emerald-500 shadow-none' : 
+                             v.CODIGO_TIPO_VERSAO === 2 ? 'bg-blue-500/10 text-blue-600 border-blue-500 ring-1 ring-blue-500 shadow-none' : 
+                             v.CODIGO_TIPO_VERSAO === 1 ? 'bg-red-500/10 text-red-500 border-red-500/50 ring-1 ring-red-500 shadow-none' : 'bg-card text-muted border-border'
                            }`}>
                              {v.DESCRICAO_TIPO_VERSAO}
                            </span>
                          </div>
-                         <div className="text-[10px] text-slate-500 font-bold">
+                         <div className="text-[10px] text-muted font-bold">
                            <div className="flex items-center gap-2 mb-1 uppercase tracking-tighter">
-                              <span className="text-slate-300">Layout:</span> {v.DESCRICAO_TIPO_LAYOUT}
+                              <span className="-muted">Layout:</span> {v.DESCRICAO_TIPO_LAYOUT}
                            </div>
-                           <div className="flex items-center gap-2 text-slate-400 font-mono text-[9px]">
+                           <div className="flex items-center gap-2 text-muted font-mono text-[9px]">
                               ID Versão: {v.CODIGO_VERSAO_DOCUMENTO}
                            </div>
                          </div>
@@ -982,17 +1000,17 @@ export default function DocumentosPage() {
                     <div className="flex flex-col gap-4 mb-4">
                         <div className="flex items-center gap-2">
                             <Zap size={14} className="text-amber-500 fill-amber-500" />
-                            <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Fluxos e Relacionamentos</h4>
+                            <h4 className="text-[11px] font-black text-foreground uppercase tracking-[0.2em]">Fluxos e Relacionamentos</h4>
                         </div>
                         
                         {uniqueRelatedDocs.length > 0 && !metadataActionsLoading && (
-                          <div className="flex flex-wrap gap-2 py-2 border-y border-slate-100/50">
+                          <div className="flex flex-wrap gap-2 py-2 border-y -border">
                             <button 
                               onClick={() => setActionsFilterDoc(null)}
-                              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
+                              className={`px-3 py-1.5 rounded-none text-[9px] font-black uppercase tracking-widest transition-all ${
                                 actionsFilterDoc === null 
-                                ? 'bg-[var(--primary)] text-white shadow-md shadow-[var(--primary)]/20' 
-                                : 'bg-slate-50 text-slate-400 hover:bg-slate-100 border border-slate-100'
+                                ? 'bg-[var(--primary)] text-foreground shadow-none shadow-[var(--primary)]/20' 
+                                : 'bg-card text-muted -background border border-border'
                               }`}
                             >
                               Todos
@@ -1001,10 +1019,10 @@ export default function DocumentosPage() {
                               <button 
                                 key={docId}
                                 onClick={() => setActionsFilterDoc(docId)}
-                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border ${
+                                className={`px-3 py-1.5 rounded-none text-[9px] font-black uppercase tracking-widest transition-all border ${
                                   actionsFilterDoc === docId 
-                                  ? 'bg-indigo-600 text-white border-indigo-700 shadow-md shadow-indigo-200' 
-                                  : 'bg-white text-indigo-500 border-indigo-100 hover:border-indigo-300 hover:bg-indigo-50'
+                                  ? 'bg-indigo-600 text-foreground border-indigo-700 shadow-none shadow-indigo-200' 
+                                  : 'bg-background text-indigo-500 border-indigo-100 hover:border-indigo-300 hover:bg-indigo-50'
                                 }`}
                               >
                                 {docId}
@@ -1017,18 +1035,18 @@ export default function DocumentosPage() {
                     {metadataActionsLoading ? (
                       <div className="py-20 flex flex-col items-center justify-center gap-4 opacity-50">
                         <Loader2 className="animate-spin text-[var(--primary)]" size={32} />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Escaneando Scripts...</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-muted">Escaneando Scripts...</span>
                       </div>
                     ) : metadataActionsError ? (
-                      <div className="py-12 px-6 bg-red-50 border border-red-100 rounded-xl text-center">
+                      <div className="py-12 px-6 bg-red-500/10 border border-red-100 rounded-none text-center">
                         <AlertTriangle size={32} className="text-red-400 mx-auto mb-4" />
-                        <p className="text-[10px] font-black text-red-700 uppercase tracking-[0.2em] mb-2 font-mono">Erro de Query Oracle</p>
+                        <p className="text-[10px] font-black text-red-500 uppercase tracking-[0.2em] mb-2 font-mono">Erro de Query Oracle</p>
                         <p className="text-[9px] text-red-500 font-mono leading-relaxed line-clamp-3 overflow-hidden mb-4">
                           {metadataActionsError}
                         </p>
                         <button 
                           onClick={() => fetchActions(selectedDoc!)}
-                          className="px-4 py-2 bg-red-100 text-red-700 text-[9px] font-black rounded uppercase hover:bg-red-200 transition-all shadow-sm"
+                          className="px-4 py-2 bg-red-100 text-red-500 text-[9px] font-black rounded uppercase hover:bg-red-200 transition-all shadow-none"
                         >
                           Tentar Novamente
                         </button>
@@ -1043,34 +1061,34 @@ export default function DocumentosPage() {
                             return single || group;
                           })
                           .map((action, idx) => (
-                          <div key={idx} className="bg-slate-50 border border-slate-100 rounded-lg overflow-hidden group hover:border-[var(--primary)]/30 transition-all shadow-sm">
-                            <div className="p-4 border-b border-slate-100 flex items-start justify-between bg-white">
+                          <div key={idx} className="bg-card border border-border rounded-none overflow-hidden group hover:border-[var(--primary)]/30 transition-all shadow-none">
+                            <div className="p-4 border-b border-border flex items-start justify-between bg-background">
                               <div className="flex-1 mr-2">
-                                <span className="block text-[10px] font-black text-slate-900 uppercase tracking-widest mb-1 leading-tight">{action.NOME_CAMPO || 'Campo sem Nome'}</span>
-                                <span className="block text-[9px] font-bold text-slate-400 font-mono italic">{action.IDENTIFICADOR_CAMPO}</span>
+                                <span className="block text-[10px] font-black text-foreground uppercase tracking-widest mb-1 leading-tight">{action.NOME_CAMPO || 'Campo sem Nome'}</span>
+                                <span className="block text-[9px] font-bold text-muted font-mono italic">{action.IDENTIFICADOR_CAMPO}</span>
                               </div>
                               <div className="text-right flex flex-col items-end gap-1 shrink-0">
                                 {action.DOCUMENTO_RELACIONADO && (
-                                  <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[8px] font-black rounded uppercase tracking-wider border border-emerald-200 shadow-sm">
+                                  <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-700 text-[8px] font-black rounded uppercase tracking-wider border border-emerald-500/20 shadow-none">
                                     Doc: {action.DOCUMENTO_RELACIONADO}
                                   </span>
                                 )}
                                 {action.GRUPO_DOCS_RELACIONADOS && (
-                                  <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[8px] font-black rounded uppercase tracking-wider border border-indigo-200 shadow-sm">
+                                  <span className="px-2 py-0.5 bg-indigo-500/10 text-indigo-700 text-[8px] font-black rounded uppercase tracking-wider border border-indigo-200 shadow-none">
                                     Grupo: {action.GRUPO_DOCS_RELACIONADOS}
                                   </span>
                                 )}
                                 {!action.DOCUMENTO_RELACIONADO && !action.GRUPO_DOCS_RELACIONADOS && (
-                                  <span className="px-2 py-0.5 bg-slate-100 text-slate-400 text-[8px] font-black rounded uppercase tracking-wider">
+                                  <span className="px-2 py-0.5 -background text-muted text-[8px] font-black rounded uppercase tracking-wider">
                                     S/ Vínculo Direto
                                   </span>
                                 )}
                               </div>
                             </div>
-                            <div className="p-4 bg-slate-50/50">
+                            <div className="p-4 -background">
                                <div className="flex flex-col gap-2">
                                  <div className="flex items-center justify-between">
-                                   <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Escopo da Lógica SQL</span>
+                                   <span className="text-[8px] font-black text-muted uppercase tracking-[0.2em]">Escopo da Lógica SQL</span>
                                    <button 
                                     onClick={(e) => {
                                       const next = e.currentTarget.parentElement?.nextElementSibling;
@@ -1082,7 +1100,7 @@ export default function DocumentosPage() {
                                    </button>
                                  </div>
                                  <div className="hidden mt-1 block w-full">
-                                    <pre className="text-[9px] font-mono text-slate-600 bg-white p-3 rounded border border-slate-200 overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-[150px] overflow-y-auto shadow-inner">
+                                    <pre className="text-[9px] font-mono text-muted bg-background p-3 rounded border border-border overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-[150px] overflow-y-auto shadow-inner">
                                       {action.SCRIPT_ACAO_COMPLETO}
                                     </pre>
                                  </div>
@@ -1092,9 +1110,9 @@ export default function DocumentosPage() {
                         ))}
                       </div>
                     ) : (
-                      <div className="py-20 text-center bg-slate-50 border border-dashed border-slate-200 rounded-xl">
-                        <Unlink size={32} className="text-slate-300 mx-auto mb-4" />
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Nenhum Vínculo Detectado</p>
+                      <div className="py-20 text-center bg-card border border-dashed border-border rounded-none">
+                        <Unlink size={32} className="-muted mx-auto mb-4" />
+                        <p className="text-[10px] font-black text-muted uppercase tracking-[0.2em]">Nenhum Vínculo Detectado</p>
                       </div>
                     )}
                   </div>
@@ -1103,35 +1121,23 @@ export default function DocumentosPage() {
             </>
           );
         })()}
-
-        <div className="p-8 border-t border-slate-100 bg-slate-50/30 flex items-center gap-3">
-           <button 
-             onClick={() => window.open(`http://dev3-mvh5.acsc.org.br:84/mveditor/report?regId=${selectedDoc}`, '_blank')}
-             className="flex-1 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-[0.98]"
-           >
-             Abrir no Editor
-           </button>
-           <button className="p-3 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-[var(--primary)] hover:border-[var(--primary)]/20 transition-all shadow-sm">
-             <RefreshCw size={16} onClick={() => fetchMetadata(selectedDoc!)} className={metadataLoading ? 'animate-spin' : ''} />
-           </button>
-        </div>
       </div>
 
-      <div id="print-area" className="hidden print:block print:bg-white print:text-black w-full" style={{ position: 'absolute', top: 0, left: 0, zIndex: 9999 }}>
+      <div id="print-area" className="hidden print:block -background print:text-black w-full" style={{ position: 'absolute', top: 0, left: 0, zIndex: 9999 }}>
         <div className="p-8">
           <div className="mb-8 border-b-4 border-black pb-4">
             <h1 className="text-3xl font-black uppercase tracking-tighter">Relatório de Perfis Vinculados</h1>
             <div className="mt-4 grid grid-cols-3 gap-8 text-[12px] font-mono uppercase">
               <div className="flex flex-col">
-                <span className="text-slate-500 text-[10px]">Identificador do Documento</span>
+                <span className="text-muted text-[10px]">Identificador do Documento</span>
                 <b className="text-lg">{selectedDoc}</b>
               </div>
               <div className="flex flex-col">
-                <span className="text-slate-500 text-[10px]">Data de Geração</span>
+                <span className="text-muted text-[10px]">Data de Geração</span>
                 <b suppressHydrationWarning>{reportDate || '...'}</b>
               </div>
               <div className="flex flex-col">
-                <span className="text-slate-500 text-[10px]">Total de Perfis</span>
+                <span className="text-muted text-[10px]">Total de Perfis</span>
                 <b className="text-emerald-700">{filteredProfileData.length}</b>
               </div>
             </div>
@@ -1139,26 +1145,26 @@ export default function DocumentosPage() {
           
           <table className="w-full text-[10px] border-collapse">
             <thead>
-              <tr className="bg-slate-100 italic border-b-2 border-black">
-                <th className="border border-slate-300 px-4 py-3 text-left">CÓD. DOC</th>
-                <th className="border border-slate-300 px-4 py-3 text-left">NOME DO DOCUMENTO</th>
-                <th className="border border-slate-300 px-4 py-3 text-left">PERFIL AMBULATORIAL</th>
-                <th className="border border-slate-300 px-4 py-3 text-center">EMPRESA</th>
+              <tr className="-background italic border-b-2 border-black">
+                <th className="border -border px-4 py-3 text-left">CÓD. DOC</th>
+                <th className="border -border px-4 py-3 text-left">NOME DO DOCUMENTO</th>
+                <th className="border -border px-4 py-3 text-left">PERFIL AMBULATORIAL</th>
+                <th className="border -border px-4 py-3 text-center">EMPRESA</th>
               </tr>
             </thead>
             <tbody>
               {filteredProfileData.map((perf, idx) => (
-                <tr key={idx} className="border-b border-slate-200 break-inside-avoid">
-                  <td className="border border-slate-300 px-4 py-2 font-mono">{perf.CD_DOCUMENTO || selectedDoc}</td>
-                  <td className="border border-slate-300 px-4 py-2 uppercase">{perf.NM_TITULO || '-'}</td>
-                  <td className="border border-slate-300 px-4 py-2 font-bold">{perf.DS_PERFIL_AMBULATORIAL || '-'}</td>
-                  <td className="border border-slate-300 px-4 py-2 text-center uppercase">{perf.EMPRESA || '-'}</td>
+                <tr key={idx} className="border-b border-border break-inside-avoid">
+                  <td className="border -border px-4 py-2 font-mono">{perf.CD_DOCUMENTO || selectedDoc}</td>
+                  <td className="border -border px-4 py-2 uppercase">{perf.NM_TITULO || '-'}</td>
+                  <td className="border -border px-4 py-2 font-bold">{perf.DS_PERFIL_AMBULATORIAL || '-'}</td>
+                  <td className="border -border px-4 py-2 text-center uppercase">{perf.EMPRESA || '-'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
           
-          <div className="mt-12 pt-4 border-t border-slate-200 text-center text-[9px] text-slate-400 italic">
+          <div className="mt-12 pt-4 border-t border-border text-center text-[9px] text-muted italic">
             Gerado eletronicamente por DocOracle Pro. Todos os direitos reservados.
           </div>
         </div>

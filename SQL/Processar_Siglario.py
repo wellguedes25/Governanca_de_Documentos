@@ -173,7 +173,8 @@ def main():
                 TEXTO_ATUAL AS TEXTO,
                 DH_FECHAMENTO,
                 CD_PRESTADOR,
-                UNIDADE
+                UNIDADE,
+                TIPO_CAMPO
             FROM DBAMV.V_AUDITORIA_COPIA_COLA
             WHERE DH_FECHAMENTO >= TRUNC(SYSDATE) - {DIAS_A_PROCESSAR}
         """
@@ -189,13 +190,8 @@ def main():
 
         cursor.execute(query_ext)
         cols = [c[0] for c in cursor.description]
-        rows = cursor.fetchall()
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Total de documentos para auditoria: {len(rows)}")
-
-        if not rows:
-            print("Nenhum documento no período. Encerrando.")
-            return
-
+        COL = {c: i for i, c in enumerate(cols)}
+        
         # ----------------------------------------------------------
         # 2. LIMPEZA — remove infrações antigas do mesmo período
         # ----------------------------------------------------------
@@ -204,34 +200,48 @@ def main():
         if doc_filter:
             del_q += doc_filter
         cursor.execute(del_q)
+        conn.commit() # Commit do delete para liberar locks se houver
 
         # ----------------------------------------------------------
-        # 3. PROCESSAMENTO NLP
+        # 3. PROCESSAMENTO NLP EM LOTES
         # ----------------------------------------------------------
-        COL = {c: i for i, c in enumerate(cols)}
-
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Iniciando processamento NLP em lotes...")
+        
         infracoes = []
-        for row in rows:
-            texto = row[COL['TEXTO']]
-            if not texto:
-                continue
-            if hasattr(texto, 'read'):   # CLOB
-                texto = texto.read()
+        total_processados = 0
+        batch_size = 5000
+        
+        while True:
+            rows = cursor.fetchmany(batch_size)
+            if not rows:
+                break
+                
+            for row in rows:
+                texto = row[COL['TEXTO']]
+                if not texto:
+                    continue
+                if hasattr(texto, 'read'):   # CLOB
+                    texto = texto.read()
 
-            for sigla, contexto in detectar_infracoes(texto, row[COL['CD_DOCUMENTO']]):
-                infracoes.append((
-                    row[COL['CD_ATENDIMENTO']],
-                    row[COL['CD_DOCUMENTO']],
-                    0,  # CD_EDITOR_REGISTRO — não exposto na view
-                    0,  # CD_DOCUMENTO_CLINICO — não exposto na view
-                    sigla,
-                    contexto,
-                    row[COL['DH_FECHAMENTO']],
-                    row[COL['CD_PRESTADOR']],
-                    row[COL['UNIDADE']],
-                ))
+                for sigla, contexto in detectar_infracoes(texto, row[COL['CD_DOCUMENTO']]):
+                    infracoes.append((
+                        row[COL['CD_ATENDIMENTO']],
+                        row[COL['CD_DOCUMENTO']],
+                        0,
+                        0,
+                        sigla,
+                        contexto,
+                        row[COL['DH_FECHAMENTO']],
+                        row[COL['CD_PRESTADOR']],
+                        row[COL['UNIDADE']],
+                    ))
+            
+            total_processados += len(rows)
+            if total_processados % 10000 == 0 or total_processados < 10000:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Processados: {total_processados} documentos... (Infrações: {len(infracoes)})")
 
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Infrações detectadas: {len(infracoes)}")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Fim do processamento. Total documentos: {total_processados}")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Total infrações detectadas: {len(infracoes)}")
 
         # ----------------------------------------------------------
         # 4. CARGA

@@ -3,15 +3,14 @@
 import { useRouter } from 'next/navigation';
 import { useUI } from '@/context/UIContext';
 import { 
-  FileText, 
   Zap, 
   ChevronRight, 
   Building2, 
   ShieldCheck, 
   BarChart3,
-  Layers
+  Layers,
+  Activity
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 
 export default function Home() {
   const router = useRouter();
@@ -23,136 +22,119 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      {/* Decorative Background Elements */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-[var(--primary)]/5 rounded-full blur-[120px]" />
-        <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-emerald-500/5 rounded-full blur-[120px]" />
+    <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row overflow-hidden selection:bg-[var(--primary)] selection:text-black">
+      {/* 10% Asymmetric Left Bar (Gateway Sidebar) */}
+      <div className="hidden md:flex w-24 border-r border-border flex-col items-center justify-between py-8 z-10 bg-background">
+        <div className="w-12 h-12 bg-foreground text-background flex items-center justify-center font-black text-xl">
+          MP
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="-rotate-90 whitespace-nowrap text-[10px] font-black tracking-[0.3em] uppercase text-muted-foreground">
+            System Selection // Gateway
+          </div>
+        </div>
+        <div className="text-muted-foreground">
+          <Activity size={24} />
+        </div>
       </div>
 
-      <div className="max-w-5xl w-full relative z-10 space-y-12">
-        {/* Branding & Welcome */}
-        <div className="text-center space-y-4 animate-in fade-in slide-in-from-top-8 duration-1000">
-          <div className="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm border border-slate-100 mb-4">
-            <Badge className="bg-[var(--primary)] text-white border-none text-[10px] font-black tracking-widest uppercase">
-              System Selection
-            </Badge>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              Oracle ACSC Gateway
-            </span>
+      {/* 90% Main Content Area */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+        
+        {/* Editor V2 - Top Half */}
+        <button 
+          onClick={() => handleSelectVersion('V2')}
+          className="group relative flex-1 border-b border-border bg-background overflow-hidden text-left flex items-center transition-colors duration-500 hover:bg-muted/50"
+        >
+          {/* Huge Background Typography */}
+          <div className="absolute -left-10 -bottom-10 text-[25vw] leading-none font-black text-foreground opacity-5 tracking-tighter pointer-events-none transition-transform duration-700 group-hover:translate-x-10">
+            V2
           </div>
-          
-          <h1 className="text-5xl md:text-7xl font-black text-slate-900 tracking-tighter uppercase italic">
-            Medlytics <span className="text-[var(--primary)]">Pro</span>
-          </h1>
-          <p className="max-w-2xl mx-auto text-slate-500 font-bold uppercase tracking-tight text-sm">
-            Selecione a versão do ecossistema de dados para iniciar o monitoramento e auditoria clínica.
-          </p>
-        </div>
 
-        {/* Selection Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-300">
-          {/* Editor V2 Card */}
-          <button 
-            onClick={() => handleSelectVersion('V2')}
-            className="group relative bg-white border border-slate-200 p-8 rounded-[40px] text-left transition-all hover:border-[var(--primary)] hover:shadow-2xl hover:shadow-[var(--primary)]/10 hover:-translate-y-2 overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-              <Layers size={120} className="text-slate-900" />
-            </div>
-            
-            <div className="relative z-10 space-y-6">
-              <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-600 group-hover:bg-[var(--primary)] group-hover:text-white transition-all duration-500 shadow-inner">
-                <FileText size={32} />
+          <div className="relative z-10 w-full px-8 md:px-16 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+            <div className="space-y-4 max-w-2xl">
+              <div className="inline-block px-3 py-1 bg-foreground text-background text-[10px] font-bold uppercase tracking-widest">
+                Stable Release
               </div>
+              <h2 className="text-6xl md:text-8xl font-black uppercase tracking-tighter text-foreground">
+                Editor <span className="text-muted-foreground">V2</span>
+              </h2>
+              <p className="text-muted-foreground text-sm md:text-base font-medium max-w-lg uppercase tracking-tight">
+                Volume geral e telemetria operacional padrão de 90 dias. Foco em estabilidade.
+              </p>
               
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <h2 className="text-3xl font-black text-slate-900 uppercase italic tracking-tighter">Editor V2</h2>
-                  <Badge variant="outline" className="text-[9px] font-black border-slate-200 text-slate-400 group-hover:border-[var(--primary-light)] group-hover:text-[var(--primary-light)]">STABLE</Badge>
-                </div>
-                <p className="text-slate-500 text-xs font-bold leading-relaxed uppercase">
-                  Versão clássica focada em volume geral e telemetria operacional padrão de 90 dias.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-wrap gap-6 pt-4 opacity-0 group-hover:opacity-100 transition-opacity duration-500 transform translate-y-4 group-hover:translate-y-0">
                 {[
-                  { icon: <Zap size={14} />, label: 'Volume Geral' },
-                  { icon: <BarChart3 size={14} />, label: 'Ranking ABC' },
-                  { icon: <Building2 size={14} />, label: '7 Unidades' },
-                  { icon: <ShieldCheck size={14} />, label: 'Assinaturas' }
+                  { icon: <Zap size={16} />, label: 'Volume Geral' },
+                  { icon: <BarChart3 size={16} />, label: 'Ranking ABC' },
+                  { icon: <Building2 size={16} />, label: '7 Unidades' },
                 ].map((feat, i) => (
-                  <div key={i} className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    <span className="text-[var(--primary-light)]">{feat.icon}</span>
+                  <div key={i} className="flex items-center gap-2 text-xs font-bold text-foreground uppercase tracking-widest">
+                    <span className="text-muted-foreground">{feat.icon}</span>
                     {feat.label}
                   </div>
                 ))}
               </div>
+            </div>
 
-              <div className="pt-4 flex items-center justify-between text-[var(--primary)]">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] group-hover:translate-x-2 transition-transform">Acessar Sistema</span>
-                <div className="w-10 h-10 rounded-full border border-slate-100 flex items-center justify-center group-hover:bg-[var(--primary)] group-hover:text-white transition-all">
-                  <ChevronRight size={20} />
-                </div>
+            <div className="hidden md:flex items-center gap-4 text-muted-foreground transition-colors duration-300">
+              <span className="text-xs font-black uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                System_Init
+              </span>
+              <div className="w-16 h-16 border border-border flex items-center justify-center group-hover:border-foreground group-hover:bg-foreground group-hover:text-background transition-all duration-300">
+                <ChevronRight size={32} />
               </div>
             </div>
-          </button>
+          </div>
+        </button>
 
-          {/* Editor V3 Card */}
-          <button 
-            onClick={() => handleSelectVersion('V3')}
-            className="group relative bg-slate-900 border border-slate-800 p-8 rounded-[40px] text-left transition-all hover:border-emerald-500 hover:shadow-2xl hover:shadow-emerald-500/20 hover:-translate-y-2 overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Zap size={120} className="text-white" />
-            </div>
-            
-            <div className="relative z-10 space-y-6">
-              <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-all duration-500 shadow-inner border border-white/5">
-                <Zap size={32} />
+        {/* Editor V3 - Bottom Half */}
+        <button 
+          onClick={() => handleSelectVersion('V3')}
+          className="group relative flex-1 bg-background overflow-hidden text-left flex items-center transition-colors duration-500 hover:bg-[var(--primary)] group-hover-v3"
+        >
+          {/* Huge Background Typography */}
+          <div className="absolute -left-10 -bottom-10 text-[25vw] leading-none font-black text-foreground opacity-5 group-hover:opacity-10 tracking-tighter pointer-events-none transition-transform duration-700 group-hover:translate-x-10">
+            V3
+          </div>
+
+          <div className="relative z-10 w-full px-8 md:px-16 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+            <div className="space-y-4 max-w-2xl">
+              <div className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 group-hover:bg-black group-hover:text-[var(--primary)] text-[10px] font-bold uppercase tracking-widest transition-colors duration-300">
+                Advanced Build
               </div>
+              <h2 className="text-6xl md:text-8xl font-black uppercase tracking-tighter text-foreground group-hover:text-black transition-colors duration-300">
+                Editor <span className="text-emerald-600 dark:text-emerald-400 group-hover:text-black/50 transition-colors duration-300">V3</span>
+              </h2>
+              <p className="text-muted-foreground group-hover:text-black/70 text-sm md:text-base font-medium max-w-lg uppercase tracking-tight transition-colors duration-300">
+                Nova arquitetura. Granularidade total. Dados consolidados e telemetria da Empresa 63.
+              </p>
               
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter">Editor V3</h2>
-                  <Badge className="bg-emerald-500 text-white border-none text-[9px] font-black animate-pulse">ADVANCED</Badge>
-                </div>
-                <p className="text-slate-400 text-xs font-bold leading-relaxed uppercase">
-                  Nova arquitetura com dados consolidados, detalhamento granular por unidade e empresa 63.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-wrap gap-6 pt-4 opacity-0 group-hover:opacity-100 transition-opacity duration-500 transform translate-y-4 group-hover:translate-y-0">
                 {[
-                  { icon: <Zap size={14} />, label: 'Granularidade' },
-                  { icon: <BarChart3 size={14} />, label: 'Empresa 63 (HR)' },
-                  { icon: <Building2 size={14} />, label: 'Consolidado' },
-                  { icon: <ShieldCheck size={14} />, label: 'Versão Ativa' }
+                  { icon: <Activity size={16} />, label: 'Granularidade' },
+                  { icon: <Layers size={16} />, label: 'Empresa 63 (HR)' },
+                  { icon: <ShieldCheck size={16} />, label: 'Consolidado' },
                 ].map((feat, i) => (
-                  <div key={i} className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                    <span className="text-emerald-500">{feat.icon}</span>
+                  <div key={i} className="flex items-center gap-2 text-xs font-bold text-foreground group-hover:text-black uppercase tracking-widest">
+                    <span className="text-muted-foreground group-hover:text-black/50">{feat.icon}</span>
                     {feat.label}
                   </div>
                 ))}
               </div>
+            </div>
 
-              <div className="pt-4 flex items-center justify-between text-emerald-500">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] group-hover:translate-x-2 transition-transform">Acessar Sistema</span>
-                <div className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-all">
-                  <ChevronRight size={20} />
-                </div>
+            <div className="hidden md:flex items-center gap-4 text-emerald-600 dark:text-emerald-400 group-hover:text-black transition-colors duration-300">
+              <span className="text-xs font-black uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                System_Init
+              </span>
+              <div className="w-16 h-16 border border-emerald-500/30 group-hover:border-black flex items-center justify-center group-hover:bg-black group-hover:text-[var(--primary)] transition-all duration-300">
+                <ChevronRight size={32} />
               </div>
             </div>
-          </button>
-        </div>
+          </div>
+        </button>
 
-        {/* Footer Info */}
-        <div className="text-center pt-8 animate-in fade-in duration-1000 delay-700">
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">
-            Medlytics Pro • Dashboard Analytics v3.1.0 • 2026
-          </p>
-        </div>
       </div>
     </div>
   );

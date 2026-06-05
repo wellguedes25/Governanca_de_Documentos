@@ -36,6 +36,7 @@ export async function GET() {
     entries,
     params: {
       docIds: data.siglarioDocIds || data.auditDocId || "916,1048,772",
+      fieldId: data.siglarioFieldId || "",
       days: data.siglarioAuditDays || data.auditDays || 15
     }
   });
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest) {
 
   if (body.type === 'SAVE_SIGLARIO_PARAMS') {
     if (body.docIds !== undefined) data.siglarioDocIds = body.docIds;
+    if (body.fieldId !== undefined) data.siglarioFieldId = body.fieldId;
     if (body.days !== undefined) data.siglarioAuditDays = Number(body.days);
     await saveData(data);
     return NextResponse.json({ message: 'Parâmetros salvos com sucesso!' });

@@ -47,6 +47,13 @@ export interface SiglarioEntry {
   criadoEm: string;
 }
 
+export interface HospitalMapping {
+  id: number;
+  nome: string;
+  sigla: string;
+  ativo: boolean;
+}
+
 export interface StorageData {
   connections: DbConnection[];
   activeConnectionId: string | null;
@@ -59,7 +66,22 @@ export interface StorageData {
     prod24h: string;
     assinados: string;
   };
+  kpiQueriesV3?: {
+    total: string;
+    prod24h: string;
+    assinados: string;
+  };
   analyticQueries: {
+    top10: string;
+    idle: string;
+    volume3m: string;
+    unitAdherence: string;
+    unitInactivity: string;
+    volumeTurno: string;
+    slaAssinatura: string;
+    similarityStats: string;
+  };
+  analyticQueriesV3?: {
     top10: string;
     idle: string;
     volume3m: string;
@@ -81,22 +103,30 @@ export interface StorageData {
   siglarioForbidden?: string[];
   siglarioEntries: SiglarioEntry[];
   siglarioDocIds?: string;
+  siglarioFieldId?: string;
   siglarioAuditDays?: number;
   auditDays?: number;
   auditDocId?: string | number;
+  hospitalsMapping?: HospitalMapping[];
 }
 
 export const INITIAL_DATA: StorageData = {
   connections: [],
   activeConnectionId: null,
-  activeQuery: 'SELECT * FROM DUAL',
-  activeQueryV3: 'SELECT * FROM DUAL',
-  profileQuery: 'SELECT * FROM DUAL',
+  activeQuery: 'SELECT CD_DOCUMENTO AS "CÓDIGO", NM_TITULO AS "NOME", COUNT(1) AS "TOTAL", MAX(DH_CRIACAO) AS "ÚLTIMO USO", /* DYNAMIC_HOSPITALS_PIVOT */ FROM (SELECT DISTINCT ED.CD_DOCUMENTO, UPPER(ED.DS_DOCUMENTO) AS NM_TITULO, A.CD_MULTI_EMPRESA, PDC.DH_CRIACAO FROM DBAMV.PW_EDITOR_CLINICO PEC JOIN DBAMV.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.PW_DOCUMENTO_CLINICO PDC ON PDC.CD_DOCUMENTO_CLINICO = PEC.CD_DOCUMENTO_CLINICO JOIN DBAMV.ATENDIME A ON A.CD_ATENDIMENTO = PDC.CD_ATENDIMENTO WHERE ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90) GROUP BY CD_DOCUMENTO, NM_TITULO ORDER BY NM_TITULO',
+  activeQueryV3: 'SELECT CD_DOCUMENTO AS "CÓDIGO", NM_TITULO AS "NOME", COUNT(1) AS "TOTAL", MAX(DH_CRIACAO) AS "ÚLTIMO USO", /* DYNAMIC_HOSPITALS_PIVOT */ FROM (SELECT DISTINCT ED.CD_DOCUMENTO, UPPER(ED.DS_DOCUMENTO) AS NM_TITULO, A.CD_MULTI_EMPRESA, PDC.DH_CRIACAO FROM DBAMV.PW_EDITOR_CLINICO PEC JOIN EDITOR.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.PW_DOCUMENTO_CLINICO PDC ON PDC.CD_DOCUMENTO_CLINICO = PEC.CD_DOCUMENTO_CLINICO JOIN DBAMV.ATENDIME A ON A.CD_ATENDIMENTO = PDC.CD_ATENDIMENTO WHERE ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90) GROUP BY CD_DOCUMENTO, NM_TITULO ORDER BY NM_TITULO',
+  profileQuery: 'SELECT DISTINCT CD_DOCUMENTO, NM_TITULO, DS_PERFIL_AMBULATORIAL, EMPRESA FROM (SELECT PMP.NM_VALOR AS CD_DOCUMENTO, PM.NM_TITULO, PA.DS_PERFIL_AMBULATORIAL, /* DYNAMIC_HOSPITALS_DECODE */ FROM DBAMV.PERFIL_AMBULATORIAL PA JOIN DBAMV.PW_PERFIL_MODULO PM ON PA.CD_PERFIL_AMBULATORIAL = PM.CD_PERFIL_AMBULATORIAL JOIN DBAMV.PW_PERFIL_MODULO_PARAMETRO PMP ON PM.CD_PERFIL_MODULO = PMP.CD_PERFIL_MODULO LEFT JOIN DBAMV.PERFIL_AMBULATORIAL_EMPRESA PAE ON PA.CD_PERFIL_AMBULATORIAL = PAE.CD_PERFIL_AMBULATORIAL WHERE PMP.CD_PARAMETRO = \'CD_DOCUMENTO\' AND PA.SN_ATIVO = \'S\' AND PA.TP_PERFIL = \'SIS\' AND PMP.NM_VALOR = :CD_DOCUMENTO UNION ALL SELECT TB_OBJETO.CD_DOCUMENTO, PM.NM_TITULO, PA.DS_PERFIL_AMBULATORIAL, /* DYNAMIC_HOSPITALS_DECODE */ FROM DBAMV.PERFIL_AMBULATORIAL PA JOIN DBAMV.PW_PERFIL_MODULO PM ON PA.CD_PERFIL_AMBULATORIAL = PM.CD_PERFIL_AMBULATORIAL JOIN DBAMV.PW_PERFIL_MODULO_PARAMETRO PMP ON PM.CD_PERFIL_MODULO = PMP.CD_PERFIL_MODULO LEFT JOIN DBAMV.PERFIL_AMBULATORIAL_EMPRESA PAE ON PA.CD_PERFIL_AMBULATORIAL = PAE.CD_PERFIL_AMBULATORIAL JOIN (SELECT NM_VALOR AS CD_DOCUMENTO, TO_CHAR(PTDC.CD_OBJETO) AS CD_OBJETO FROM DBAMV.PW_TIPO_DOCUMENTO_CONSULTA PTDC JOIN DBAMV.PW_TIPO_DOCUMENTO_MODULO PTDM ON PTDC.CD_TIPO_DOCUMENTO_CONSULTA = PTDM.CD_TIPO_DOCUMENTO_CONSULTA JOIN DBAMV.PW_TIPO_DOCUMENTO_MODULO_PARAM PTDMP ON PTDM.CD_TIPO_DOCUMENTO_MODULO = PTDMP.CD_TIPO_DOCUMENTO_MODULO WHERE PTDMP.CD_PARAMETRO = \'CD_DOCUMENTO\' AND NM_VALOR = :CD_DOCUMENTO) TB_OBJETO ON PMP.NM_VALOR = TB_OBJETO.CD_OBJETO WHERE PA.SN_ATIVO = \'S\' AND PA.TP_PERFIL = \'SIS\')',
   oracleClientPath: 'C:\\orant\\Client\\instantclient_23_0',
+  hospitalsMapping: [],
   kpiQueries: {
     total: 'SELECT COUNT(*) as TOTAL FROM DBAMV.PW_DOCUMENTO_CLINICO',
     prod24h: "SELECT COUNT(*) as TOTAL FROM DBAMV.PW_DOCUMENTO_CLINICO WHERE DH_CRIACAO >= SYSDATE - 1",
     assinados: "SELECT COUNT(*) as TOTAL FROM DBAMV.PW_DOCUMENTO_CLINICO WHERE TP_STATUS = 'ASSINADO' AND DH_CRIACAO >= SYSDATE - 30"
+  },
+  kpiQueriesV3: {
+    total: '',
+    prod24h: '',
+    assinados: ''
   },
   analyticQueries: {
     top10: `SELECT * FROM (
@@ -107,7 +137,7 @@ export const INITIAL_DATA: StorageData = {
       JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO
       JOIN EDITOR_DOCUMENTO ED ON TO_CHAR(ED.CD_DOCUMENTO) = TO_CHAR(PEC.CD_DOCUMENTO)
       JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO
-     WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63)
+     WHERE A.CD_MULTI_EMPRESA IN (/* DYNAMIC_HOSPITALS_IN */)
        AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO')
        AND ED.CD_TIPO_ITEM = 13
        AND PDC.DH_CRIACAO >= ADD_MONTHS(SYSDATE, -3)
@@ -120,7 +150,7 @@ WHERE ROWNUM <= 10`,
       FROM DBAMV.PW_DOCUMENTO_CLINICO PDC
       JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO
       JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO
-     WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63)
+     WHERE A.CD_MULTI_EMPRESA IN (/* DYNAMIC_HOSPITALS_IN */)
        AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO')
        AND PDC.DH_CRIACAO >= ADD_MONTHS(SYSDATE, -3)
      GROUP BY PEC.CD_DOCUMENTO
@@ -138,7 +168,7 @@ SELECT CAST(ED.CD_DOCUMENTO AS NUMBER) AS CD_DOCUMENTO,
   JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO
   JOIN EDITOR_DOCUMENTO ED ON TO_CHAR(ED.CD_DOCUMENTO) = TO_CHAR(PEC.CD_DOCUMENTO)
   JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO
- WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63)
+ WHERE A.CD_MULTI_EMPRESA IN (/* DYNAMIC_HOSPITALS_IN */)
    AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO')
    AND ED.CD_TIPO_ITEM = 13
    AND PDC.DH_CRIACAO >= ADD_MONTHS(SYSDATE, -3)`,
@@ -157,7 +187,7 @@ SELECT CAST(ED.CD_DOCUMENTO AS NUMBER) AS CD_DOCUMENTO,
   JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO
   JOIN EDITOR_DOCUMENTO ED ON TO_CHAR(ED.CD_DOCUMENTO) = TO_CHAR(PEC.CD_DOCUMENTO)
   JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO
- WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63)
+ WHERE A.CD_MULTI_EMPRESA IN (/* DYNAMIC_HOSPITALS_IN */)
    AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO')
    AND ED.CD_TIPO_ITEM = 13
    AND PDC.DH_CRIACAO >= ADD_MONTHS(SYSDATE, -3)
@@ -180,7 +210,7 @@ SELECT CAST(ED.CD_DOCUMENTO AS NUMBER) AS CD_DOCUMENTO,
   JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO
   JOIN EDITOR_DOCUMENTO ED ON TO_CHAR(ED.CD_DOCUMENTO) = TO_CHAR(PEC.CD_DOCUMENTO)
   JOIN DBAMV.ATENDIME A ON PDC.CD_ATENDIMENTO = A.CD_ATENDIMENTO
- WHERE A.CD_MULTI_EMPRESA IN (3, 4, 7, 10, 11, 25, 63)
+ WHERE A.CD_MULTI_EMPRESA IN (/* DYNAMIC_HOSPITALS_IN */)
    AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO')
    AND ED.CD_TIPO_ITEM = 13
    AND PDC.DH_CRIACAO >= ADD_MONTHS(SYSDATE, -3)
@@ -189,6 +219,16 @@ SELECT CAST(ED.CD_DOCUMENTO AS NUMBER) AS CD_DOCUMENTO,
           A.CD_MULTI_EMPRESA
  ORDER BY DIAS_SEM_USO DESC`,
     // Queries opcionais — usadas pela rota de analytics avançado
+    volumeTurno: '',
+    slaAssinatura: '',
+    similarityStats: '',
+  },
+  analyticQueriesV3: {
+    top10: '',
+    idle: '',
+    volume3m: '',
+    unitAdherence: '',
+    unitInactivity: '',
     volumeTurno: '',
     slaAssinatura: '',
     similarityStats: '',
@@ -231,7 +271,9 @@ ORDER BY
          INNER JOIN dbamv.editor_versao_documento evdo
             ON el.cd_versao_documento = evdo.cd_versao_documento
          WHERE el.cd_layout = edl.cd_layout_cabecalho) AS Documento_Cabecalho,
-       edl.cd_layout_rodape         AS Codigo_Layout_Rodape
+       edl.cd_layout_rodape         AS Codigo_Layout_Rodape,
+       (SELECT COUNT(DISTINCT elr.cd_regra) FROM dbamv.editor_layout_regra elr WHERE elr.cd_layout = edl.cd_layout) AS Quantidade_Regras,
+       (SELECT COUNT(DISTINCT elc.cd_campo) FROM dbamv.editor_layout_campo elc WHERE elc.cd_layout = edl.cd_layout) AS Quantidade_Campos
   FROM dbamv.editor_documento edo
  INNER JOIN dbamv.editor_versao_documento evd ON edo.cd_documento = evd.cd_documento
  INNER JOIN dbamv.editor_tipo_versao etv      ON etv.cd_tipo_versao = evd.cd_tipo_versao
@@ -313,6 +355,7 @@ ORDER BY
   siglarioForbidden: [],
   siglarioEntries: [],
   siglarioDocIds: "916,1048,772",
+  siglarioFieldId: "",
   siglarioAuditDays: 15,
   auditDays: 15,
   auditDocId: "916,1048,772"
@@ -340,6 +383,8 @@ export async function getData(): Promise<StorageData> {
       ...INITIAL_DATA,
       ...data,
       activeQueryV3: data.activeQueryV3 || INITIAL_DATA.activeQueryV3,
+      kpiQueriesV3: data.kpiQueriesV3 || INITIAL_DATA.kpiQueriesV3,
+      analyticQueriesV3: data.analyticQueriesV3 || INITIAL_DATA.analyticQueriesV3,
       enabledQueries: {
         ...INITIAL_DATA.enabledQueries,
         ...(data.enabledQueries || {})
@@ -355,6 +400,7 @@ export async function getData(): Promise<StorageData> {
       siglarioForbidden: data.siglarioForbidden || INITIAL_DATA.siglarioForbidden,
       siglarioEntries: data.siglarioEntries || INITIAL_DATA.siglarioEntries,
       siglarioDocIds: data.siglarioDocIds || INITIAL_DATA.siglarioDocIds,
+      siglarioFieldId: data.siglarioFieldId !== undefined ? data.siglarioFieldId : INITIAL_DATA.siglarioFieldId,
       siglarioAuditDays: data.siglarioAuditDays !== undefined ? Number(data.siglarioAuditDays) : INITIAL_DATA.siglarioAuditDays,
       auditDays: data.auditDays !== undefined ? Number(data.auditDays) : INITIAL_DATA.auditDays,
       auditDocId: data.auditDocId !== undefined ? data.auditDocId : INITIAL_DATA.auditDocId

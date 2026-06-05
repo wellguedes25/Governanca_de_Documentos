@@ -60,6 +60,8 @@ export async function POST(request: Request) {
   } else if (body.type === 'SAVE_AUDIT_PARAMS') {
     if (body.auditDays !== undefined) data.auditDays = Number(body.auditDays);
     if (body.auditDocId !== undefined) data.auditDocId = body.auditDocId;
+  } else if (body.type === 'SAVE_HOSPITALS_MAPPING') {
+    data.hospitalsMapping = body.hospitalsMapping;
   }
 
   if (body.enabledQueries) {

@@ -6,7 +6,7 @@ import multiprocessing
 from difflib import SequenceMatcher
 from datetime import datetime
 from dotenv import load_dotenv
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 
 # Carrega configurações do arquivo .env
 load_dotenv()
@@ -149,7 +149,7 @@ def main():
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Ativando Paralelismo (Workers: {num_cores})")
         
         try:
-            with ProcessPoolExecutor(max_workers=num_cores) as executor:
+            with ThreadPoolExecutor(max_workers=num_cores) as executor:
                 while True:
                     rows = cursor_fetch.fetchmany(BATCH_SIZE)
                     if not rows:

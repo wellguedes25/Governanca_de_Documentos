@@ -42,6 +42,8 @@ export async function POST(request: Request) {
     // O oracledb aceita um objeto { KEY: value } para placeholders :KEY na query.
     const binds = body.params && typeof body.params === 'object' ? body.params : {};
 
+    // Macros são resolvidos centralmente em lib/oracle.ts
+
     const rows = await executeQuery(connection, sql, binds);
     return NextResponse.json({ rows });
   } catch (err: any) {

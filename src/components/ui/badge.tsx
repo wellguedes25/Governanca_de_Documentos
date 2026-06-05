@@ -16,7 +16,7 @@ const badgeVariants = cva(
         destructive:
           "bg-rose-50 text-rose-600 border border-rose-200 px-2 py-0.5 rounded-[var(--radius)]",
         outline:
-          "border border-[var(--border)] text-slate-500 px-2 py-0.5 rounded-[var(--radius)]",
+          "border border-[var(--border)] text-muted px-2 py-0.5 rounded-[var(--radius)]",
         live:
           "bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-[var(--radius)]",
       },

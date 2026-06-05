@@ -9,19 +9,19 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-[var(--primary)] text-white shadow-[var(--shadow-primary)] hover:bg-[var(--primary-dark)]",
+          "bg-[var(--primary)] text-foreground shadow-[var(--shadow-primary)] hover:bg-[var(--primary-dark)]",
         destructive:
-          "bg-[var(--destructive)] text-white hover:bg-red-600",
+          "bg-[var(--destructive)] text-foreground hover:bg-red-600",
         outline:
           "border border-[var(--border)] bg-white text-slate-700 hover:bg-[var(--accent)] hover:text-[var(--primary)] hover:border-[var(--primary)]",
         secondary:
-          "bg-slate-100 text-slate-900 hover:bg-slate-200",
+          "-accent -foreground -accent",
         ghost:
-          "text-slate-500 hover:bg-[var(--accent)] hover:text-[var(--primary)]",
+          "text-muted hover:bg-[var(--accent)] hover:text-[var(--primary)]",
         link:
           "text-[var(--primary)] underline-offset-4 hover:underline",
         cta:
-          "bg-[var(--cta)] text-white hover:bg-orange-600 shadow-lg",
+          "bg-[var(--cta)] text-foreground hover:bg-orange-600 shadow-lg",
       },
       size: {
         default: "h-9 px-4 py-2 rounded-[var(--radius)]",

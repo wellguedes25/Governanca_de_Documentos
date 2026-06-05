@@ -118,8 +118,42 @@ export async function executeQuery(connection: DbConnection, sql: string, binds:
       throw new Error('A query SQL fornecida é nula ou indefinida. Verifique o arquivo storage.json.');
     }
 
+    // Process SQL Macros for dynamic hospitals
+    let finalSql = sql;
+    const data = await getData();
+    const activeHospitals = (data.hospitalsMapping || []).filter((h: any) => h.ativo);
+    
+    // Legacy support for older variables if any still exist
+    if (finalSql.includes(':EMPRESAS_ATIVAS')) {
+      const idsString = activeHospitals.length > 0 ? activeHospitals.map((h: any) => h.id).join(', ') : '-1';
+      finalSql = finalSql.replace(/:EMPRESAS_ATIVAS/g, idsString);
+    }
+    if (finalSql.includes(':DECODE_EMPRESAS')) {
+      const decodeSequence = activeHospitals.length > 0 ? activeHospitals.map((h: any) => `${h.id}, '${h.sigla}'`).join(', ') : "0, 'N/A'";
+      finalSql = finalSql.replace(/:DECODE_EMPRESAS/g, decodeSequence);
+    }
+
+    // New DYNAMIC_HOSPITALS_* macros
+    if (finalSql.includes('/* DYNAMIC_HOSPITALS_PIVOT */')) {
+      const pivotSnippet = activeHospitals.map((h: any) => `MAX(CASE WHEN CD_MULTI_EMPRESA = ${h.id} THEN '1' ELSE '0' END) AS "${h.sigla}"`).join(', ');
+      // If no active hospitals, we still need a valid column for Oracle
+      finalSql = finalSql.replace(/\/\* DYNAMIC_HOSPITALS_PIVOT \*\//g, pivotSnippet || "'1' AS \"NO_HOSPITALS\"");
+    }
+    
+    if (finalSql.includes('/* DYNAMIC_HOSPITALS_DECODE */')) {
+      const decodeSnippet = activeHospitals.flatMap((h: any) => [h.id, `'${h.sigla}'`]).join(',');
+      // If no active hospitals, default to 'NO_HOSPITALS'
+      finalSql = finalSql.replace(/\/\* DYNAMIC_HOSPITALS_DECODE \*\//g, decodeSnippet ? `Decode(NVL(PA.CD_MULTI_EMPRESA, PAE.CD_MULTI_EMPRESA),${decodeSnippet}) AS EMPRESA` : "'NO_HOSPITALS' AS EMPRESA");
+    }
+    
+    if (finalSql.includes('/* DYNAMIC_HOSPITALS_IN */')) {
+      const inSnippet = activeHospitals.map((h: any) => h.id).join(', ');
+      // IN () is invalid in Oracle. We must provide at least one value. '-1' or 'NULL' works if no IDs exist.
+      finalSql = finalSql.replace(/\/\* DYNAMIC_HOSPITALS_IN \*\//g, inSnippet || "-1");
+    }
+
     // Remove ponto e vírgula final se houver
-    const cleanSql = sql.trim().replace(/;$/, '');
+    const cleanSql = finalSql.trim().replace(/;$/, '');
 
     const start = Date.now();
     const result = await conn.execute(cleanSql, binds, {

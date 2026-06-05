@@ -3,13 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   FileText, Zap, Clock, Activity, Loader2, AlertTriangle,
-  RotateCcw, BarChart3, TrendingUp, Users, Search, PlusSquare,
-  Archive, Building2, BookOpen, ScanEye, Database, LayoutDashboard
+  RotateCcw, BarChart3, TrendingUp, Search,
+  Archive, Building2, Database, LayoutDashboard, ChevronRight
 } from 'lucide-react';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useUI } from '@/context/UIContext';
 import { useRouter } from 'next/navigation';
@@ -23,10 +19,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<any>(null);
-  const [customData, setCustomData] = useState<Record<string, any>>({});
   const [enabledQueries, setEnabledQueries] = useState<Record<string, boolean>>({});
-  const [cardSettings, setCardSettings] = useState<Record<string, any>>({});
-  const [customCards, setCustomCards] = useState<any[]>([]);
 
   const [statsLoading, setStatsLoading] = useState(true);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
@@ -89,7 +82,7 @@ export default function Dashboard() {
       if (type) setLoadingMap(prev => ({ ...prev, [type]: false }));
       else setStatsLoading(false);
     }
-  }, []);
+  }, [docVersion]);
 
   const fetchAnalytics = useCallback(async (force = false, type?: string) => {
     const cacheKey = `dashboard_analytics_${docVersion || 'V2'}`;
@@ -125,7 +118,7 @@ export default function Dashboard() {
       const data = await res.json();
       if (data.error) {
         setError(data.error);
-        throw new Error(data.error);
+        return; // Retorna sem lançar exceção para não quebrar o React Client Component
       }
       setError(null);
 
@@ -140,33 +133,7 @@ export default function Dashboard() {
       if (type) setLoadingMap(prev => ({ ...prev, [type]: false }));
       else setAnalyticsLoading(false);
     }
-  }, []);
-
-  const fetchCustomCard = useCallback(async (card: any, force = false) => {
-    const cacheKey = `dashboard_custom_${card.id}`;
-    if (!force) {
-      const cached = sessionStorage.getItem(cacheKey);
-      if (cached) {
-        setCustomData(prev => ({ ...prev, [card.id]: cached }));
-        return;
-      }
-    }
-
-    setLoadingMap(prev => ({ ...prev, [card.id]: true }));
-    try {
-      const res = await fetch(`/api/dashboard/stats?type=${card.id}&version=${docVersion || 'V2'}`);
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      const value = String(data.value);
-      setCustomData(prev => ({ ...prev, [card.id]: value }));
-      sessionStorage.setItem(cacheKey, value);
-    } catch (err) {
-      console.error(`Erro ao carregar card custom (${card.title}):`, err);
-      setCustomData(prev => ({ ...prev, [card.id]: 'Erro' }));
-    } finally {
-      if (card.id) setLoadingMap(prev => ({ ...prev, [card.id]: false }));
-    }
-  }, []);
+  }, [docVersion]);
 
   // Inicialização de Configurações
   useEffect(() => {
@@ -175,8 +142,6 @@ export default function Dashboard() {
         const res = await fetch('/api/connections');
         const data = await res.json();
         setEnabledQueries(data.enabledQueries || {});
-        setCardSettings(data.cardSettings || {});
-        setCustomCards(data.customCards || []);
       } catch (err) {
         console.error('Erro ao carregar config:', err);
       }
@@ -204,31 +169,27 @@ export default function Dashboard() {
 
   const getCardData = (id: string) => {
     const cardMap: Record<string, any> = {
-      total: { title: 'Volume Geral (90d)', value: stats?.total || '0', icon: <FileText />, color: 'from-[var(--primary)] to-[var(--primary-light)]' },
-      prod24h: { title: 'Produção 24h', value: stats?.prod24h || '0', icon: <Activity />, color: 'from-orange-600 to-red-500' },
-      assinados: { title: 'Taxa de Assinatura', value: stats?.assinadosPercent || '0%', icon: <Zap />, color: 'from-emerald-600 to-teal-400' },
-      idle: { title: 'Documentos Ociosos', value: Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR'), icon: <Archive />, color: 'from-rose-600 to-orange-500' },
+      total: { title: 'Volume Geral (90d)', value: stats?.total || '0', icon: <FileText size={20} /> },
+      prod24h: { title: 'Produção 24h', value: stats?.prod24h || '0', icon: <Activity size={20} /> },
     };
 
     if (id === 'hospitais') return {
-      title: 'Hospitais',
-      value: '7 Unidades',
-      icon: <Building2 size={20} />,
-      color: 'from-slate-700 to-slate-900'
+      title: 'Hospitais Mapeados',
+      value: '7 UN',
+      icon: <Building2 size={20} />
     };
 
     if (id === 'volumeTurno') {
       const dia = analytics?.volumeTurno?.find((t: any) => t.TURNO === 'DIA')?.QTD || 0;
       const noite = analytics?.volumeTurno?.find((t: any) => t.TURNO === 'NOITE')?.QTD || 0;
       return {
-        title: 'Produção por Turno',
-        value: `${dia}D / ${noite}N`,
-        icon: <Clock size={20} />,
-        color: 'from-amber-400 to-orange-600'
+        title: 'Turno Dia / Noite',
+        value: `${dia} / ${noite}`,
+        icon: <Clock size={20} />
       };
     }
 
-    return cardMap[id] || { title: 'Indicador', value: '0', icon: <BarChart3 />, color: 'from-slate-500 to-slate-700' };
+    return cardMap[id] || { title: 'Indicador', value: '0', icon: <BarChart3 size={20} /> };
   };
 
   const isCardLoading = (id: string) => loadingMap[id];
@@ -239,303 +200,311 @@ export default function Dashboard() {
     total: Number(u.QTD_TOTAL_PREENCHIDA || 0)
   }));
   const maxUnitTotal = unitData[0]?.total || 1;
-  const unitColors: Record<string, string> = {
-    'HSC': 'bg-[var(--primary)]', 'CSSJ': 'bg-emerald-500', 'HST': 'bg-amber-500',
-    'HSJ': 'bg-rose-500', 'HMRP': 'bg-indigo-500', 'HCNSC': 'bg-teal-500', 'HR': 'bg-orange-500'
-  };
 
   if (!docVersion) return null;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-700 pb-20">
-      {/* Header */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-slate-100 pb-8">
-        <div>
-          <h1 className="text-3xl font-black text-slate-900 flex items-center gap-4 uppercase italic tracking-tighter">
-            <div className="p-3 bg-[var(--primary)] rounded-2xl shadow-xl shadow-[var(--primary)]/20 not-italic">
-              <LayoutDashboard size={32} className="text-white" />
-            </div>
-            Medlytics Dashboard <Badge className="ml-2 bg-slate-900 text-white border-none">{docVersion}</Badge>
+    <div className="h-screen bg-background text-foreground flex flex-col md:flex-row overflow-hidden selection:bg-[var(--primary)] selection:text-black font-mono">
+      
+      {/* 10% Asymmetric Left Bar (Sidebar) */}
+      <div className="hidden md:flex w-64 border-r border-border flex-col justify-between py-8 z-10 bg-background">
+        
+        <div className="px-6 mb-12">
+          <div className="w-12 h-12 bg-white text-black flex items-center justify-center font-black text-xl mb-6">
+            MP
+          </div>
+          <div className="text-[10px] font-black uppercase tracking-[0.2em] text-muted mb-2">
+            Medlytics Gateway
+          </div>
+          <h1 className="text-2xl font-black uppercase tracking-tighter text-[var(--primary)]">
+            Telemetria <span className="text-foreground block">{docVersion}</span>
           </h1>
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-2 flex items-center gap-2">
-            <span className="w-8 h-[2px] bg-[var(--primary-light)]" />
-            Telemetria em tempo real • Oracle ACSC
-          </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            className="rounded-xl border-slate-200 hover:border-[var(--primary-light)] hover:text-[var(--primary-light)]"
+        <div className="flex-1 flex flex-col gap-2 px-4">
+          {[
+            { id: 'operacional', label: 'Operacional', icon: <TrendingUp size={16} /> },
+            { id: 'unidades', label: 'Unidades', icon: <Building2 size={16} /> },
+            { id: 'qualidade', label: 'Qualidade', icon: <Zap size={16} /> }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as DashboardTab)}
+              className={cn(
+                "flex items-center gap-4 px-4 py-4 text-xs font-black uppercase tracking-widest transition-all border border-transparent",
+                activeTab === tab.id 
+                  ? "bg-[var(--primary)] text-black border-[var(--primary)]" 
+                  : "text-muted -foreground -border -background"
+              )}
+            >
+              {tab.icon}
+              {tab.label}
+              {activeTab === tab.id && <ChevronRight size={16} className="ml-auto" />}
+            </button>
+          ))}
+        </div>
+
+        <div className="px-6 mt-auto">
+          <button
             onClick={() => {
               fetchStats(true);
               fetchAnalytics(true);
             }}
+            className="w-full flex items-center justify-between p-4 bg-card border border-border -border text-xs font-black uppercase tracking-widest transition-colors group"
           >
-            <RotateCcw size={14} className={(statsLoading || analyticsLoading) ? 'animate-spin' : 'mr-2'} />
             Sincronizar
-          </Button>
-        </div>
-      </header>
-
-      {error && (
-        <div className="bg-rose-50 border-2 border-rose-100 p-6 rounded-3xl animate-in slide-in-from-top-4 duration-500 flex items-center gap-6 group">
-          <div className="p-3 bg-rose-500 rounded-2xl shadow-lg shadow-rose-200 group-hover:scale-110 transition-transform">
-            <AlertTriangle size={24} className="text-white" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-sm font-black text-rose-900 uppercase tracking-widest mb-1 italic">Falha na Sincronização</h3>
-            <p className="text-rose-600/80 text-xs font-bold leading-relaxed">
-              O sistema encontrou um problema ao conectar com o Oracle: <span className="text-rose-900 underline underline-offset-4 decoration-rose-300">{error}</span>. 
-              Por favor, verifique as configurações de conexão ou tente sincronizar novamente.
-            </p>
-          </div>
-          <Button 
-            variant="ghost" 
-            onClick={() => { fetchStats(true); fetchAnalytics(true); }}
-            className="rounded-xl hover:bg-rose-100 text-rose-600 font-black text-[10px] uppercase tracking-widest px-6"
-          >
-            Tentar Novamente
-          </Button>
-        </div>
-      )}
-
-      {/* Custom Tabs Navigation */}
-      <div className="flex bg-slate-100/50 p-1 rounded-2xl w-full md:w-fit">
-        {[
-          { id: 'operacional', label: 'Operacional', icon: <TrendingUp size={16} /> },
-          { id: 'unidades', label: 'Unidades', icon: <Building2 size={16} /> },
-          { id: 'qualidade', label: 'Qualidade', icon: <Zap size={16} /> }
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as DashboardTab)}
-            className={cn(
-              "flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
-              activeTab === tab.id 
-                ? "bg-white text-[var(--primary-light)] shadow-lg scale-[1.02]" 
-                : "text-slate-400 hover:text-slate-600 hover:bg-white/50"
-            )}
-          >
-            {tab.icon}
-            {tab.label}
+            <RotateCcw size={14} className={cn("text-muted -foreground transition-colors", (statsLoading || analyticsLoading) && "animate-spin")} />
           </button>
-        ))}
+        </div>
       </div>
 
-      {/* Tab Content Rendering */}
-      <div className="animate-in slide-in-from-bottom-4 duration-500">
-        {activeTab === 'operacional' && (
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {['total', 'prod24h', 'hospitais', 'volumeTurno'].map(id => {
-                const card = getCardData(id);
-                return (
-                  <Card key={id} className="relative overflow-hidden group">
-                    <div className={cn("absolute top-0 left-0 w-1 h-full bg-gradient-to-b", card.color)} />
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <h3 className="text-slate-500">{card.title}</h3>
-                      <div className="p-2 bg-slate-50 rounded-lg text-[var(--primary-light)]">{card.icon}</div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-3xl font-black text-slate-900 tracking-tighter">
-                        {isCardLoading(id) ? <Skeleton className="h-10 w-32" /> : card.value}
-                      </div>
-                      {id === 'volumeTurno' && (
-                        <p className="text-[9px] text-slate-400 font-bold uppercase mt-2">Últimos 7 dias (Dia vs Noite)</p>
-                      )}
-                      {id === 'hospitais' && (
-                        <p className="text-[9px] text-slate-400 font-bold uppercase mt-2">Unidades mapeadas</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+      {/* Mobile Header (fallback) */}
+      <div className="md:hidden flex flex-col border-b border-border bg-background p-4 gap-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+             <div className="w-8 h-8 bg-white text-black flex items-center justify-center font-black text-sm">MP</div>
+             <h1 className="text-lg font-black uppercase tracking-tighter text-[var(--primary)]">Telemetria {docVersion}</h1>
+          </div>
+          <button onClick={() => { fetchStats(true); fetchAnalytics(true); }}>
+            <RotateCcw size={16} className={cn("text-muted", (statsLoading || analyticsLoading) && "animate-spin")} />
+          </button>
+        </div>
+        
+        <div className="flex flex-wrap gap-2">
+          {[
+            { id: 'operacional', label: 'Operacional' },
+            { id: 'unidades', label: 'Unidades' },
+            { id: 'qualidade', label: 'Qualidade' }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as DashboardTab)}
+              className={cn(
+                "px-3 py-2 text-[10px] font-black uppercase tracking-widest border transition-all",
+                activeTab === tab.id ? "bg-[var(--primary)] text-black border-[var(--primary)]" : "text-muted border-border"
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-            <Card className="relative overflow-hidden min-h-[500px]">
-              <div className="absolute top-0 left-0 w-1 h-full bg-[var(--primary)]" />
-              <CardHeader className="flex flex-row items-center justify-between border-b border-slate-50 pb-6">
-                <h2 className="text-slate-900 flex items-center gap-3">
-                  <TrendingUp className="text-[var(--primary-light)]" size={24} />
-                  Ranking de Documentos (Curva ABC)
+      {/* 90% Main Content Area */}
+      <div className="flex-1 flex flex-col h-full overflow-y-auto p-4 md:p-12 space-y-8 bg-background">
+        
+        {/* Error State */}
+        {error && (
+          <div className="border border-red-500 bg-red-500/10 p-6 flex flex-col md:flex-row items-start md:items-center gap-6">
+            <div className="w-12 h-12 bg-red-500 text-black flex items-center justify-center font-black shrink-0">
+              <AlertTriangle size={24} />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-black text-red-500 uppercase tracking-widest mb-1">Falha Crítica de Sincronização</h3>
+              <p className="text-red-400 text-xs uppercase tracking-widest">
+                System Error: {error}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Tab Content Rendering */}
+        <div className="animate-in fade-in duration-500">
+          
+          {/* TAB: OPERACIONAL */}
+          {activeTab === 'operacional' && (
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {['total', 'prod24h', 'hospitais', 'volumeTurno'].map(id => {
+                  const card = getCardData(id);
+                  return (
+                    <div key={id} className="border border-border bg-card p-6 flex flex-col gap-4 group hover:border-[var(--primary)] transition-colors relative overflow-hidden">
+                      <div className="text-[10px] text-muted font-bold uppercase tracking-widest flex items-center justify-between">
+                        {card.title}
+                        <span className="text-zinc-700 group-hover:text-[var(--primary)] transition-colors">{card.icon}</span>
+                      </div>
+                      <div className="text-4xl lg:text-4xl font-black text-foreground tracking-tighter my-2">
+                        {isCardLoading(id) ? <Loader2 className="animate-spin text-muted-foreground" /> : card.value}
+                      </div>
+                      <div className="w-full h-1 bg-background mt-auto">
+                        <div className="h-full bg-foreground group-hover:bg-[var(--primary)] transition-colors w-1/3" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Huge Data Block for Ranking */}
+              <div className="border border-border bg-background p-6 md:p-12 relative overflow-hidden">
+                {/* Removed Huge RANK text per user request */}
+                <h2 className="text-xl font-black text-[var(--primary)] uppercase tracking-widest mb-12 relative z-10 flex items-center gap-4">
+                  <span className="w-4 h-4 bg-[var(--primary)]"></span>
+                  Curva ABC
                 </h2>
-              </CardHeader>
-              <CardContent className="pt-8">
-                {loadingMap['top10'] ? (
-                   <div className="space-y-6">
-                     {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-xl" />)}
-                   </div>
-                ) : (
-                  <div className="space-y-5">
-                    {analytics?.top10?.map((doc: any, i: number) => {
+                
+                <div className="space-y-6 relative z-10">
+                  {loadingMap['top10'] ? (
+                     <div className="flex justify-center py-12"><Loader2 className="animate-spin text-muted-foreground" size={32} /></div>
+                  ) : (
+                    analytics?.top10?.map((doc: any, i: number) => {
                       const max = analytics.top10[0]?.QTD_TOTAL || 1;
                       const percent = (doc.QTD_TOTAL / max) * 100;
                       return (
-                        <div key={i} className="group/bar">
-                          <div className="flex justify-between items-end mb-2">
-                            <span className="text-[11px] font-black text-slate-700 uppercase tracking-tight">
-                              <span className="text-[var(--primary-light)] mr-2 italic">#{String(i + 1).padStart(2, '0')}</span>
+                        <div key={i} className="group/bar flex flex-col gap-2">
+                          <div className="flex justify-between items-end">
+                            <span className="text-xs font-black text-foreground uppercase tracking-widest flex items-center gap-4">
+                              <span className="text-muted-foreground font-mono w-6">#{String(i + 1).padStart(2, '0')}</span>
                               {doc.DS_DOCUMENTO}
                             </span>
-                            <span className="text-[11px] font-mono font-black text-[var(--primary-light)] bg-[var(--primary-light)]/5 px-2 py-0.5 rounded-lg">
+                            <span className="text-sm font-black text-[var(--primary)] font-mono">
                               {Number(doc.QTD_TOTAL).toLocaleString('pt-BR')}
                             </span>
                           </div>
-                          <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-4 w-full bg-card border border-border">
                             <div
-                              className="h-full bg-gradient-to-r from-[var(--primary)] to-[var(--primary-light)] rounded-full transition-all duration-1000"
+                              className="h-full bg-foreground group-hover/bar:bg-[var(--primary)] transition-colors duration-300"
                               style={{ width: `${percent}%` }}
                             />
                           </div>
                         </div>
                       )
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
-        {activeTab === 'unidades' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <Card className="lg:col-span-2 p-8 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-1 h-full bg-[var(--primary)]" />
-              <CardHeader className="p-0 mb-8 border-b border-slate-100 pb-6">
-                <h2 className="text-slate-900 flex items-center gap-3">
-                  <Building2 size={28} className="text-[var(--primary)]" />
+          {/* TAB: UNIDADES */}
+          {activeTab === 'unidades' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 border border-border bg-background p-6 md:p-12">
+                <h2 className="text-xl font-black text-foreground uppercase tracking-widest mb-12 flex items-center gap-4">
+                  <span className="w-4 h-4 bg-white"></span>
                   Produção por Unidade
                 </h2>
-              </CardHeader>
-              <CardContent className="p-0">
-                {loadingMap['unitAdherence'] ? (
-                  <div className="space-y-6">
-                    {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {unitData.map((unit) => {
+                <div className="space-y-8">
+                  {loadingMap['unitAdherence'] ? (
+                    <div className="flex justify-center py-12"><Loader2 className="animate-spin text-muted-foreground" size={32} /></div>
+                  ) : (
+                    unitData.map((unit) => {
                       const percent = (unit.total / maxUnitTotal) * 100;
-                      const barColor = unitColors[unit.sigla] || 'bg-slate-400';
                       return (
-                        <div key={unit.sigla}>
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
-                              <div className={cn("w-3 h-3 rounded-full shadow-sm", barColor)} />
+                        <div key={unit.sigla} className="group">
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="text-sm font-black text-muted-foreground uppercase tracking-widest transition-colors">
                               {unit.sigla}
                             </span>
-                            <span className="text-xs font-mono font-black text-slate-500">
+                            <span className="text-sm font-black text-foreground font-mono">
                               {unit.total.toLocaleString('pt-BR')}
                             </span>
                           </div>
-                          <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                          <div className="h-6 w-full bg-card border border-border relative">
+                            {/* Grid markers inside bar */}
+                            <div className="absolute inset-0 grid grid-cols-4 pointer-events-none">
+                              <div className="border-r border-border"></div>
+                              <div className="border-r border-border"></div>
+                              <div className="border-r border-border"></div>
+                              <div></div>
+                            </div>
                             <div
-                              className={cn("h-full rounded-full transition-all duration-1000 ease-out", barColor)}
+                              className="h-full bg-foreground group-hover:bg-[var(--primary)] transition-colors duration-500"
                               style={{ width: `${percent}%` }}
                             />
                           </div>
                         </div>
                       );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                    })
+                  )}
+                </div>
+              </div>
 
-            <div className="space-y-6">
-               <Card className="p-8 bg-slate-900 text-white border-none shadow-2xl">
-                 <h4 className="text-xs font-black uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-                   <AlertTriangle size={16} className="text-amber-500" />
-                   Status da Rede
-                 </h4>
-                 <div className="space-y-4">
-                    <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                      <span className="text-[10px] font-bold uppercase text-slate-400">Database Oracle</span>
-                      <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 font-black">ESTÁVEL</Badge>
-                    </div>
-                    <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                      <span className="text-[10px] font-bold uppercase text-slate-400">Latência Média</span>
-                      <span className="text-xs font-black text-white">42ms</span>
-                    </div>
+              <div className="space-y-8">
+                 <div className="border border-[var(--primary)] bg-[var(--primary)]/5 p-8 text-foreground relative overflow-hidden">
+                   <h4 className="text-xs font-black uppercase tracking-[0.2em] mb-8 flex items-center gap-3 text-[var(--primary)]">
+                     <div className="w-2 h-2 bg-[var(--primary)] animate-pulse"></div>
+                     Status da Rede
+                   </h4>
+                   <div className="space-y-6 font-mono">
+                      <div className="flex justify-between items-end border-b border-border pb-2">
+                        <span className="text-[10px] uppercase text-muted">Database Oracle</span>
+                        <span className="text-xs font-black text-[var(--primary)]">ESTÁVEL</span>
+                      </div>
+                      <div className="flex justify-between items-end border-b border-border pb-2">
+                        <span className="text-[10px] uppercase text-muted">Latência Média</span>
+                        <span className="text-xs font-black text-foreground">42ms</span>
+                      </div>
+                   </div>
                  </div>
-               </Card>
 
-               <Card className="p-8 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--primary-light)]/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-[var(--primary-light)]/10 transition-all" />
-                <h3 className="text-xs font-black text-[var(--primary-light)] flex items-center gap-2 mb-4 uppercase italic tracking-widest">
-                  <Database size={16} />
-                  INFO UNIDADE
-                </h3>
-                <p className="text-[10px] text-slate-500 leading-relaxed font-bold uppercase italic tracking-tight">
-                  Dados segmentados pelas 7 principais unidades hospitalares da ACSC. Sincronização granular via DBLink.
-                </p>
-              </Card>
+                 <div className="border border-border p-8 group hover:border-[var(--primary)] transition-colors bg-card">
+                  <h3 className="text-xs font-black text-muted-foreground flex items-center gap-3 mb-4 uppercase tracking-widest transition-colors">
+                    <Database size={16} />
+                    INFO UNIDADE
+                  </h3>
+                  <p className="text-[10px] text-muted leading-relaxed font-bold uppercase tracking-widest">
+                    Dados segmentados pelas 7 principais unidades hospitalares da ACSC. Sincronização granular via DBLink.
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {activeTab === 'qualidade' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-             <Card className="relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-1 h-full bg-emerald-600" />
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-500">Taxa de Assinatura</CardTitle>
-                </CardHeader>
-                <CardContent>
-                   <div className="text-4xl font-black text-slate-900 tracking-tighter">
-                     {loadingMap['assinados'] ? <Skeleton className="h-10 w-24" /> : stats?.assinadosPercent}
-                   </div>
-                   
-                   <div className="flex gap-4 mt-6 border-t border-slate-50 pt-4">
-                      <div>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Assinados</p>
-                        <div className="text-lg font-black text-emerald-600 tracking-tighter leading-none">
-                          {loadingMap['assinados'] ? <Skeleton className="h-5 w-12" /> : stats?.assinadosRaw || '0'}
-                        </div>
+          {/* TAB: QUALIDADE */}
+          {activeTab === 'qualidade' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+               <div className="border border-border p-6 flex flex-col gap-4 group hover:border-[var(--primary)] transition-colors bg-card md:col-span-2">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center justify-between">
+                    Taxa de Assinatura
+                    <Zap size={16} className="text-zinc-700 group-hover:text-[var(--primary)]" />
+                  </div>
+                  <div className="text-6xl font-black text-foreground tracking-tighter my-4">
+                    {loadingMap['assinados'] ? <Loader2 className="animate-spin text-muted-foreground" /> : stats?.assinadosPercent}
+                  </div>
+                  <div className="flex gap-8 border-t border-border pt-6 mt-auto font-mono">
+                    <div>
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-2">Assinados</p>
+                      <div className="text-xl font-black text-[var(--primary)]">
+                        {stats?.assinadosRaw || '0'}
                       </div>
-                      <div className="w-[1px] h-8 bg-slate-100" />
-                      <div>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total</p>
-                        <div className="text-lg font-black text-slate-700 tracking-tighter leading-none">
-                          {loadingMap['assinados'] ? <Skeleton className="h-5 w-12" /> : stats?.totalRaw || '0'}
-                        </div>
+                    </div>
+                    <div className="w-[1px] bg-background" />
+                    <div>
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-2">Total</p>
+                      <div className="text-xl font-black text-foreground">
+                        {stats?.totalRaw || '0'}
                       </div>
-                   </div>
-                </CardContent>
-             </Card>
+                    </div>
+                  </div>
+               </div>
 
-
-             <Card className="relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-1 h-full bg-rose-600" />
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-500">Docs Ociosos</CardTitle>
-                </CardHeader>
-                <CardContent>
-                   <div className="text-4xl font-black text-slate-900 tracking-tighter">
-                     {loadingMap['idle'] ? <Skeleton className="h-10 w-24" /> : Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR')}
-                   </div>
-
-                   <div className="flex gap-4 mt-6 border-t border-slate-50 pt-4">
-                      <div>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Ociosos</p>
-                        <div className="text-lg font-black text-rose-600 tracking-tighter leading-none">
-                          {loadingMap['idle'] ? <Skeleton className="h-5 w-12" /> : Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR')}
-                        </div>
+               <div className="border border-border p-6 flex flex-col gap-4 group hover:border-red-500 transition-colors bg-card md:col-span-2">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center justify-between">
+                    Docs Ociosos
+                    <Archive size={16} className="text-zinc-700 group-hover:text-red-500" />
+                  </div>
+                  <div className="text-6xl font-black text-foreground tracking-tighter my-4">
+                    {loadingMap['idle'] ? <Loader2 className="animate-spin text-muted-foreground" /> : Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR')}
+                  </div>
+                  <div className="flex gap-8 border-t border-border pt-6 mt-auto font-mono">
+                    <div>
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-2">Ociosos</p>
+                      <div className="text-xl font-black text-red-500">
+                        {Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR')}
                       </div>
-                      <div className="w-[1px] h-8 bg-slate-100" />
-                      <div>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Modelos</p>
-                        <div className="text-lg font-black text-slate-700 tracking-tighter leading-none">
-                          {loadingMap['idle'] ? <Skeleton className="h-5 w-12" /> : Number(analytics?.idle?.[0]?.TOTAL_TEMPLATES || 0).toLocaleString('pt-BR')}
-                        </div>
+                    </div>
+                    <div className="w-[1px] bg-background" />
+                    <div>
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-2">Modelos (Templates)</p>
+                      <div className="text-xl font-black text-foreground">
+                        {Number(analytics?.idle?.[0]?.TOTAL_TEMPLATES || 0).toLocaleString('pt-BR')}
                       </div>
-                   </div>
-                </CardContent>
-             </Card>
-
-          </div>
-        )}
+                    </div>
+                  </div>
+               </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

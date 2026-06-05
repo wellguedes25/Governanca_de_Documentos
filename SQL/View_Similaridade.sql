@@ -1,4 +1,4 @@
-﻿-- Script para criação da View de Auditoria de Similaridade
+-- Script para criação da View de Auditoria de Similaridade
 -- Esta view prepara os dados para o processador Python de PLN
 
 CREATE OR REPLACE VIEW DBAMV.V_AUDITORIA_COPIA_COLA AS
@@ -7,6 +7,8 @@ SELECT
     PEC.CD_DOCUMENTO,
     PTD.DS_TIPO_DOCUMENTO AS DS_DOCUMENTO,
     ECA.DS_IDENTIFICADOR AS IDENTIFICADOR_FILTRO,
+    Decode(ECA.CD_TIPO_VISUALIZACAO,1, 'TEXTO',2,'TEXTAREA') AS TIPO_CAMPO,
+
     PDC.DH_FECHAMENTO,
     PDC.CD_PRESTADOR AS CD_PRESTADOR,
     LEI.DS_RESUMO AS LEITO,
@@ -28,6 +30,8 @@ LEFT JOIN DBAMV.LEITO LEI ON ATE.CD_LEITO = LEI.CD_LEITO
 LEFT JOIN DBAMV.UNID_INT UNI ON LEI.CD_UNID_INT = UNI.CD_UNID_INT
 WHERE
     PDC.TP_STATUS IN ('FECHADO', 'ASSINADO')
+    AND ECA.CD_TIPO_VISUALIZACAO IN (1,2)
+   -- AND PDC.DH_FECHAMENTO >= TRUNC(SYSDATE) - 7 -- Filtro de segurança de 15 dias na view
     AND ERC.LO_VALOR IS NOT NULL;
 
 -- Comentário: A view é genérica. O script Python ou a consulta podem filtrar por CD_DOCUMENTO específico.

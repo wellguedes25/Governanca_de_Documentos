@@ -107,7 +107,7 @@ export default function Home() {
                 Editor <span className="text-emerald-600 dark:text-emerald-400 group-hover:text-black/50 transition-colors duration-300">V3</span>
               </h2>
               <p className="text-muted-foreground group-hover:text-black/70 text-sm md:text-base font-medium max-w-lg uppercase tracking-tight transition-colors duration-300">
-                Nova arquitetura. Granularidade total. Dados consolidados e telemetria da Empresa 63.
+                NOVA ARQUITETURA HTML5. VOLUME GERAL E TELEMETRIA OPERACIONAL DOS DOCUMENTOS CLÍNICOS DO MVEDITOR 3.0 HTML5. FOCO EM PERFORMANCE
               </p>
               
               <div className="flex flex-wrap gap-6 pt-4 opacity-0 group-hover:opacity-100 transition-opacity duration-500 transform translate-y-4 group-hover:translate-y-0">

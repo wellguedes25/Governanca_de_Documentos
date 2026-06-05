@@ -885,11 +885,21 @@ export default function DocumentosPage() {
       >
         {/* Lógica de Extração de Metadados (Fix: Oracle Aliases in Uppercase) */}
         {(() => {
-          // Busca a versão publicada (TIPO_VERSAO = 3) do layout TELA (TIPO_LAYOUT = 1)
-          const activeSpecs = metadata.find(m => m.CODIGO_TIPO_VERSAO === 3 && m.CODIGO_TIPO_LAYOUT === 1) 
-                           || metadata.find(m => m.CODIGO_TIPO_VERSAO === 3 && m.CODIGO_TIPO_LAYOUT === 2)
-                           || metadata.find(m => m.CODIGO_TIPO_VERSAO === 3)
-                           || metadata[0];
+          // Busca a versão publicada (TIPO_VERSAO = 3) separando os layouts de Tela e Relatório
+          const telaSpecs = metadata.find(m => m.CODIGO_TIPO_VERSAO === 3 && m.CODIGO_TIPO_LAYOUT === 1);
+          const relatorioSpecs = metadata.find(m => m.CODIGO_TIPO_VERSAO === 3 && m.CODIGO_TIPO_LAYOUT === 2);
+          const fallbackSpecs = metadata.find(m => m.CODIGO_TIPO_VERSAO === 3) || metadata[0];
+
+          // Baseia-se primariamente na Tela para regras/campos. Se não houver Tela, tenta Relatório ou Fallback.
+          const baseSpecs = telaSpecs || relatorioSpecs || fallbackSpecs;
+          
+          // Faz o "merge": usa os dados da base, mas injeta o Cabeçalho/Rodapé do Relatório (já que a Tela não os possui).
+          const activeSpecs = baseSpecs ? {
+            ...baseSpecs,
+            CODIGO_LAYOUT_CABECALHO: relatorioSpecs?.CODIGO_LAYOUT_CABECALHO || baseSpecs.CODIGO_LAYOUT_CABECALHO,
+            DOCUMENTO_CABECALHO: relatorioSpecs?.DOCUMENTO_CABECALHO || baseSpecs.DOCUMENTO_CABECALHO,
+            CODIGO_LAYOUT_RODAPE: relatorioSpecs?.CODIGO_LAYOUT_RODAPE || baseSpecs.CODIGO_LAYOUT_RODAPE,
+          } : undefined;
           
           const hasTestVersion = metadata.some(m => m.CODIGO_TIPO_VERSAO === 1);
           const publishedRow = metadata.find(m => m.CODIGO_TIPO_VERSAO === 3);

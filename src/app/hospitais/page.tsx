@@ -33,6 +33,7 @@ export default function HospitaisPage() {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<any>(null);
   const [hospitals, setHospitals] = useState<any[]>([]);
+  const [activeConnName, setActiveConnName] = useState('');
 
   // Proteção de rota
   useEffect(() => {
@@ -69,6 +70,12 @@ export default function HospitaisPage() {
     fetch('/api/connections')
       .then(res => res.json())
       .then(storage => {
+        if (storage.activeConnectionId && storage.connections) {
+          const activeConn = storage.connections.find((c: any) => c.id === storage.activeConnectionId);
+          if (activeConn) {
+            setActiveConnName(activeConn.name);
+          }
+        }
         if (storage.hospitalsMapping) {
           const active = storage.hospitalsMapping
             .filter((h: any) => h.ativo)
@@ -109,7 +116,7 @@ export default function HospitaisPage() {
         {/* --- PADRONIZAÇÃO DO HEADER --- */}
         <PageHeader 
           title="Unidades Hospitalares"
-          subtitle="Gestão Operacional • ACSC"
+          subtitle={selectedHospital ? `${selectedHospital.nome}` : "Gestão Operacional"}
           icon={Building2}
         />
         
@@ -343,7 +350,7 @@ export default function HospitaisPage() {
                   Insight Operacional
                 </h4>
                 <p className="text-[10px] text-muted leading-relaxed font-bold uppercase tracking-widest">
-                  Esta unidade representa <span className="text-foreground">{(data.globalTotal > 0 ? ((Number(data.kpis.TOTAL_DOCS) / Number(data.globalTotal)) * 100) : 0).toFixed(1)}%</span> do volume total transacionado na rede ACSC nos últimos 90 dias.
+                  Esta unidade representa <span className="text-foreground">{(data.globalTotal > 0 ? ((Number(data.kpis.TOTAL_DOCS) / Number(data.globalTotal)) * 100) : 0).toFixed(1)}%</span> do volume total transacionado na empresa <span className="text-foreground">{activeConnName || 'selecionada'}</span> nos últimos 90 dias.
                 </p>
               </div>
 

@@ -63,18 +63,7 @@ export default function Home() {
                 VOLUME GERAL E TELEMETRIA OPERACIONAL DOS DOCUMENTOS CLÍNICOS DO MVEDITOR 2.0 FLEX. FOCO EM INDICADORES.
               </p>
               
-              <div className="flex flex-wrap gap-6 pt-4 opacity-0 group-hover:opacity-100 transition-opacity duration-500 transform translate-y-4 group-hover:translate-y-0">
-                {[
-                  { icon: <Zap size={16} />, label: 'Volume Geral' },
-                  { icon: <BarChart3 size={16} />, label: 'Ranking ABC' },
-                  { icon: <Building2 size={16} />, label: '7 Unidades' },
-                ].map((feat, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs font-bold text-foreground uppercase tracking-widest">
-                    <span className="text-muted-foreground">{feat.icon}</span>
-                    {feat.label}
-                  </div>
-                ))}
-              </div>
+
             </div>
 
             <div className="hidden md:flex items-center gap-4 text-muted-foreground transition-colors duration-300">
@@ -110,18 +99,7 @@ export default function Home() {
                 NOVA ARQUITETURA HTML5. VOLUME GERAL E TELEMETRIA OPERACIONAL DOS DOCUMENTOS CLÍNICOS DO MVEDITOR 3.0 HTML5. FOCO EM PERFORMANCE
               </p>
               
-              <div className="flex flex-wrap gap-6 pt-4 opacity-0 group-hover:opacity-100 transition-opacity duration-500 transform translate-y-4 group-hover:translate-y-0">
-                {[
-                  { icon: <Activity size={16} />, label: 'Granularidade' },
-                  { icon: <Layers size={16} />, label: 'Empresa 63 (HR)' },
-                  { icon: <ShieldCheck size={16} />, label: 'Consolidado' },
-                ].map((feat, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs font-bold text-foreground group-hover:text-black uppercase tracking-widest">
-                    <span className="text-muted-foreground group-hover:text-black/50">{feat.icon}</span>
-                    {feat.label}
-                  </div>
-                ))}
-              </div>
+
             </div>
 
             <div className="hidden md:flex items-center gap-4 text-emerald-600 dark:text-emerald-400 group-hover:text-black transition-colors duration-300">

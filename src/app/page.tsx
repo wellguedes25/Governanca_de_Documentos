@@ -60,7 +60,7 @@ export default function Home() {
                 Editor <span className="text-muted-foreground">V2</span>
               </h2>
               <p className="text-muted-foreground text-sm md:text-base font-medium max-w-lg uppercase tracking-tight">
-                Volume geral e telemetria operacional padrão de 90 dias. Foco em estabilidade.
+                VOLUME GERAL E TELEMETRIA OPERACIONAL DOS DOCUMENTOS CLÍNICOS DO MVEDITOR 2.0 FLEX. FOCO EM INDICADORES.
               </p>
               
               <div className="flex flex-wrap gap-6 pt-4 opacity-0 group-hover:opacity-100 transition-opacity duration-500 transform translate-y-4 group-hover:translate-y-0">

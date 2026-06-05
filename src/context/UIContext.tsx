@@ -5,8 +5,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 interface UIContextType {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
-  oracleData: any[] | null;
-  setOracleData: (data: any[] | null) => void;
+  oracleData: Record<string, unknown>[] | null;
+  setOracleData: (data: Record<string, unknown>[] | null) => void;
   columnWidths: Record<string, number>;
   setColumnWidth: (column: string, width: number) => void;
   docVersion: 'V2' | 'V3' | null;
@@ -17,7 +17,7 @@ const UIContext = createContext<UIContextType | undefined>(undefined);
 
 export function UIProvider({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [oracleData, setOracleData] = useState<any[] | null>(null);
+  const [oracleData, setOracleData] = useState<Record<string, unknown>[] | null>(null);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const [docVersion, setDocVersionState] = useState<'V2' | 'V3' | null>(null);
 
@@ -25,12 +25,16 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const savedSidebar = localStorage.getItem('sidebarOpen');
     if (savedSidebar !== null) {
-      setSidebarOpen(savedSidebar === 'true');
+      setTimeout(() => {
+        setSidebarOpen(savedSidebar === 'true');
+      }, 0);
     }
 
     const savedVersion = sessionStorage.getItem('app_doc_version') as 'V2' | 'V3' | null;
     if (savedVersion) {
-      setDocVersionState(savedVersion);
+      setTimeout(() => {
+        setDocVersionState(savedVersion);
+      }, 0);
     }
   }, []);
 

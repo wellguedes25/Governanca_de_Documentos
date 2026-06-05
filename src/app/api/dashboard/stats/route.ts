@@ -51,7 +51,7 @@ export async function GET(request: Request) {
       if (!sql || sql.trim() === '') {
         return [{ TOTAL: 0 }];
       }
-      return executeQuery(conn, sql);
+      return executeQuery(conn, sql, {}, { ttlSeconds: 300, forceRefresh: force });
     };
 
     const getCol = (row: any, colName: string) => {

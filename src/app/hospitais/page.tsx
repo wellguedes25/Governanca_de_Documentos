@@ -18,6 +18,37 @@ import { cn } from '@/lib/utils';
 import { useUI } from '@/context/UIContext';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { DbConnection, HospitalMapping } from '@/lib/storage';
+
+interface DetailItem {
+  CD_DOCUMENTO: string;
+  NOME: string;
+  VERSAO?: string;
+  USO_UNIDADE: number;
+  ULTIMO_USO?: string;
+}
+
+interface Top5Item {
+  NOME: string;
+  USO: number;
+}
+
+interface RankingItem {
+  SIGLA: string;
+  TOTAL_OCORRENCIAS: number;
+}
+
+interface SimilarityItem {
+  DS_DOCUMENTO: string;
+  QTD_SIMILAR_80: number;
+  TOTAL_AUDITADO: number;
+  PERCENTUAL_PLAGIO: number;
+}
+
+interface SlaItem {
+  FAIXA_SLA: string;
+  TOTAL: number;
+}
 
 const COLORS = [
   'bg-[var(--primary)]', 'bg-emerald-500', 'bg-amber-500', 'bg-indigo-500', 
@@ -25,15 +56,60 @@ const COLORS = [
   'bg-fuchsia-500', 'bg-lime-500', 'bg-sky-500', 'bg-orange-500'
 ];
 
+interface HospitalStats {
+  kpis: {
+    TOTAL_DOCS?: number;
+    DOCS_ATIVOS?: number;
+    ULTIMO_REGISTRO?: string;
+  };
+  details: DetailItem[];
+  top5: Top5Item[];
+  globalTotal: number;
+  error?: string;
+}
+
+interface QualityStats {
+  similarity: SimilarityItem[];
+  sla: SlaItem[];
+}
+
+interface VocabStats {
+  adherence: {
+    TOTAL_DOCUMENTOS: number;
+    DOCUMENTOS_LIMPOS: number;
+    INDICE_ADERENCIA: number;
+  };
+  ranking: RankingItem[];
+}
+
+interface HospitalItem extends HospitalMapping {
+  color: string;
+}
+
 export default function HospitaisPage() {
   const { docVersion } = useUI();
   const router = useRouter();
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<any>(null);
-  const [hospitals, setHospitals] = useState<any[]>([]);
+  const [data, setData] = useState<HospitalStats | null>(null);
+  const [qualityData, setQualityData] = useState<QualityStats | null>(null);
+  const [vocabData, setVocabData] = useState<VocabStats | null>(null);
+  const [hospitals, setHospitals] = useState<HospitalItem[]>([]);
   const [activeConnName, setActiveConnName] = useState('');
+
+  // Cálculos das métricas de SLA e Redundância
+  const slaRows = qualityData?.sla || [];
+  const totalSigned = slaRows.reduce((acc: number, r: SlaItem) => acc + Number(r.TOTAL), 0);
+  const within24h = slaRows
+    .filter((r: SlaItem) => r.FAIXA_SLA !== 'Mais de 24h')
+    .reduce((acc: number, r: SlaItem) => acc + Number(r.TOTAL), 0);
+  const slaPercentage = totalSigned > 0 ? ((within24h / totalSigned) * 100).toFixed(1) : '100.0';
+
+  const similarityRows = qualityData?.similarity || [];
+  const totalSimilarityAudit = similarityRows.reduce((acc: number, r: SimilarityItem) => acc + Number(r.TOTAL_AUDITADO), 0);
+  const totalRedundant = similarityRows.reduce((acc: number, r: SimilarityItem) => acc + Number(r.QTD_SIMILAR_80), 0);
+  const redundancyRate = totalSimilarityAudit > 0 ? ((totalRedundant / totalSimilarityAudit) * 100).toFixed(1) : '0.0';
 
   // Proteção de rota
   useEffect(() => {
@@ -45,21 +121,52 @@ export default function HospitaisPage() {
 
   const selectedHospital = hospitals[selectedIdx];
 
-  const fetchData = async (id: string) => {
+  const fetchData = async (id: string, force = false) => {
+    const cacheKey = `hospital_data_${id}`;
+    if (!force) {
+      const cachedStr = sessionStorage.getItem(cacheKey);
+      if (cachedStr) {
+        try {
+          const cached = JSON.parse(cachedStr);
+          setData(cached.stats);
+          setQualityData(cached.quality);
+          setVocabData(cached.vocab);
+          setError(null);
+          return;
+        } catch (e) {}
+      }
+    }
+
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/hospitals/stats?id=${id}`);
-      const json = await res.json();
+      const [resStats, resQuality, resVocab] = await Promise.all([
+        fetch(`/api/hospitals/stats?id=${id}${force ? '&force=true' : ''}`),
+        fetch(`/api/hospitals/quality?id=${id}${force ? '&force=true' : ''}`),
+        fetch(`/api/hospitals/vocabulary?id=${id}${force ? '&force=true' : ''}`)
+      ]);
       
-      if (json.error) {
-        setError(json.error);
+      const jsonStats = await resStats.json();
+      const jsonQuality = await resQuality.json();
+      const jsonVocab = await resVocab.json();
+      
+      if (jsonStats.error) {
+        setError(jsonStats.error);
         return;
       }
       
-      setData(json);
-    } catch (error: any) {
-      console.error('Erro ao buscar dados do hospital:', error);
+      setData(jsonStats);
+      setQualityData(jsonQuality);
+      setVocabData(jsonVocab);
+
+      sessionStorage.setItem(cacheKey, JSON.stringify({
+        stats: jsonStats,
+        quality: jsonQuality,
+        vocab: jsonVocab
+      }));
+    } catch (error) {
+      const err = error as Error;
+      console.error('Erro ao buscar dados do hospital:', err);
       setError('Falha na comunicação com o servidor Oracle.');
     } finally {
       setLoading(false);
@@ -71,15 +178,15 @@ export default function HospitaisPage() {
       .then(res => res.json())
       .then(storage => {
         if (storage.activeConnectionId && storage.connections) {
-          const activeConn = storage.connections.find((c: any) => c.id === storage.activeConnectionId);
+          const activeConn = storage.connections.find((c: DbConnection) => c.id === storage.activeConnectionId);
           if (activeConn) {
             setActiveConnName(activeConn.name);
           }
         }
         if (storage.hospitalsMapping) {
           const active = storage.hospitalsMapping
-            .filter((h: any) => h.ativo)
-            .map((h: any, i: number) => ({
+            .filter((h: HospitalMapping) => h.ativo)
+            .map((h: HospitalMapping, i: number) => ({
               ...h,
               nome: h.nome || h.sigla, // Usamos a sigla como fallback para o nome
               color: COLORS[i % COLORS.length]
@@ -87,7 +194,7 @@ export default function HospitaisPage() {
           setHospitals(active);
           
           if (active.length > 0) {
-            fetchData(active[0].id);
+            fetchData(String(active[0].id));
           }
         }
       });
@@ -95,9 +202,9 @@ export default function HospitaisPage() {
 
   useEffect(() => {
     if (selectedHospital) {
-      fetchData(selectedHospital.id);
+      fetchData(String(selectedHospital.id));
     }
-  }, [selectedIdx]);
+  }, [selectedIdx, selectedHospital]);
 
   if (hospitals.length === 0) {
     return (
@@ -156,7 +263,7 @@ export default function HospitaisPage() {
             </p>
           </div>
           <button 
-            onClick={() => fetchData(selectedHospital.id)}
+            onClick={() => fetchData(String(selectedHospital.id), true)}
             className="px-6 py-4 bg-card border border-red-500/50 hover:border-red-500 text-red-500 text-[10px] font-black uppercase tracking-widest transition-all flex items-center"
           >
             <RefreshCcw size={14} className="mr-2" /> Tentar Novamente
@@ -185,7 +292,7 @@ export default function HospitaisPage() {
             </div>
           </div>
           <button 
-            onClick={() => fetchData(selectedHospital.id)}
+            onClick={() => fetchData(String(selectedHospital.id))}
             className="px-8 py-4 bg-card border -border hover:border-white text-foreground text-[10px] font-black uppercase tracking-widest transition-all"
           >
             Tentar Novamente
@@ -194,7 +301,7 @@ export default function HospitaisPage() {
       ) : data?.kpis ? (
         <div className="space-y-8">
           
-          {/* KPI Grid */}
+          {/* KPI Grid - Linha 1: Métricas Operacionais */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             
             <div className="border border-border -background p-6 flex flex-col gap-4 group hover:border-[var(--primary)] transition-colors relative">
@@ -249,6 +356,59 @@ export default function HospitaisPage() {
 
           </div>
 
+          {/* KPI Grid - Linha 2: Qualidade Clínica & Segurança (Meta 2 JCI / CFM) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            <div className="border border-border -background p-6 flex flex-col gap-4 group hover:border-cyan-500 transition-colors relative">
+              <div className="absolute top-0 right-0 w-8 h-8 -background group-hover:bg-cyan-500 transition-colors flex items-center justify-center">
+                 <Building2 size={14} className="text-muted group-hover:text-black" />
+              </div>
+              <div className="text-[10px] text-muted font-black uppercase tracking-widest">
+                Aderência ao Siglário
+                <span className="block mt-1 -muted">JCI Meta 2 (Comunicação Limpa)</span>
+              </div>
+              <div className="text-5xl font-black text-foreground tracking-tighter mt-2">
+                {vocabData?.adherence?.INDICE_ADERENCIA !== undefined ? `${vocabData.adherence.INDICE_ADERENCIA}%` : '100.0%'}
+              </div>
+              <div className="mt-auto pt-4 border-t border-border">
+                <span className="text-[9px] font-black uppercase tracking-widest text-cyan-500 bg-cyan-500/10 px-2 py-1">Livre de Abrevições Proibidas</span>
+              </div>
+            </div>
+
+            <div className="border border-border -background p-6 flex flex-col gap-4 group hover:border-rose-500 transition-colors relative">
+              <div className="absolute top-0 right-0 w-8 h-8 -background group-hover:bg-rose-500 transition-colors flex items-center justify-center">
+                 <AlertTriangle size={14} className="text-muted group-hover:text-black" />
+              </div>
+              <div className="text-[10px] text-muted font-black uppercase tracking-widest">
+                Índice de Redundância
+                <span className="block mt-1 -muted">Evolutivas Clonadas &gt; 80%</span>
+              </div>
+              <div className="text-5xl font-black text-foreground tracking-tighter mt-2">
+                {redundancyRate}%
+              </div>
+              <div className="mt-auto pt-4 border-t border-border">
+                <span className="text-[9px] font-black uppercase tracking-widest text-rose-500 bg-rose-500/10 px-2 py-1">Controle de Plágio Clínico</span>
+              </div>
+            </div>
+
+            <div className="border border-border -background p-6 flex flex-col gap-4 group hover:border-indigo-500 transition-colors relative">
+              <div className="absolute top-0 right-0 w-8 h-8 -background group-hover:bg-indigo-500 transition-colors flex items-center justify-center">
+                 <Clock size={14} className="text-muted group-hover:text-black" />
+              </div>
+              <div className="text-[10px] text-muted font-black uppercase tracking-widest">
+                SLA de Assinatura (24h)
+                <span className="block mt-1 -muted">Fechamento do Registro (CFM)</span>
+              </div>
+              <div className="text-5xl font-black text-foreground tracking-tighter mt-2">
+                {slaPercentage}%
+              </div>
+              <div className="mt-auto pt-4 border-t border-border">
+                <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500 bg-indigo-500/10 px-2 py-1">Tempo Limite de Faturamento</span>
+              </div>
+            </div>
+
+          </div>
+
           {/* Main Content: Table & Ranking */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
@@ -271,7 +431,7 @@ export default function HospitaisPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-800">
-                    {data?.details?.slice(0, 5).map((item: any) => (
+                    {data?.details?.slice(0, 5).map((item: DetailItem) => (
                       <tr key={item.CD_DOCUMENTO} className="group -background transition-colors">
                         <td className="py-4">
                           <div className="flex items-center gap-4">
@@ -314,7 +474,7 @@ export default function HospitaisPage() {
                 </h3>
                 
                 <div className="space-y-6 relative z-10">
-                  {data?.top5?.map((doc: any, i: number) => {
+                  {data?.top5?.map((doc: Top5Item, i: number) => {
                     const max = data?.top5?.[0]?.USO || 1;
                     const percent = (doc.USO / max) * 100;
                     return (
@@ -352,6 +512,116 @@ export default function HospitaisPage() {
                 <p className="text-[10px] text-muted leading-relaxed font-bold uppercase tracking-widest">
                   Esta unidade representa <span className="text-foreground">{(data.globalTotal > 0 ? ((Number(data.kpis.TOTAL_DOCS) / Number(data.globalTotal)) * 100) : 0).toFixed(1)}%</span> do volume total transacionado do ambiente <span className="text-foreground">{activeConnName || 'selecionado'}</span> nos últimos 90 dias.
                 </p>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Section: Auditoria Clínica e Segurança (Meta 2 JCI / CFM / ONA) */}
+          <div className="border-t border-border pt-8 space-y-6">
+            <h2 className="text-lg font-black text-foreground uppercase tracking-widest flex items-center gap-4">
+              <span className="w-4 h-4 bg-[var(--primary)]"></span>
+              Painel de Rastreabilidade Assistencial (JCI / CFM)
+            </h2>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              
+              {/* Acronyms Audit */}
+              <div className="border border-border bg-background p-6 md:p-8 relative">
+                <h3 className="text-sm font-black text-[var(--primary)] uppercase tracking-widest mb-6 flex items-center gap-3">
+                  <span className="w-2.5 h-2.5 bg-cyan-500 rounded-none"></span>
+                  Abreviações Proibidas (JCI)
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="py-2 text-[9px] font-black uppercase text-muted tracking-widest">Sigla</th>
+                        <th className="py-2 text-[9px] font-black uppercase text-muted tracking-widest text-right">Violados</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800">
+                      {vocabData?.ranking && vocabData.ranking.length > 0 ? (
+                        vocabData.ranking.slice(0, 5).map((row: RankingItem, i: number) => (
+                          <tr key={i} className="text-xs group hover:bg-zinc-900 transition-colors">
+                            <td className="py-3 font-mono font-bold text-cyan-400 uppercase">{row.SIGLA}</td>
+                            <td className="py-3 text-right font-mono font-bold text-foreground">{row.TOTAL_OCORRENCIAS} docs</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={2} className="py-6 text-center text-xs text-muted uppercase tracking-wider font-bold">100% de Aderência Assistencial</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Redundancy Audit */}
+              <div className="border border-border bg-background p-6 md:p-8 relative">
+                <h3 className="text-sm font-black text-[var(--primary)] uppercase tracking-widest mb-6 flex items-center gap-3">
+                  <span className="w-2.5 h-2.5 bg-rose-500 rounded-none"></span>
+                  Documentos Redundantes
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="py-2 text-[9px] font-black uppercase text-muted tracking-widest">Documento</th>
+                        <th className="py-2 text-[9px] font-black uppercase text-muted tracking-widest text-right">Clonados (&gt;80%)</th>
+                        <th className="py-2 text-[9px] font-black uppercase text-muted tracking-widest text-right">Taxa</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800">
+                      {similarityRows && similarityRows.length > 0 ? (
+                        similarityRows.slice(0, 5).map((row: SimilarityItem, i: number) => (
+                          <tr key={i} className="text-xs group hover:bg-zinc-900 transition-colors">
+                            <td className="py-3 truncate max-w-[120px] uppercase font-bold text-foreground">{row.DS_DOCUMENTO}</td>
+                            <td className="py-3 text-right font-mono text-muted">{row.QTD_SIMILAR_80} / {row.TOTAL_AUDITADO}</td>
+                            <td className="py-3 text-right font-mono font-bold text-rose-500">{row.PERCENTUAL_PLAGIO}%</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={3} className="py-6 text-center text-xs text-muted uppercase tracking-wider font-bold">Nenhuma cópia detectada</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* SLA Distribution */}
+              <div className="border border-border bg-background p-6 md:p-8 relative">
+                <h3 className="text-sm font-black text-[var(--primary)] uppercase tracking-widest mb-6 flex items-center gap-3">
+                  <span className="w-2.5 h-2.5 bg-indigo-500 rounded-none"></span>
+                  SLA de Assinatura
+                </h3>
+                <div className="space-y-4">
+                  {['0-2h', '2-6h', '6-12h', '12-24h', 'Mais de 24h'].map(faixa => {
+                    const match = slaRows.find((r: SlaItem) => r.FAIXA_SLA === faixa);
+                    const total = match ? Number(match.TOTAL) : 0;
+                    const maxSla = Math.max(...slaRows.map((r: SlaItem) => Number(r.TOTAL)), 1);
+                    const pct = (total / maxSla) * 100;
+                    return (
+                      <div key={faixa} className="flex flex-col gap-1 text-[10px]">
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold tracking-wider uppercase">{faixa}</span>
+                          <span className="font-mono text-muted">{total} docs</span>
+                        </div>
+                        <div className="h-2 w-full bg-card border border-border">
+                          <div 
+                            className={cn(
+                              "h-full transition-all duration-500 ease-out", 
+                              faixa === 'Mais de 24h' ? 'bg-destructive' : 'bg-indigo-500'
+                            )}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
             </div>

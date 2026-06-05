@@ -6,6 +6,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get('type');
   const version = searchParams.get('version') || 'V2';
+  const force = searchParams.get('force') === 'true';
   
   const data = await getData();
   const activeConn = data.connections.find(c => String(c.id) === String(data.activeConnectionId));
@@ -39,7 +40,7 @@ export async function GET(request: Request) {
       if (!sql || sql.trim() === '' || sql === 'SELECT * FROM DUAL') {
         return fallbackRows;
       }
-      return executeQuery(conn, sql);
+      return executeQuery(conn, sql, {}, { ttlSeconds: 900, forceRefresh: force });
     };
 
     // Consultas individuais para economizar recursos e permitir refresh granular

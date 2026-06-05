@@ -173,15 +173,7 @@ SELECT CAST(ED.CD_DOCUMENTO AS NUMBER) AS CD_DOCUMENTO,
    AND ED.CD_TIPO_ITEM = 13
    AND PDC.DH_CRIACAO >= ADD_MONTHS(SYSDATE, -3)`,
     unitAdherence: `SELECT A.CD_MULTI_EMPRESA,
-       CASE A.CD_MULTI_EMPRESA
-            WHEN 3 THEN 'CSSJ'
-            WHEN 4 THEN 'HST'
-            WHEN 7 THEN 'HSC'
-            WHEN 10 THEN 'HSJ'
-            WHEN 11 THEN 'HMRP'
-            WHEN 25 THEN 'HCNSC'
-            WHEN 63 THEN 'HR'
-       END AS SIGLA_UNIDADE,
+       /* DYNAMIC_HOSPITALS_DECODE(A.CD_MULTI_EMPRESA) */ AS SIGLA_UNIDADE,
        COUNT(PDC.CD_DOCUMENTO_CLINICO) AS QTD_TOTAL_PREENCHIDA
   FROM DBAMV.PW_DOCUMENTO_CLINICO PDC
   JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO
@@ -195,15 +187,7 @@ SELECT CAST(ED.CD_DOCUMENTO AS NUMBER) AS CD_DOCUMENTO,
  ORDER BY QTD_TOTAL_PREENCHIDA DESC`,
     unitInactivity: `SELECT CAST(ED.CD_DOCUMENTO AS NUMBER) AS CD_DOCUMENTO,
        UPPER(ED.DS_DOCUMENTO) AS DS_DOCUMENTO,
-       CASE A.CD_MULTI_EMPRESA
-            WHEN 3 THEN 'CSSJ'
-            WHEN 4 THEN 'HST'
-            WHEN 7 THEN 'HSC'
-            WHEN 10 THEN 'HSJ'
-            WHEN 11 THEN 'HMRP'
-            WHEN 25 THEN 'HCNSC'
-            WHEN 63 THEN 'HR'
-       END AS SIGLA_UNIDADE,
+       /* DYNAMIC_HOSPITALS_DECODE(A.CD_MULTI_EMPRESA) */ AS SIGLA_UNIDADE,
        MAX(PDC.DH_CRIACAO) AS ULTIMA_DATA_USO,
        TRUNC(SYSDATE) - TRUNC(MAX(PDC.DH_CRIACAO)) AS DIAS_SEM_USO
   FROM DBAMV.PW_DOCUMENTO_CLINICO PDC
@@ -218,10 +202,40 @@ SELECT CAST(ED.CD_DOCUMENTO AS NUMBER) AS CD_DOCUMENTO,
           UPPER(ED.DS_DOCUMENTO),
           A.CD_MULTI_EMPRESA
  ORDER BY DIAS_SEM_USO DESC`,
-    // Queries opcionais — usadas pela rota de analytics avançado
-    volumeTurno: '',
-    slaAssinatura: '',
-    similarityStats: '',
+    slaAssinatura: `SELECT 
+    CASE 
+        WHEN (PDC.DH_FECHAMENTO - PDC.DH_CRIACAO) * 24 <= 2 THEN '0-2h'
+        WHEN (PDC.DH_FECHAMENTO - PDC.DH_CRIACAO) * 24 <= 6 THEN '2-6h'
+        WHEN (PDC.DH_FECHAMENTO - PDC.DH_CRIACAO) * 24 <= 12 THEN '6-12h'
+        WHEN (PDC.DH_FECHAMENTO - PDC.DH_CRIACAO) * 24 <= 24 THEN '12-24h'
+        ELSE 'Mais de 24h'
+    END AS FAIXA_SLA,
+    COUNT(1) AS TOTAL
+FROM DBAMV.PW_DOCUMENTO_CLINICO PDC
+JOIN DBAMV.ATENDIME A ON A.CD_ATENDIMENTO = PDC.CD_ATENDIMENTO
+WHERE A.CD_MULTI_EMPRESA = :ID
+  AND PDC.TP_STATUS = 'ASSINADO'
+  AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 30
+GROUP BY 
+    CASE 
+        WHEN (PDC.DH_FECHAMENTO - PDC.DH_CRIACAO) * 24 <= 2 THEN '0-2h'
+        WHEN (PDC.DH_FECHAMENTO - PDC.DH_CRIACAO) * 24 <= 6 THEN '2-6h'
+        WHEN (PDC.DH_FECHAMENTO - PDC.DH_CRIACAO) * 24 <= 12 THEN '6-12h'
+        WHEN (PDC.DH_FECHAMENTO - PDC.DH_CRIACAO) * 24 <= 24 THEN '12-24h'
+        ELSE 'Mais de 24h'
+    END`,
+    similarityStats: `SELECT 
+    T.CD_DOCUMENTO,
+    T.DS_DOCUMENTO,
+    COUNT(CASE WHEN T.GRAU_SIMILARIDADE >= 80 THEN 1 END) AS QTD_SIMILAR_80,
+    COUNT(1) AS TOTAL_AUDITADO,
+    ROUND(COUNT(CASE WHEN T.GRAU_SIMILARIDADE >= 80 THEN 1 END) * 100 / NULLIF(COUNT(1), 0), 2) AS PERCENTUAL_PLAGIO
+FROM DBAMV.TB_AUDITORIA_SIMILARIDADE T
+JOIN DBAMV.ATENDIME A ON A.CD_ATENDIMENTO = T.CD_ATENDIMENTO
+WHERE A.CD_MULTI_EMPRESA = :ID
+  AND T.DH_FECHAMENTO >= TRUNC(SYSDATE) - 90
+GROUP BY T.CD_DOCUMENTO, T.DS_DOCUMENTO
+ORDER BY QTD_SIMILAR_80 DESC`,
   },
   analyticQueriesV3: {
     top10: '',
@@ -391,9 +405,9 @@ export async function getData(): Promise<StorageData> {
       },
       cardSettings: data.cardSettings || {},
       customCards: data.customCards || [],
-      docMappings: (data.docMappings || INITIAL_DATA.docMappings).map((m: any) => ({
+      docMappings: (data.docMappings || INITIAL_DATA.docMappings).map((m: DocMapping) => ({
         ...m,
-        fields: m.fields.map((f: any) => typeof f === 'string' ? { id: f, name: f } : f)
+        fields: m.fields.map((f: FieldMapping | string) => typeof f === 'string' ? { id: f, name: f } : f)
       })),
       reportBaseUrl: data.reportBaseUrl || INITIAL_DATA.reportBaseUrl,
       siglarioAllowed: data.siglarioAllowed || INITIAL_DATA.siglarioAllowed,
@@ -411,10 +425,23 @@ export async function getData(): Promise<StorageData> {
   }
 }
 
+import { encrypt } from './encryption';
+
 export async function saveData(data: StorageData) {
   const { storageFile } = getStoragePaths();
   ensureDataDir();
-  fs.writeFileSync(storageFile, JSON.stringify(data, null, 2));
+  
+  // Clone data to avoid mutating the in-memory object directly
+  const dataToSave = JSON.parse(JSON.stringify(data));
+  if (dataToSave.connections) {
+    dataToSave.connections.forEach((conn: DbConnection) => {
+      if (conn.password && !conn.password.startsWith('encrypted:')) {
+        conn.password = encrypt(conn.password);
+      }
+    });
+  }
+
+  fs.writeFileSync(storageFile, JSON.stringify(dataToSave, null, 2));
 }
 
 // Para exportação de debug

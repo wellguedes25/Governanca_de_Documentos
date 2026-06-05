@@ -2,13 +2,10 @@ import { NextResponse } from 'next/server';
 import { getData, STORAGE_FILE } from '@/lib/storage';
 import { executeQuery } from '@/lib/oracle';
 
-// Cache simples em memória para evitar sobrecarga no Oracle em requisições paralelas
-const cache: { [key: string]: { data: any, timestamp: number } } = {};
-const CACHE_TTL = 30 * 1000; // 30 segundos
-
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const hospitalId = searchParams.get('id');
+  const force = searchParams.get('force') === 'true';
 
   if (!hospitalId) {
     return NextResponse.json({ error: 'Hospital ID is required' }, { status: 400 });
@@ -28,20 +25,14 @@ export async function GET(request: Request) {
     }, { status: 400 });
   }
 
-  // Verificar cache
-  const cacheKey = `${activeConn.id}_${hospitalId}`;
-  if (cache[cacheKey] && (Date.now() - cache[cacheKey].timestamp < CACHE_TTL)) {
-    return NextResponse.json(cache[cacheKey].data);
-  }
-
   try {
     const queries = (data as any).hospitalQueries;
     
     const [kpisRes, detailRes, top5Res, globalRes] = await Promise.all([
-      executeQuery(activeConn, queries.kpis, { ID: hospitalId }),
-      executeQuery(activeConn, queries.detailTable, { ID: hospitalId }),
-      executeQuery(activeConn, queries.top5, { ID: hospitalId }),
-      executeQuery(activeConn, (data as any).kpiQueries.total, {})
+      executeQuery(activeConn, queries.kpis, { ID: hospitalId }, { ttlSeconds: 600, forceRefresh: force }),
+      executeQuery(activeConn, queries.detailTable, { ID: hospitalId }, { ttlSeconds: 600, forceRefresh: force }),
+      executeQuery(activeConn, queries.top5, { ID: hospitalId }, { ttlSeconds: 600, forceRefresh: force }),
+      executeQuery(activeConn, (data as any).kpiQueries.total, {}, { ttlSeconds: 600, forceRefresh: force })
     ]);
 
     const result = {
@@ -49,11 +40,6 @@ export async function GET(request: Request) {
       details: detailRes,
       top5: top5Res,
       globalTotal: globalRes[0]?.TOTAL_GERAL_PREENCHIDO || 0
-    };
-
-    cache[cacheKey] = {
-      data: result,
-      timestamp: Date.now()
     };
 
     return NextResponse.json(result);

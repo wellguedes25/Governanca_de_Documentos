@@ -365,8 +365,8 @@ export default function DocumentosPage() {
         const isDateB = !isNaN(Date.parse(String(valB)));
 
         if (isDateA && isDateB) {
-          const timeA = new Date(valA).getTime();
-          const timeB = new Date(valB).getTime();
+          const timeA = new Date(String(valA)).getTime();
+          const timeB = new Date(String(valB)).getTime();
           return sortConfig.direction === 'asc' ? timeA - timeB : timeB - timeA;
         }
 

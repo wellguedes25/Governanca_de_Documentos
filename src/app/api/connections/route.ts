@@ -4,7 +4,18 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const data = await getData();
-  return NextResponse.json(data);
+  
+  // Hide passwords before sending to frontend
+  const dataToSend = JSON.parse(JSON.stringify(data));
+  if (dataToSend.connections) {
+    dataToSend.connections.forEach((conn: any) => {
+      if (conn.password) {
+        conn.password = '********';
+      }
+    });
+  }
+  
+  return NextResponse.json(dataToSend);
 }
 
 export async function POST(request: Request) {
@@ -14,6 +25,16 @@ export async function POST(request: Request) {
   if (body.type === 'SAVE_CONNECTION') {
     const conn: DbConnection = body.connection;
     const index = data.connections.findIndex(c => c.id === conn.id);
+    
+    // If the frontend sends back the masked password, recover the real one from disk
+    if (conn.password === '********') {
+      if (index > -1) {
+        conn.password = data.connections[index].password;
+      } else {
+        conn.password = undefined;
+      }
+    }
+    
     if (index > -1) {
       data.connections[index] = conn;
     } else {

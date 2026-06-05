@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<any>(null);
+  const [globalQuality, setGlobalQuality] = useState<any>(null);
   const [enabledQueries, setEnabledQueries] = useState<Record<string, boolean>>({});
 
   const [statsLoading, setStatsLoading] = useState(true);
@@ -135,6 +136,34 @@ export default function Dashboard() {
     }
   }, [docVersion]);
 
+  const fetchGlobalQuality = useCallback(async (force = false) => {
+    const cacheKey = `dashboard_global_quality_${docVersion || 'V2'}`;
+    if (!force) {
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          setGlobalQuality(JSON.parse(cached));
+          setLoadingMap(prev => ({ ...prev, 'globalQuality': false }));
+          return;
+        } catch (e) {}
+      }
+    }
+
+    setLoadingMap(prev => ({ ...prev, 'globalQuality': true }));
+    try {
+      const res = await fetch(`/api/dashboard/quality`);
+      const data = await res.json();
+      if (!data.error) {
+        setGlobalQuality(data);
+        sessionStorage.setItem(cacheKey, JSON.stringify(data));
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingMap(prev => ({ ...prev, 'globalQuality': false }));
+    }
+  }, [docVersion]);
+
   // Inicialização de Configurações
   useEffect(() => {
     async function loadConfig() {
@@ -164,8 +193,9 @@ export default function Dashboard() {
     } else if (activeTab === 'qualidade') {
       if (enabledQueries['assinados'] !== false) fetchStats(false, 'assinados');
       if (enabledQueries['idle'] !== false) fetchAnalytics(false, 'idle');
+      fetchGlobalQuality(false);
     }
-  }, [activeTab, enabledQueries, fetchStats, fetchAnalytics]);
+  }, [activeTab, enabledQueries, fetchStats, fetchAnalytics, fetchGlobalQuality]);
 
   const getCardData = (id: string) => {
     const cardMap: Record<string, any> = {
@@ -452,56 +482,103 @@ export default function Dashboard() {
 
           {/* TAB: QUALIDADE */}
           {activeTab === 'qualidade' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-               <div className="border border-border p-6 flex flex-col gap-4 group hover:border-[var(--primary)] transition-colors bg-card md:col-span-2">
-                  <div className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center justify-between">
-                    Taxa de Assinatura
-                    <Zap size={16} className="text-zinc-700 group-hover:text-[var(--primary)]" />
-                  </div>
-                  <div className="text-6xl font-black text-foreground tracking-tighter my-4">
-                    {loadingMap['assinados'] ? <Loader2 className="animate-spin text-muted-foreground" /> : stats?.assinadosPercent}
-                  </div>
-                  <div className="flex gap-8 border-t border-border pt-6 mt-auto font-mono">
-                    <div>
-                      <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-2">Assinados</p>
-                      <div className="text-xl font-black text-[var(--primary)]">
-                        {stats?.assinadosRaw || '0'}
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                 <div className="border border-border p-6 flex flex-col gap-4 group hover:border-[var(--primary)] transition-colors bg-card md:col-span-2">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center justify-between">
+                      Taxa de Assinatura
+                      <Zap size={16} className="text-zinc-700 group-hover:text-[var(--primary)]" />
+                    </div>
+                    <div className="text-6xl font-black text-foreground tracking-tighter my-4">
+                      {loadingMap['assinados'] ? <Loader2 className="animate-spin text-muted-foreground" /> : stats?.assinadosPercent}
+                    </div>
+                    <div className="flex gap-8 border-t border-border pt-6 mt-auto font-mono">
+                      <div>
+                        <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-2">Assinados</p>
+                        <div className="text-xl font-black text-[var(--primary)]">
+                          {stats?.assinadosRaw || '0'}
+                        </div>
+                      </div>
+                      <div className="w-[1px] bg-background" />
+                      <div>
+                        <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-2">Total</p>
+                        <div className="text-xl font-black text-foreground">
+                          {stats?.totalRaw || '0'}
+                        </div>
                       </div>
                     </div>
-                    <div className="w-[1px] bg-background" />
-                    <div>
-                      <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-2">Total</p>
-                      <div className="text-xl font-black text-foreground">
-                        {stats?.totalRaw || '0'}
-                      </div>
-                    </div>
-                  </div>
-               </div>
+                 </div>
 
-               <div className="border border-border p-6 flex flex-col gap-4 group hover:border-red-500 transition-colors bg-card md:col-span-2">
-                  <div className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center justify-between">
-                    Docs Ociosos
-                    <Archive size={16} className="text-zinc-700 group-hover:text-red-500" />
-                  </div>
-                  <div className="text-6xl font-black text-foreground tracking-tighter my-4">
-                    {loadingMap['idle'] ? <Loader2 className="animate-spin text-muted-foreground" /> : Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR')}
-                  </div>
-                  <div className="flex gap-8 border-t border-border pt-6 mt-auto font-mono">
-                    <div>
-                      <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-2">Ociosos</p>
-                      <div className="text-xl font-black text-red-500">
-                        {Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR')}
+                 <div className="border border-border p-6 flex flex-col gap-4 group hover:border-red-500 transition-colors bg-card md:col-span-2">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center justify-between">
+                      Docs Ociosos
+                      <Archive size={16} className="text-zinc-700 group-hover:text-red-500" />
+                    </div>
+                    <div className="text-6xl font-black text-foreground tracking-tighter my-4">
+                      {loadingMap['idle'] ? <Loader2 className="animate-spin text-muted-foreground" /> : Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR')}
+                    </div>
+                    <div className="flex gap-8 border-t border-border pt-6 mt-auto font-mono">
+                      <div>
+                        <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-2">Ociosos</p>
+                        <div className="text-xl font-black text-red-500">
+                          {Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR')}
+                        </div>
+                      </div>
+                      <div className="w-[1px] bg-background" />
+                      <div>
+                        <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-2">Modelos (Templates)</p>
+                        <div className="text-xl font-black text-foreground">
+                          {Number(analytics?.idle?.[0]?.TOTAL_TEMPLATES || 0).toLocaleString('pt-BR')}
+                        </div>
                       </div>
                     </div>
-                    <div className="w-[1px] bg-background" />
-                    <div>
-                      <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-2">Modelos (Templates)</p>
-                      <div className="text-xl font-black text-foreground">
-                        {Number(analytics?.idle?.[0]?.TOTAL_TEMPLATES || 0).toLocaleString('pt-BR')}
-                      </div>
+                 </div>
+              </div>
+
+              {/* JCI / ONA GLOBAL */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                 {/* Redundancy */}
+                 <div className="border border-border p-6 flex flex-col gap-4 group hover:border-rose-500 transition-colors bg-card">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center justify-between">
+                      Redundância Clínica
+                      <AlertTriangle size={16} className="text-zinc-700 group-hover:text-rose-500" />
                     </div>
-                  </div>
-               </div>
+                    <div className="text-5xl font-black text-foreground tracking-tighter my-4">
+                      {loadingMap['globalQuality'] ? <Loader2 className="animate-spin text-muted-foreground" /> : `${globalQuality?.redundancia || '0.0'}%`}
+                    </div>
+                    <div className="border-t border-border pt-4 mt-auto">
+                      <p className="text-[9px] font-bold text-rose-500 bg-rose-500/10 px-2 py-1 uppercase tracking-widest inline-block">Plágio &gt; 80%</p>
+                    </div>
+                 </div>
+
+                 {/* Siglario */}
+                 <div className="border border-border p-6 flex flex-col gap-4 group hover:border-cyan-500 transition-colors bg-card">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center justify-between">
+                      Vocabulário Limpo (JCI)
+                      <FileText size={16} className="text-zinc-700 group-hover:text-cyan-500" />
+                    </div>
+                    <div className="text-5xl font-black text-foreground tracking-tighter my-4">
+                      {loadingMap['globalQuality'] ? <Loader2 className="animate-spin text-muted-foreground" /> : `${globalQuality?.aderencia || '100.0'}%`}
+                    </div>
+                    <div className="border-t border-border pt-4 mt-auto">
+                      <p className="text-[9px] font-bold text-cyan-500 bg-cyan-500/10 px-2 py-1 uppercase tracking-widest inline-block">S/ Siglas Proibidas</p>
+                    </div>
+                 </div>
+
+                 {/* SLA */}
+                 <div className="border border-border p-6 flex flex-col gap-4 group hover:border-indigo-500 transition-colors bg-card">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center justify-between">
+                      SLA Assinatura 24h
+                      <Clock size={16} className="text-zinc-700 group-hover:text-indigo-500" />
+                    </div>
+                    <div className="text-5xl font-black text-foreground tracking-tighter my-4">
+                      {loadingMap['globalQuality'] ? <Loader2 className="animate-spin text-muted-foreground" /> : `${globalQuality?.sla24h || '100.0'}%`}
+                    </div>
+                    <div className="border-t border-border pt-4 mt-auto">
+                      <p className="text-[9px] font-bold text-indigo-500 bg-indigo-500/10 px-2 py-1 uppercase tracking-widest inline-block">Fechamento Rápido</p>
+                    </div>
+                 </div>
+              </div>
             </div>
           )}
         </div>

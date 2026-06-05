@@ -443,7 +443,7 @@ export default function Dashboard() {
                     INFO UNIDADE
                   </h3>
                   <p className="text-[10px] text-muted leading-relaxed font-bold uppercase tracking-widest">
-                    Dados segmentados pelas 7 principais unidades hospitalares da ACSC. Sincronização granular via DBLink.
+                    Dados segmentados unidades hospitalares. Sincronização granular via DBLink por Medylitcs Pro.
                   </p>
                 </div>
               </div>

@@ -143,7 +143,7 @@ export async function executeQuery(connection: DbConnection, sql: string, binds:
     if (finalSql.includes('/* DYNAMIC_HOSPITALS_DECODE */')) {
       const decodeSnippet = activeHospitals.flatMap((h: any) => [h.id, `'${h.sigla}'`]).join(',');
       // If no active hospitals, default to 'NO_HOSPITALS'
-      finalSql = finalSql.replace(/\/\* DYNAMIC_HOSPITALS_DECODE \*\//g, decodeSnippet ? `Decode(NVL(PA.CD_MULTI_EMPRESA, PAE.CD_MULTI_EMPRESA),${decodeSnippet}) AS EMPRESA` : "'NO_HOSPITALS' AS EMPRESA");
+      finalSql = finalSql.replace(/\/\*\s*DYNAMIC_HOSPITALS_DECODE\s*\*\/(?:\s*AS\s+EMPRESA)?/gi, decodeSnippet ? `Decode(NVL(PA.CD_MULTI_EMPRESA, PAE.CD_MULTI_EMPRESA),${decodeSnippet}) AS EMPRESA` : "'NO_HOSPITALS' AS EMPRESA");
     }
     
     if (finalSql.includes('/* DYNAMIC_HOSPITALS_IN */')) {

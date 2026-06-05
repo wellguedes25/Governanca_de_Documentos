@@ -28,6 +28,7 @@ export default function DocumentosPage() {
   const profilePageSize = 5;
 
   // Estados para Sidebar de Informações Técnicas
+  const [sidebarDoc, setSidebarDoc] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [metadata, setMetadata] = useState<any[]>([]);
   const [metadataLoading, setMetadataLoading] = useState(false);
@@ -84,24 +85,31 @@ export default function DocumentosPage() {
     });
   }, []);
 
-  // Dispara busca de perfis e metadados ao selecionar documento
+  // Dispara busca de perfis ao selecionar documento
   useEffect(() => {
     if (selectedDoc) {
       setProfileCurrentPage(1);
       setProfileSearchTerm('');
       setProfileUnitFilter('');
       fetchProfile(selectedDoc);
-      fetchMetadata(selectedDoc);
-      fetchActions(selectedDoc);
-      setActionsFilterDoc(null);
     } else {
       setProfileData([]);
+    }
+  }, [selectedDoc]);
+
+  // Dispara busca de metadados para o sidebar
+  useEffect(() => {
+    if (sidebarDoc && sidebarOpen) {
+      fetchMetadata(sidebarDoc);
+      fetchActions(sidebarDoc);
+      setActionsFilterDoc(null);
+    } else if (!sidebarOpen) {
       setMetadata([]);
       setMetadataActions([]);
       setMetadataActionsError(null);
       setActionsFilterDoc(null);
     }
-  }, [selectedDoc]);
+  }, [sidebarDoc, sidebarOpen]);
 
   async function fetchProfile(docId: string) {
     setProfileLoading(true);
@@ -584,17 +592,21 @@ export default function DocumentosPage() {
                     return (
                        <tr 
                         key={idx} 
-                        onClick={() => setSelectedDoc(docCode)}
+                        onClick={() => setSelectedDoc(isSelected ? null : docCode)}
                         className={`transition-all group cursor-pointer border-l-4 ${isSelected ? 'bg-[var(--primary)]/5 border-[var(--primary)] text-foreground' : '-background border-transparent text-muted'}`}
                       >
                         <td className="px-3 py-2 border-r -border text-center">
                           <button 
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedDoc(docCode);
-                              setSidebarOpen(true);
+                              if (sidebarOpen && sidebarDoc === docCode) {
+                                setSidebarOpen(false);
+                              } else {
+                                setSidebarDoc(docCode);
+                                setSidebarOpen(true);
+                              }
                             }}
-                            className={`p-1.5 rounded-none transition-all ${isSelected && sidebarOpen ? 'bg-[var(--primary)] text-foreground' : '-muted hover:text-[var(--primary)] hover:bg-[var(--primary)]/10'}`}
+                            className={`p-1.5 rounded-none transition-all ${sidebarDoc === docCode && sidebarOpen ? 'bg-[var(--primary)] text-foreground' : '-muted hover:text-[var(--primary)] hover:bg-[var(--primary)]/10'}`}
                           >
                             <Info size={14} />
                           </button>
@@ -871,13 +883,6 @@ export default function DocumentosPage() {
       <div 
         className={`fixed top-0 right-0 h-full bg-background border-l border-border z-[100] transition-all duration-500 ease-in-out transform flex flex-col ${sidebarOpen ? 'translate-x-0 w-[450px]' : 'translate-x-full w-[450px]'}`}
       >
-        <button 
-          onClick={() => setSidebarOpen(false)}
-          className="absolute -left-12 top-6 p-3 bg-background border border-border rounded-none text-muted hover:text-[var(--primary)] shadow-[-5px_0_15px_rgba(0,0,0,0.05)] transition-all"
-        >
-          <X size={20} />
-        </button>
-
         {/* Lógica de Extração de Metadados (Fix: Oracle Aliases in Uppercase) */}
         {(() => {
           // Busca a versão publicada (TIPO_VERSAO = 3) do layout TELA (TIPO_LAYOUT = 1)
@@ -891,8 +896,14 @@ export default function DocumentosPage() {
 
           return (
             <>
-              <div className="p-8 border-b border-border -background">
-                <div className="flex items-center gap-3 mb-2">
+              <div className="p-8 border-b border-border -background relative">
+                <button 
+                  onClick={() => setSidebarOpen(false)}
+                  className="absolute top-6 right-6 p-2 text-muted hover:text-[var(--primary)] transition-all"
+                >
+                  <X size={20} />
+                </button>
+                <div className="flex items-center gap-3 mb-2 pr-8">
                   <span className="px-2 py-0.5 bg-[var(--primary)] text-foreground text-[9px] font-black rounded uppercase tracking-wider">
                     Document Specs
                   </span>
@@ -902,11 +913,11 @@ export default function DocumentosPage() {
                     </span>
                   )}
                 </div>
-                <h3 className="text-xl font-black text-foreground uppercase tracking-tighter leading-tight italic">
+                <h3 className="text-xl font-black text-foreground uppercase tracking-tighter leading-tight italic pr-8">
                   {metadata[0]?.DESCRICAO_DOCUMENTO || 'Detalhes Técnicos'}
                 </h3>
                 <p className="text-[10px] text-muted font-bold uppercase tracking-[0.2em] mt-1">
-                  Oracle Identifier: <b className="text-[var(--primary)]">{selectedDoc}</b>
+                  Oracle Identifier: <b className="text-[var(--primary)]">{sidebarDoc}</b>
                 </p>
               </div>
 

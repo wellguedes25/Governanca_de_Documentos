@@ -368,7 +368,7 @@ export default function HospitaisPage() {
                 <span className="block mt-1 -muted">JCI Meta 2 (Comunicação Limpa)</span>
               </div>
               <div className="text-5xl font-black text-foreground tracking-tighter mt-2">
-                {vocabData?.adherence?.INDICE_ADERENCIA !== undefined ? `${vocabData.adherence.INDICE_ADERENCIA}%` : '100.0%'}
+                {vocabData?.adherence?.INDICE_ADERENCIA !== undefined ? `${Number(vocabData.adherence.INDICE_ADERENCIA).toFixed(1)}%` : '100.0%'}
               </div>
               <div className="mt-auto pt-4 border-t border-border">
                 <span className="text-[9px] font-black uppercase tracking-widest text-cyan-500 bg-cyan-500/10 px-2 py-1">Livre de Abrevições Proibidas</span>

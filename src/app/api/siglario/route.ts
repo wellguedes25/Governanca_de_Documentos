@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const dataInicio = searchParams.get('dataInicio') || '';
   const dataFim = searchParams.get('dataFim') || '';
+  const empresa = searchParams.get('empresa') || '';
 
   if (!dataInicio || !dataFim) {
     return NextResponse.json({ error: 'Parâmetros dataInicio e dataFim são obrigatórios.' }, { status: 400 });
@@ -26,8 +27,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Nenhuma conexão ativa configurada.' }, { status: 503 });
   }
 
-  // Bind variables posicionais (:1, :2) — elimina SQL Injection por completo
-  const query = `
+  // Montar query dinâmica e binds conforme presença de empresa
+  let query = `
     SELECT 
       S.CD_ATENDIMENTO AS ATENDIMENTO,
       S.CD_DOCUMENTO AS DOCUMENTO,
@@ -37,15 +38,26 @@ export async function GET(request: NextRequest) {
       S.CONTEXTO,
       TO_CHAR(S.DH_FECHAMENTO, 'YYYY-MM-DD HH24:MI:SS') AS DATA_HORA,
       S.CD_PRESTADOR AS PRESTADOR,
-      S.UNIDADE
+      S.UNIDADE,
+      A.CD_MULTI_EMPRESA AS CD_EMPRESA
     FROM DBAMV.TB_AUDITORIA_SIGLARIO S
-    WHERE S.DH_FECHAMENTO BETWEEN TO_DATE(:1, 'YYYY-MM-DD') 
-                               AND TO_DATE(:2, 'YYYY-MM-DD') + 1
-    ORDER BY S.DH_FECHAMENTO DESC, S.SIGLA_DETECTADA ASC
+    LEFT JOIN DBAMV.ATENDIME A ON A.CD_ATENDIMENTO = S.CD_ATENDIMENTO
   `;
 
+  const binds: any[] = [dataInicio, dataFim];
+
+  query += ` WHERE S.DH_FECHAMENTO BETWEEN TO_DATE(:1, 'YYYY-MM-DD') 
+                               AND TO_DATE(:2, 'YYYY-MM-DD') + 1 `;
+
+  if (empresa) {
+    query += ` AND A.CD_MULTI_EMPRESA = :3 `;
+    binds.push(Number(empresa));
+  }
+
+  query += ` ORDER BY S.DH_FECHAMENTO DESC, S.SIGLA_DETECTADA ASC `;
+
   try {
-    const rows = await executeQuery(activeConn, query, [dataInicio, dataFim]);
+    const rows = await executeQuery(activeConn, query, binds);
     return NextResponse.json({ rows });
   } catch (err: any) {
     console.error('[API Siglario]', err);

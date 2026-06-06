@@ -16,6 +16,7 @@ interface SiglaInfracao {
   DATA_HORA: string;
   PRESTADOR: number | string;
   UNIDADE: string;
+  CD_EMPRESA?: number;
 }
 
 interface RankingItem { sigla: string; count: number; }
@@ -38,6 +39,10 @@ export default function AuditoriaTab() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 20;
 
+  // Hospitais (Empresas)
+  const [hospitals, setHospitals] = useState<{id: number, sigla: string, nome: string}[]>([]);
+  const [empresa, setEmpresa] = useState<string>('');
+
   // Config independentes
   const [docIds, setDocIds] = useState('');
   const [days, setDays] = useState(15);
@@ -59,6 +64,18 @@ export default function AuditoriaTab() {
           setDays(json.params.days);
         }
       });
+
+    fetch('/api/connections')
+      .then(res => res.json())
+      .then(storage => {
+        if (storage.hospitalsMapping) {
+          const activeHospitals = storage.hospitalsMapping
+            .filter((h: any) => h.ativo)
+            .map((h: any) => ({ id: h.id, sigla: h.sigla, nome: h.nome || h.sigla }));
+          setHospitals(activeHospitals);
+        }
+      })
+      .catch(err => console.error('[Siglario] Erro ao carregar empresas:', err));
   }, []);
 
   async function handleSaveConfig() {
@@ -122,7 +139,11 @@ export default function AuditoriaTab() {
   async function handleExecute() {
     setLoading(true); setError(''); setHasSearched(true); setCurrentPage(1);
     try {
-      const res = await fetch('/api/siglario?' + new URLSearchParams({ dataInicio, dataFim }));
+      const params = new URLSearchParams({ dataInicio, dataFim });
+      if (empresa) {
+        params.append('empresa', empresa);
+      }
+      const res = await fetch('/api/siglario?' + params.toString());
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Erro ao consultar siglário'); }
       const json = await res.json();
       setData(json.rows || []);
@@ -181,20 +202,32 @@ export default function AuditoriaTab() {
         <h3 className="text-[10px] font-black text-muted uppercase tracking-[0.3em] mb-6 flex items-center gap-2">
           <Filter size={12} /> Parâmetros de Auditoria
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          {hospitals.length > 0 && (
+            <div>
+              <label className="text-[9px] font-black text-muted uppercase tracking-widest mb-1.5 block">Empresa</label>
+              <select value={empresa} onChange={e => setEmpresa(e.target.value)}
+                className="w-full bg-card border border-border rounded-none px-4 py-2.5 text-sm font-bold text-foreground focus:outline-none focus:border-[var(--primary)] transition-all h-[42px]">
+                <option value="">Todas</option>
+                {hospitals.map(h => (
+                  <option key={h.id} value={String(h.id)}>{h.sigla}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className="text-[9px] font-black text-muted uppercase tracking-widest mb-1.5 block">Data Início</label>
             <input type="date" max={dataFim} value={dataInicio} onChange={e => setDataInicio(e.target.value)}
-              className="w-full bg-card border border-border rounded-none px-4 py-2.5 text-sm font-bold text-foreground focus:outline-none focus:border-[var(--primary)] transition-all" />
+              className="w-full bg-card border border-border rounded-none px-4 py-2.5 text-sm font-bold text-foreground focus:outline-none focus:border-[var(--primary)] transition-all h-[42px]" />
           </div>
           <div>
             <label className="text-[9px] font-black text-muted uppercase tracking-widest mb-1.5 block">Data Fim</label>
             <input type="date" min={dataInicio} value={dataFim} onChange={e => setDataFim(e.target.value)}
-              className="w-full bg-card border border-border rounded-none px-4 py-2.5 text-sm font-bold text-foreground focus:outline-none focus:border-[var(--primary)] transition-all" />
+              className="w-full bg-card border border-border rounded-none px-4 py-2.5 text-sm font-bold text-foreground focus:outline-none focus:border-[var(--primary)] transition-all h-[42px]" />
           </div>
           <div className="flex items-end">
             <button onClick={handleExecute} disabled={loading}
-              className="w-full flex items-center justify-center gap-3 bg-[var(--primary)] hover:opacity-90 text-foreground px-8 py-2.5 rounded-none text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-none disabled:opacity-60">
+              className="w-full flex items-center justify-center gap-3 bg-[var(--primary)] hover:opacity-90 text-foreground px-8 py-2.5 rounded-none text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-none disabled:opacity-60 h-[42px]">
               {loading ? <Loader2 size={16} className="animate-spin" /> : <BookOpen size={16} />}
               {loading ? 'Carregando...' : 'Consultar Auditoria'}
             </button>
@@ -291,6 +324,7 @@ export default function AuditoriaTab() {
               {paginated.map((row, i) => {
                 const key = `${row.ATENDIMENTO}-${row.CD_DOCUMENTO_CLINICO}-${row.SIGLA_DETECTADA}-${i}`;
                 const isExpanded = expanded === key;
+                const hospSigla = hospitals.find(h => h.id === Number(row.CD_EMPRESA))?.sigla || '';
                 return (
                   <div key={key} className="bg-background border border-border rounded-none overflow-hidden shadow-none hover:border-rose-300 transition-all group">
                     <button onClick={() => setExpanded(isExpanded ? null : key)} className="w-full flex items-start gap-4 p-5 text-left">
@@ -300,6 +334,11 @@ export default function AuditoriaTab() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap gap-3 mb-2 items-center">
+                          {hospSigla && (
+                            <span className="bg-[var(--primary)]/10 text-[var(--primary)] text-[9px] font-black uppercase px-2 py-0.5 rounded-none tracking-widest">
+                              {hospSigla}
+                            </span>
+                          )}
                           <span className="text-[10px] font-black text-muted uppercase tracking-wider">
                             Atend. <span className="text-foreground">{row.ATENDIMENTO}</span>
                           </span>

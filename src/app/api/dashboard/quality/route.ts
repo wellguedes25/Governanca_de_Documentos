@@ -98,7 +98,7 @@ export async function GET(request: Request) {
     const slaPercent = totalSigned > 0 ? ((within24h / totalSigned) * 100).toFixed(1) : '100.0';
 
     // Aderência
-    const adherencia = vocabRes[0]?.INDICE_ADERENCIA !== undefined ? vocabRes[0].INDICE_ADERENCIA : '100.0';
+    const adherencia = vocabRes[0]?.INDICE_ADERENCIA !== undefined ? Number(vocabRes[0].INDICE_ADERENCIA).toFixed(1) : '100.0';
 
     return NextResponse.json({
       redundancia,

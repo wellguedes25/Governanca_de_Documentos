@@ -85,12 +85,16 @@ export default function SimilaridadePage() {
   const [activeTab, setActiveTab] = useState<'consulta' | 'mapeamentos'>('consulta');
   const [reportUrl, setReportUrl] = useState('http://dev3-mvh5.acsc.org.br:84/mveditor/report?regId=');
 
+  // Hospitais (Empresas)
+  const [hospitals, setHospitals] = useState<{id: number, sigla: string, nome: string}[]>([]);
+
   // Filtros
 
   const [filters, setFilters] = useState({
     documento: '',
     campo: '',
     prestador: '',
+    empresa: '' as string,
     dataInicio: get30DaysAgo(),
     dataFim: getToday(),
     minScore: 0
@@ -123,6 +127,12 @@ export default function SimilaridadePage() {
       if (storage.similarityQuery) setSimilarityQuery(storage.similarityQuery);
       if (storage.docMappings) setDocMappings(storage.docMappings);
       if (storage.reportBaseUrl) setReportUrl(storage.reportBaseUrl);
+      if (storage.hospitalsMapping) {
+        const activeHospitals = storage.hospitalsMapping
+          .filter((h: any) => h.ativo)
+          .map((h: any) => ({ id: h.id, sigla: h.sigla, nome: h.nome || h.sigla }));
+        setHospitals(activeHospitals);
+      }
     } catch (err) {
       console.error('[Similaridade] Falha ao verificar conexão:', err);
     }
@@ -185,6 +195,11 @@ export default function SimilaridadePage() {
     setSelectedPrestadores([]);
 
     try {
+      // Montar cláusula de empresa dinamicamente
+      const empresaClause = filters.empresa
+        ? 'AND ATE.CD_MULTI_EMPRESA = :CD_EMPRESA'
+        : '';
+
       // Usar query dinâmica do Motor SQL se disponível, caso contrário usar fallback
       const query = similarityQuery || `
         SELECT 
@@ -198,30 +213,43 @@ export default function SimilaridadePage() {
             P.NM_PRESTADOR as NOME_PRESTADOR,
             A.LEITO,
             A.UNIDADE,
-            A.GRAU_SIMILARIDADE as SCORE
+            A.GRAU_SIMILARIDADE as SCORE,
+            ATE.CD_MULTI_EMPRESA as CD_EMPRESA,
+            ME.DS_MULTI_EMPRESA as NOME_EMPRESA
         FROM 
             DBAMV.TB_AUDITORIA_SIMILARIDADE A
         LEFT JOIN
             DBAMV.PRESTADOR P ON P.CD_PRESTADOR = A.CD_PRESTADOR
+        JOIN
+            DBAMV.ATENDIME ATE ON ATE.CD_ATENDIMENTO = A.CD_ATENDIMENTO
+        LEFT JOIN
+            DBAMV.MULTI_EMPRESA ME ON ME.CD_MULTI_EMPRESA = ATE.CD_MULTI_EMPRESA
         WHERE 
             A.CD_DOCUMENTO = :CD_DOCUMENTO
             AND A.IDENTIFICADOR_FILTRO = :IDENTIFICADOR
             AND A.DH_FECHAMENTO BETWEEN TO_DATE(:DATA_INI, 'YYYY-MM-DD') AND TO_DATE(:DATA_FIM, 'YYYY-MM-DD') + 1
+            ${empresaClause}
         ORDER BY 
             A.CD_ATENDIMENTO DESC, A.DH_FECHAMENTO DESC
       `;
+
+      // Montar params dinamicamente
+      const params: Record<string, string> = {
+        CD_DOCUMENTO: filters.documento,
+        IDENTIFICADOR: filters.campo,
+        DATA_INI: filters.dataInicio,
+        DATA_FIM: filters.dataFim
+      };
+      if (filters.empresa) {
+        params.CD_EMPRESA = filters.empresa;
+      }
 
       const execRes = await fetch('/api/oracle/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query,
-          params: {
-            CD_DOCUMENTO: filters.documento,
-            IDENTIFICADOR: filters.campo,
-            DATA_INI: filters.dataInicio,
-            DATA_FIM: filters.dataFim
-          }
+          params
         }),
       });
 
@@ -600,6 +628,25 @@ export default function SimilaridadePage() {
       <div className="-background backdrop-blur-md border border-border rounded-3xl p-6 shadow-none relative group overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[var(--primary)] to-transparent opacity-30"></div>
         <div className="flex flex-wrap items-end gap-6">
+          {/* Empresa (Hospital) */}
+          {hospitals.length > 0 && (
+            <div className="w-[200px] space-y-2">
+              <label className="text-[10px] font-black text-muted uppercase tracking-widest flex items-center gap-2">
+                <Building2 size={12} className="text-[var(--primary)]" /> Empresa
+              </label>
+              <select
+                className="w-full bg-background border-2 border-border rounded-none px-4 py-2.5 text-xs font-black text-foreground outline-none focus:border-[var(--primary)] transition-all shadow-none"
+                value={filters.empresa}
+                onChange={(e) => setFilters(f => ({ ...f, empresa: e.target.value }))}
+              >
+                <option value="">Todas</option>
+                {hospitals.map(h => (
+                  <option key={h.id} value={String(h.id)}>{h.sigla}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Documento (Selector) */}
           <div className="flex-1 min-w-[300px] space-y-2">
             <label className="text-[10px] font-black text-muted uppercase tracking-widest flex items-center gap-2">
@@ -1035,6 +1082,7 @@ export default function SimilaridadePage() {
                   <tr className="-background border-b border-border">
                     <th className="px-8 py-5 text-[10px] font-black text-muted uppercase tracking-[0.2em] text-center">Atendimento</th>
                     <th className="px-8 py-5 text-[10px] font-black text-muted uppercase tracking-[0.2em]">Registro Clínico</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-muted uppercase tracking-[0.2em]">Empresa</th>
                     <th className="px-8 py-5 text-[10px] font-black text-muted uppercase tracking-[0.2em]">Data e Hora</th>
                     <th className="px-8 py-5 text-[10px] font-black text-muted uppercase tracking-[0.2em] text-center">Prestador</th>
                     <th className="px-8 py-5 text-[10px] font-black text-muted uppercase tracking-[0.2em]">Localização</th>
@@ -1045,7 +1093,7 @@ export default function SimilaridadePage() {
                 <tbody className="divide-y divide-slate-50">
                   {loading ? (
                     <tr>
-                      <td colSpan={7} className="py-32 text-center">
+                      <td colSpan={8} className="py-32 text-center">
                         <div className="flex flex-col items-center gap-6">
                           <div className="relative">
                             <div className="w-16 h-16 border-4 border-border border-t-[var(--primary)] rounded-none animate-spin"></div>
@@ -1076,6 +1124,12 @@ export default function SimilaridadePage() {
                                   <span className="text-[9px] font-bold text-blue-500 uppercase tracking-tighter bg-blue-500/10 px-1.5 py-0.5 rounded italic">{getVal(row, 'IDENTIFICADOR')}</span>
                                 </div>
                               </div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-4">
+                            <div className="flex items-center gap-2">
+                              <Building2 size={12} className="text-muted opacity-40" />
+                              <span className="text-[10px] font-black text-muted uppercase tracking-widest">{getVal(row, 'NOME_EMPRESA') || getVal(row, 'CD_EMPRESA') || '—'}</span>
                             </div>
                           </td>
                           <td className="px-8 py-4">

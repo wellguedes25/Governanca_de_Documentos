@@ -20,7 +20,10 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
     <div className="flex flex-col min-h-screen bg-background">
       {/* Main App Layout wrapper */}
       {showNav && <Sidebar />}
-      <main className={`flex-1 flex flex-col ${showNav ? 'pt-16' : 'pt-0'} ${mainPadding}`}>
+      <main 
+        suppressHydrationWarning
+        className={`flex-1 flex flex-col ${showNav ? 'pt-16' : 'pt-0'} ${mainPadding}`}
+      >
         <div className="w-full h-full flex flex-col">
           {children}
         </div>

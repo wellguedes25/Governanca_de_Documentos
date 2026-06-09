@@ -4,30 +4,38 @@
       "id": "ya6fv732m",
       "name": "DATAGUARD",
       "user": "ACSC_WELLINGTON_GUEDES",
-      "password": "M1vcb3G1",
+      "password": "encrypted:d587f21c51db76babc89a1a2157e8d65:c7a1c4c17f4f150117790ac49b44e6e2",
       "connectString": "EXACCDG-SCAN.acsc.local:1521/PRDMV1.acsc.local"
     },
     {
       "id": "rq3v1tbeq",
       "name": "DEV3",
       "user": "dbamv",
-      "password": "dbamv",
+      "password": "encrypted:00bc69baee510d92de3dd1b29b2f9c74:005ebf75b931ab2c8a479dfa20b520a5",
       "connectString": "EXACCHML-SCAN:1521/MVDEV3.acsc.local"
     },
     {
       "id": "1cs741i9t",
       "name": "DEV1",
       "user": "DBAMV",
-      "password": "dbamv",
+      "password": "encrypted:b686ce28d097a600245f9e8da8ccf6ce:3ab9491bb4c37807d1aed0d7b35b8959",
       "connectString": "EXACCHML-SCAN:1521/MVDEV1.acsc.local"
     }
   ],
-  "activeConnectionId": "1cs741i9t",
+  "activeConnectionId": "ya6fv732m",
   "activeQuery": "SELECT CD_DOCUMENTO AS \"CÓDIGO\", NM_TITULO AS \"NOME\", COUNT(1) AS \"TOTAL\", MAX(DH_CRIACAO) AS \"ÚLTIMO USO\", /* DYNAMIC_HOSPITALS_PIVOT */ FROM (SELECT DISTINCT ED.CD_DOCUMENTO, UPPER(ED.DS_DOCUMENTO) AS NM_TITULO, A.CD_MULTI_EMPRESA, PDC.DH_CRIACAO FROM DBAMV.PW_EDITOR_CLINICO PEC JOIN DBAMV.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.PW_DOCUMENTO_CLINICO PDC ON PDC.CD_DOCUMENTO_CLINICO = PEC.CD_DOCUMENTO_CLINICO JOIN DBAMV.ATENDIME A ON A.CD_ATENDIMENTO = PDC.CD_ATENDIMENTO WHERE ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90) GROUP BY CD_DOCUMENTO, NM_TITULO ORDER BY NM_TITULO",
   "activeQueryV3": "SELECT CD_DOCUMENTO AS \"CÓDIGO\", NM_TITULO AS \"NOME\", COUNT(1) AS \"TOTAL\", MAX(DH_CRIACAO) AS \"ÚLTIMO USO\", /* DYNAMIC_HOSPITALS_PIVOT */ FROM (SELECT DISTINCT ED.CD_DOCUMENTO, UPPER(ED.DS_DOCUMENTO) AS NM_TITULO, A.CD_MULTI_EMPRESA, PDC.DH_CRIACAO FROM DBAMV.PW_EDITOR_CLINICO PEC JOIN EDITOR.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.PW_DOCUMENTO_CLINICO PDC ON PDC.CD_DOCUMENTO_CLINICO = PEC.CD_DOCUMENTO_CLINICO JOIN DBAMV.ATENDIME A ON A.CD_ATENDIMENTO = PDC.CD_ATENDIMENTO WHERE ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90) GROUP BY CD_DOCUMENTO, NM_TITULO ORDER BY NM_TITULO",
   "profileQuery": "SELECT DISTINCT CD_DOCUMENTO, NM_TITULO, DS_PERFIL_AMBULATORIAL, EMPRESA FROM (SELECT PMP.NM_VALOR AS CD_DOCUMENTO, PM.NM_TITULO, PA.DS_PERFIL_AMBULATORIAL, /* DYNAMIC_HOSPITALS_DECODE */ AS EMPRESA FROM DBAMV.PERFIL_AMBULATORIAL PA JOIN DBAMV.PW_PERFIL_MODULO PM ON PA.CD_PERFIL_AMBULATORIAL = PM.CD_PERFIL_AMBULATORIAL JOIN DBAMV.PW_PERFIL_MODULO_PARAMETRO PMP ON PM.CD_PERFIL_MODULO = PMP.CD_PERFIL_MODULO LEFT JOIN DBAMV.PERFIL_AMBULATORIAL_EMPRESA PAE ON PA.CD_PERFIL_AMBULATORIAL = PAE.CD_PERFIL_AMBULATORIAL WHERE PMP.CD_PARAMETRO = 'CD_DOCUMENTO' AND PA.SN_ATIVO = 'S' AND PA.TP_PERFIL = 'SIS' AND PMP.NM_VALOR = :CD_DOCUMENTO UNION ALL SELECT TB_OBJETO.CD_DOCUMENTO, PM.NM_TITULO, PA.DS_PERFIL_AMBULATORIAL, /* DYNAMIC_HOSPITALS_DECODE */ AS EMPRESA FROM DBAMV.PERFIL_AMBULATORIAL PA JOIN DBAMV.PW_PERFIL_MODULO PM ON PA.CD_PERFIL_AMBULATORIAL = PM.CD_PERFIL_AMBULATORIAL JOIN DBAMV.PW_PERFIL_MODULO_PARAMETRO PMP ON PM.CD_PERFIL_MODULO = PMP.CD_PERFIL_MODULO LEFT JOIN DBAMV.PERFIL_AMBULATORIAL_EMPRESA PAE ON PA.CD_PERFIL_AMBULATORIAL = PAE.CD_PERFIL_AMBULATORIAL JOIN (SELECT NM_VALOR AS CD_DOCUMENTO, TO_CHAR(PTDC.CD_OBJETO) AS CD_OBJETO FROM DBAMV.PW_TIPO_DOCUMENTO_CONSULTA PTDC JOIN DBAMV.PW_TIPO_DOCUMENTO_MODULO PTDM ON PTDC.CD_TIPO_DOCUMENTO_CONSULTA = PTDM.CD_TIPO_DOCUMENTO_CONSULTA JOIN DBAMV.PW_TIPO_DOCUMENTO_MODULO_PARAM PTDMP ON PTDM.CD_TIPO_DOCUMENTO_MODULO = PTDMP.CD_TIPO_DOCUMENTO_MODULO WHERE PTDMP.CD_PARAMETRO = 'CD_DOCUMENTO' AND NM_VALOR = :CD_DOCUMENTO) TB_OBJETO ON PMP.NM_VALOR = TB_OBJETO.CD_OBJETO WHERE PA.SN_ATIVO = 'S' AND PA.TP_PERFIL = 'SIS')",
+  "ambulatoryProfilesQuery": "SELECT pa.cd_perfil_ambulatorial AS Cod_Perfil, pa.ds_perfil_ambulatorial AS Nome_Perfil, pa.cd_especialidade AS Cod_Especialidade, esp.ds_especialid AS Especialidade, pa.cd_sistema AS Sistema, pa.tp_porta_entrada AS Porta_Entrada, pa.tp_atendimento AS Tipo_Atendimento, pa.cd_tip_presta AS Cod_Tipo_Prestador, tp.nm_tip_presta AS Nome_Tipo_Prestador, pa.cd_setor AS Cod_Setor, seto.nm_setor AS Nome_Setor, pa.cd_multi_empresa AS Empresa_Fixa FROM dbamv.perfil_ambulatorial pa LEFT JOIN dbamv.especialid esp ON esp.cd_especialid = pa.cd_especialidade LEFT JOIN dbamv.tip_presta tp ON tp.cd_tip_presta = pa.cd_tip_presta LEFT JOIN dbamv.setor seto ON seto.cd_setor = pa.cd_setor WHERE pa.sn_ativo = 'S' AND pa.tp_perfil = 'SIS'",
+  "ambulatoryProfileDetailsQuery": "SELECT pm.cd_perfil_modulo AS Cod_Perfil_Modulo, pm.cd_modulo AS Modulo, pm.cd_perfil_modulo_pai AS Cod_Perfil_Modulo_Pai, pm.nm_titulo AS Titulo, pm.cd_perfil_modulo_agrupador AS Agrupador, pmp.cd_perfil_modulo_parametro AS Cod_Mod_Parametro, pmp.cd_modulo AS Modulo_Parametro, pmp.cd_parametro AS Parametro, pmp.cd_perfil_modulo AS Cod_Perfil_Mod_Origem, CASE WHEN pmp.cd_parametro = 'CD_OBJETO' AND po.nm_objeto IS NOT NULL THEN pmp.nm_valor || ' - ' || po.nm_objeto WHEN pmp.cd_parametro = 'CD_DOCUMENTO' AND ed.ds_documento IS NOT NULL THEN pmp.nm_valor || ' - ' || ed.ds_documento ELSE pmp.nm_valor END AS Valor_Parametro, pmp.ds_valor AS Desc_Valor_Parametro FROM dbamv.perfil_ambulatorial pa INNER JOIN dbamv.pw_perfil_modulo pm ON pa.cd_perfil_ambulatorial = pm.cd_perfil_ambulatorial INNER JOIN dbamv.pw_perfil_modulo_parametro pmp ON pm.cd_perfil_modulo = pmp.cd_perfil_modulo LEFT JOIN dbamv.pagu_objeto po ON pmp.cd_parametro = 'CD_OBJETO' AND TO_CHAR(po.cd_objeto) = pmp.nm_valor LEFT JOIN dbamv.editor_documento ed ON pmp.cd_parametro = 'CD_DOCUMENTO' AND TO_CHAR(ed.cd_documento) = pmp.nm_valor WHERE pa.sn_ativo = 'S' AND pa.tp_perfil = 'SIS' AND pa.cd_perfil_ambulatorial = :CD_PERFIL",
   "oracleClientPath": "C:\\orant\\Client\\instantclient_23_0",
   "hospitalsMapping": [
+    {
+      "id": 1,
+      "nome": "ASSOCIACAO CONGREGACAO DE SANTA CATARINA",
+      "sigla": "ACSC",
+      "ativo": true
+    },
     {
       "id": 3,
       "nome": "CASA DE SAUDE SAO JOSE",
@@ -41,9 +49,33 @@
       "ativo": true
     },
     {
+      "id": 5,
+      "nome": "COLEGIO SANTA CATARINA - RJ",
+      "sigla": "CSCR",
+      "ativo": true
+    },
+    {
+      "id": 6,
+      "nome": "COLEGIO SANTA CATARINA - JF",
+      "sigla": "CSCJ",
+      "ativo": true
+    },
+    {
       "id": 7,
       "nome": "HOSPITAL SANTA CATARINA",
       "sigla": "HSC",
+      "ativo": true
+    },
+    {
+      "id": 8,
+      "nome": "COLEGIO SANTA CATARINA - SP",
+      "sigla": "CSCS",
+      "ativo": true
+    },
+    {
+      "id": 10,
+      "nome": "HOSPITAL SAO JOSE",
+      "sigla": "HSJ",
       "ativo": true
     },
     {
@@ -53,15 +85,147 @@
       "ativo": true
     },
     {
+      "id": 12,
+      "nome": "ESCOLA SANTA CATARINA ",
+      "sigla": "ESC",
+      "ativo": true
+    },
+    {
+      "id": 16,
+      "nome": "COLEGIO SANTA CATARINA - GO",
+      "sigla": "CSCG",
+      "ativo": true
+    },
+    {
+      "id": 18,
+      "nome": "HOSPITAL SAO LUIS",
+      "sigla": "HSL",
+      "ativo": true
+    },
+    {
+      "id": 19,
+      "nome": "LAR MADRE REGINA",
+      "sigla": "LMR",
+      "ativo": true
+    },
+    {
+      "id": 23,
+      "nome": "CRECHE SAGRADA FAMILIA",
+      "sigla": "CSF",
+      "ativo": true
+    },
+    {
       "id": 25,
       "nome": "HOSPITAL DE CLINICAS NSRA. DA CONCEICAO ",
       "sigla": "HCNSC",
       "ativo": true
     },
     {
-      "id": 10,
-      "nome": "HOSPITAL SAO JOSE",
-      "sigla": "HSJ",
+      "id": 26,
+      "nome": "OS ACSC - REDE ASSIST SUP TEC S (STS)",
+      "sigla": "ARASTS",
+      "ativo": true
+    },
+    {
+      "id": 28,
+      "nome": "CENTRO DE REFERENCIA DO IDOSO",
+      "sigla": "CRI",
+      "ativo": true
+    },
+    {
+      "id": 36,
+      "nome": "AMBULATORIO MEDICO DE ESPEC ITAPEVI",
+      "sigla": "AMEI",
+      "ativo": true
+    },
+    {
+      "id": 42,
+      "nome": "CRECHE MONTEIRO LOBATO ",
+      "sigla": "CML",
+      "ativo": true
+    },
+    {
+      "id": 43,
+      "nome": "HOSPITAL AMPARO MATERNAL",
+      "sigla": "HAM",
+      "ativo": true
+    },
+    {
+      "id": 45,
+      "nome": "OBRA SOCIAL SANTA CATARINA ",
+      "sigla": "OSSC",
+      "ativo": true
+    },
+    {
+      "id": 46,
+      "nome": "HOSPITAL REGIONAL DE CACERES",
+      "sigla": "HRC",
+      "ativo": true
+    },
+    {
+      "id": 47,
+      "nome": "CRECHE SAO JOSE DO ITAMARATI",
+      "sigla": "CSJI",
+      "ativo": true
+    },
+    {
+      "id": 48,
+      "nome": "HOSP ESTADUAL CENTRAL ",
+      "sigla": "HEC",
+      "ativo": true
+    },
+    {
+      "id": 49,
+      "nome": "HOSPITAL ESTADUAL ALBERTO TORRES ",
+      "sigla": "HEAT",
+      "ativo": true
+    },
+    {
+      "id": 50,
+      "nome": "HOSP ESTADUAL PREF JOAO BATISTA CAFFARO",
+      "sigla": "HEPJBC",
+      "ativo": true
+    },
+    {
+      "id": 51,
+      "nome": "HOSPITAL SAO JOSE E MATERNIDADE CHIQUINH",
+      "sigla": "HSJMC",
+      "ativo": true
+    },
+    {
+      "id": 52,
+      "nome": "HOSPITAL SANTA ISABEL",
+      "sigla": "HSI",
+      "ativo": true
+    },
+    {
+      "id": 53,
+      "nome": "HOSPITAL NOSSA SENHORA DA CONCEICAO",
+      "sigla": "HNSC",
+      "ativo": true
+    },
+    {
+      "id": 54,
+      "nome": "PROVINCIA MADRE REGINA",
+      "sigla": "PMR",
+      "ativo": true
+    },
+    {
+      "id": 60,
+      "nome": "CANCER-CENTER - CSSJ",
+      "sigla": "CCC",
+      "ativo": true
+    },
+    {
+      "id": 61,
+      "nome": "HOSPITAL ESTADUAL FRANCISCO MORATO",
+      "sigla": "HEFM",
+      "ativo": true
+    },
+    {
+      "id": 62,
+      "nome": "COLEGIO VIRGEM PODEROSA",
+      "sigla": "CVP",
       "ativo": true
     },
     {

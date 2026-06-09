@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, RefreshCw, Filter, FileText, Download, GripVertical, Check, X, ChevronUp, ChevronDown, ListFilter, XCircle, FileSpreadsheet, Printer, AlertTriangle, Loader2, Info, History, Settings, ExternalLink, Zap, Unlink, Network } from 'lucide-react';
+import { Search, RefreshCw, Filter, FileText, Download, GripVertical, Check, X, ChevronUp, ChevronDown, ListFilter, XCircle, FileSpreadsheet, Printer, AlertTriangle, Loader2, Info, History, Settings, ExternalLink, Zap, Unlink, Network, Database, ChevronRight, Layout } from 'lucide-react';
 import { useUI } from '@/context/UIContext';
 import { PageHeader } from '@/components/ui/PageHeader';
 import DocumentGraph from '@/components/DocumentGraph';
@@ -39,6 +39,192 @@ export default function DocumentosPage() {
   const [activeTab, setActiveTab] = useState<'specs' | 'history' | 'actions' | 'map'>('specs');
   const [graphFullscreen, setGraphFullscreen] = useState(false);
   const [actionsFilterDoc, setActionsFilterDoc] = useState<string | null>(null);
+
+  const [activeMainTab, setActiveMainTab] = useState<'documentos' | 'perfis'>('documentos');
+
+  // Estados para a aba Perfis Ambulatoriais
+  const [ambulatoryProfilesData, setAmbulatoryProfilesData] = useState<any[]>([]);
+  const [ambulatoryProfilesLoading, setAmbulatoryProfilesLoading] = useState(false);
+  const [ambulatoryProfilesError, setAmbulatoryProfilesError] = useState('');
+  const [selectedPerfilId, setSelectedPerfilId] = useState<string | null>(null);
+  const [perfisSearchTerm, setPerfisSearchTerm] = useState('');
+  const [perfisCurrentPage, setPerfisCurrentPage] = useState(1);
+  const perfisPageSize = 5;
+
+  const [profileDetailsCache, setProfileDetailsCache] = useState<Record<string, any>>({});
+  const [profileDetailsLoading, setProfileDetailsLoading] = useState(false);
+  const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setExpandedModules({});
+  }, [selectedPerfilId]);
+
+  const fetchAmbulatoryProfiles = async () => {
+    if (ambulatoryProfilesData.length > 0) return; // já carregado
+    setAmbulatoryProfilesLoading(true);
+    setAmbulatoryProfilesError('');
+    try {
+      const res = await fetch('/api/oracle/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'AMBULATORY_PROFILES' })
+      });
+      const result = await res.json();
+      if (res.ok) {
+        setAmbulatoryProfilesData(result.rows || []);
+      } else {
+        setAmbulatoryProfilesError(result.error || 'Erro ao carregar perfis ambulatoriais.');
+      }
+    } catch (err: any) {
+      setAmbulatoryProfilesError('Erro de comunicação com o servidor.');
+    } finally {
+      setAmbulatoryProfilesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeMainTab === 'perfis') {
+      fetchAmbulatoryProfiles();
+    }
+  }, [activeMainTab]);
+
+  useEffect(() => {
+    if (!selectedPerfilId) return;
+    if (profileDetailsCache[selectedPerfilId]) return;
+
+    const fetchDetails = async () => {
+      setProfileDetailsLoading(true);
+      try {
+        const res = await fetch('/api/oracle/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            query: 'AMBULATORY_PROFILE_DETAILS',
+            params: { CD_PERFIL: selectedPerfilId }
+          })
+        });
+        const result = await res.json();
+        
+        const modulos: Record<string, any> = {};
+        if (result.rows) {
+          result.rows.forEach((row: any) => {
+            const codPerfilModulo = String(row.COD_PERFIL_MODULO || row.Cod_Perfil_Modulo || row['\"COD_PERFIL_MODULO\"'] || '');
+            const moduloName = String(row.MODULO || row.Modulo || row['\"MODULO\"'] || '');
+            const tituloModulo = String(row.TITULO || row.Titulo || row['\"TITULO\"'] || '');
+            const parametro = String(row.PARAMETRO || row.Parametro || row['\"PARAMETRO\"'] || '');
+            const valor = String(row.VALOR_PARAMETRO || row.Valor_Parametro || row['\"VALOR_PARAMETRO\"'] || '');
+            const descValor = String(row.DESC_VALOR_PARAMETRO || row.Desc_Valor_Parametro || row['\"DESC_VALOR_PARAMETRO\"'] || '');
+
+            if (!codPerfilModulo) return;
+
+            if (!modulos[codPerfilModulo]) {
+              modulos[codPerfilModulo] = { Titulo: tituloModulo, ModuloId: moduloName, Parametros: [] };
+            }
+            if (parametro) {
+              modulos[codPerfilModulo].Parametros.push({
+                Parametro: parametro, Valor: valor, Descricao: descValor
+              });
+            }
+          });
+        }
+        
+        setProfileDetailsCache(prev => ({
+          ...prev,
+          [selectedPerfilId]: modulos
+        }));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setProfileDetailsLoading(false);
+      }
+    };
+    
+    fetchDetails();
+  }, [selectedPerfilId, profileDetailsCache]);
+
+  const masterPerfisList = useMemo(() => {
+    return ambulatoryProfilesData.map(row => ({
+      id: String(row.COD_PERFIL || row.Cod_Perfil || row['\"COD_PERFIL\"'] || ''),
+      Nome_Perfil: String(row.NOME_PERFIL || row.Nome_Perfil || row['\"NOME_PERFIL\"'] || ''),
+      Especialidade: String(row.ESPECIALIDADE || row.Especialidade || row['\"ESPECIALIDADE\"'] || ''),
+      Sistema: String(row.SISTEMA || row.Sistema || row['\"SISTEMA\"'] || ''),
+    })).filter(p => p.id);
+  }, [ambulatoryProfilesData]);
+
+  const groupedPerfis = useMemo(() => {
+    const groups: Record<string, any> = {};
+    masterPerfisList.forEach(p => { groups[p.id] = p; });
+    return groups;
+  }, [masterPerfisList]);
+
+  const filteredPerfisList = useMemo(() => {
+    let list = masterPerfisList;
+    if (perfisSearchTerm) {
+      const term = perfisSearchTerm.toLowerCase();
+      list = list.filter(p => 
+        p.Nome_Perfil.toLowerCase().includes(term) || 
+        p.id.toLowerCase().includes(term) ||
+        p.Especialidade.toLowerCase().includes(term)
+      );
+    }
+    return list;
+  }, [masterPerfisList, perfisSearchTerm]);
+
+  useEffect(() => {
+    setPerfisCurrentPage(1);
+  }, [perfisSearchTerm]);
+
+  const perfisTotalPages = Math.ceil(filteredPerfisList.length / perfisPageSize);
+  const paginatedPerfisList = useMemo(() => {
+    const start = (perfisCurrentPage - 1) * perfisPageSize;
+    return filteredPerfisList.slice(start, start + perfisPageSize);
+  }, [filteredPerfisList, perfisCurrentPage]);
+
+  const exportPerfisToCSV = () => {
+    if (!selectedPerfilId) return;
+    const perfil = groupedPerfis[selectedPerfilId];
+    const modulos = profileDetailsCache[selectedPerfilId];
+    if (!perfil || !modulos) return;
+
+    const rows = [
+      ['Perfil', perfil.Nome_Perfil],
+      ['Sistema', perfil.Sistema || ''],
+      ['Especialidade', perfil.Especialidade || ''],
+      [],
+      ['Módulo ID', 'Módulo', 'Parâmetro', 'Valor Atribuído', 'Descrição']
+    ];
+
+    Object.entries(modulos).forEach(([modId, modData]: [string, any]) => {
+      const displayModId = modData.ModuloId || modId;
+      if (modData.Parametros.length === 0) {
+        rows.push([displayModId, modData.Titulo || `Módulo ${displayModId}`, 'Nenhum parâmetro vinculado', '', '']);
+      } else {
+        modData.Parametros.forEach((param: any) => {
+          rows.push([
+            displayModId,
+            modData.Titulo || `Módulo ${displayModId}`,
+            param.Parametro,
+            param.Valor || 'Não definido',
+            param.Descricao || ''
+          ]);
+        });
+      }
+    });
+
+    const csvContent = rows.map(r => r.map(cell => {
+      const cellStr = String(cell);
+      if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\\n')) {
+        return '"' + cellStr.replace(/"/g, '""') + '"';
+      }
+      return cellStr;
+    }).join(',')).join('\\n');
+
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Perfil_${selectedPerfilId}.csv`;
+    link.click();
+  };
 
   // Extrair documentos únicos relacionados para filtros no topo
   const uniqueRelatedDocs = useMemo(() => {
@@ -226,6 +412,8 @@ export default function DocumentosPage() {
   const exportToPDF = () => {
     window.print();
   };
+
+
 
   // Removido useEffect duplicado que estava no fim do bloco de estados
 
@@ -449,15 +637,40 @@ export default function DocumentosPage() {
               icon={FileText}
               badge={activeConnName || 'DISCONNECTED'}
             />
-            {error && (
+            
+            {/* Tabs Selector */}
+            <div className="flex items-center gap-4 mt-6 border-b border-border">
+              <button
+                onClick={() => setActiveMainTab('documentos')}
+                className={`pb-2 px-1 text-[11px] font-black uppercase tracking-widest transition-all border-b-2 ${activeMainTab === 'documentos' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-muted hover:text-foreground'}`}
+              >
+                Documentos
+              </button>
+              <button
+                onClick={() => setActiveMainTab('perfis')}
+                className={`pb-2 px-1 text-[11px] font-black uppercase tracking-widest transition-all border-b-2 ${activeMainTab === 'perfis' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-muted hover:text-foreground'}`}
+              >
+                Perfis Ambulatoriais
+              </button>
+            </div>
+
+            {error && activeMainTab === 'documentos' && (
               <div className="mt-4 p-3 bg-red-500/10 border border-red-500/50/20 rounded-none flex items-center gap-3 text-red-500 animate-in slide-in-from-top-2">
                 <AlertTriangle size={16} />
                 <span className="text-[11px] font-black uppercase tracking-tight">{error}</span>
               </div>
             )}
+            
+            {ambulatoryProfilesError && activeMainTab === 'perfis' && (
+              <div className="mt-4 p-3 bg-red-500/10 border border-red-500/50/20 rounded-none flex items-center gap-3 text-red-500 animate-in slide-in-from-top-2">
+                <AlertTriangle size={16} />
+                <span className="text-[11px] font-black uppercase tracking-tight">{ambulatoryProfilesError}</span>
+              </div>
+            )}
           </div>
 
-          <div className="flex items-center gap-3">
+          {activeMainTab === 'documentos' && (
+            <div className="flex items-center gap-3">
             <div className="relative group">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted group-focus-within:text-[var(--primary)] transition-colors" size={14} />
               <input 
@@ -483,9 +696,12 @@ export default function DocumentosPage() {
               <Download size={16} />
             </button>
           </div>
+          )}
         </div>
         
-        <div className="bg-background border border-border rounded-none p-4 flex flex-wrap items-center gap-6 shadow-none animate-in slide-in-from-top duration-700 relative overflow-visible">
+        {activeMainTab === 'documentos' && (
+          <>
+            <div className="bg-background border border-border rounded-none p-4 flex flex-wrap items-center gap-6 shadow-none animate-in slide-in-from-top duration-700 relative overflow-visible">
           <div className="flex items-center gap-2 text-muted">
             <ListFilter size={18} className="text-[var(--primary)]" />
             <span className="text-[10px] font-black uppercase tracking-[0.2em] min-w-fit">Filtros Técnicos</span>
@@ -879,8 +1095,12 @@ export default function DocumentosPage() {
             </div>
           </div>
          )}
+        </>
+        )}
       </div>
 
+      {activeMainTab === 'documentos' && (
+        <>
       {/* Sidebar Técnico (Opção B) */}
       <div 
         className={`fixed top-0 right-0 h-full bg-background border-l border-border z-[100] transition-all duration-500 ease-in-out transform flex flex-col ${sidebarOpen ? 'translate-x-0 w-[450px]' : 'translate-x-full w-[450px]'}`}
@@ -1178,6 +1398,217 @@ export default function DocumentosPage() {
           );
         })()}
       </div>
+      </>
+      )}
+
+      {activeMainTab === 'perfis' && (
+          <div className="animate-in fade-in slide-in-from-right-4 duration-500 h-full flex flex-col md:flex-row gap-6 mt-4">
+            {/* Master: Lista de Perfis */}
+            <div className="w-full md:w-1/3 flex flex-col bg-card border border-border rounded-none relative print:hidden">
+              <div className="p-4 border-b border-border bg-background sticky top-0 z-10 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[12px] font-black uppercase tracking-widest text-foreground flex items-center gap-2">
+                    <ListFilter size={14} className="text-[var(--primary)]" />
+                    Perfis Cadastrados
+                  </h3>
+                  <span className="text-[10px] bg-[var(--primary)] text-background px-2 py-0.5 rounded-none font-bold">
+                    {filteredPerfisList.length}
+                  </span>
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={12} />
+                  <input 
+                    type="text" 
+                    placeholder="Buscar perfil..."
+                    className="w-full bg-background border border-border rounded-none pl-8 pr-4 py-1.5 text-[10px] text-foreground outline-none focus:border-[var(--primary)] transition-all shadow-none"
+                    value={perfisSearchTerm}
+                    onChange={(e) => setPerfisSearchTerm(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+                {paginatedPerfisList.map(perfil => (
+                  <button
+                    key={perfil.id}
+                    onClick={() => setSelectedPerfilId(perfil.id)}
+                    className={`w-full text-left p-3 border rounded-none transition-all duration-200 group flex items-start gap-3 ${
+                      selectedPerfilId === perfil.id 
+                        ? 'bg-[var(--primary)]/10 border-[var(--primary)]/50' 
+                        : 'bg-background border-border hover:border-muted-foreground'
+                    }`}
+                  >
+                    <div className={`mt-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500`} />
+                    <div className="flex-1 min-w-0">
+                      <h4 className={`text-[11px] font-black uppercase tracking-wide truncate ${selectedPerfilId === perfil.id ? 'text-[var(--primary)]' : 'text-foreground'}`}>
+                        {perfil.Nome_Perfil}
+                      </h4>
+                      <p className="text-[9px] text-muted-foreground font-mono mt-1">Cód: {perfil.id}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        {perfil.Sistema && (
+                          <span className="text-[9px] px-1.5 py-0.5 bg-card border border-border rounded-none flex items-center gap-1">
+                            <Layout size={10} /> {perfil.Sistema}
+                          </span>
+                        )}
+                        {perfil.Especialidade && (
+                          <span className="text-[9px] px-1.5 py-0.5 bg-card border border-border rounded-none flex items-center gap-1">
+                            <Database size={10} /> {perfil.Especialidade}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronRight size={14} className={`opacity-0 group-hover:opacity-100 transition-all ${selectedPerfilId === perfil.id ? 'opacity-100 text-[var(--primary)]' : 'text-muted'}`} />
+                  </button>
+                ))}
+                {filteredPerfisList.length === 0 && !ambulatoryProfilesLoading && (
+                  <div className="text-center p-8 text-muted-foreground">
+                    <p className="text-[10px] uppercase font-bold tracking-widest">Nenhum perfil encontrado</p>
+                  </div>
+                )}
+                {ambulatoryProfilesLoading && (
+                  <div className="text-center p-8 text-muted-foreground flex flex-col items-center gap-2">
+                    <RefreshCw size={16} className="animate-spin text-[var(--primary)]" />
+                    <p className="text-[10px] uppercase font-bold tracking-widest">Carregando...</p>
+                  </div>
+                )}
+              </div>
+              
+              {perfisTotalPages > 1 && (
+                <div className="p-2 border-t border-border bg-background flex items-center justify-between sticky bottom-0">
+                  <button 
+                    onClick={() => setPerfisCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={perfisCurrentPage === 1}
+                    className="px-3 py-1 bg-card border border-border hover:border-[var(--primary)] text-[10px] font-black uppercase tracking-wider text-muted hover:text-[var(--primary)] transition-all disabled:opacity-30 disabled:pointer-events-none"
+                  >
+                    Anterior
+                  </button>
+                  <span className="text-[10px] font-mono text-foreground font-black">
+                    {perfisCurrentPage} / {perfisTotalPages}
+                  </span>
+                  <button 
+                    onClick={() => setPerfisCurrentPage(p => Math.min(perfisTotalPages, p + 1))}
+                    disabled={perfisCurrentPage === perfisTotalPages}
+                    className="px-3 py-1 bg-card border border-border hover:border-[var(--primary)] text-[10px] font-black uppercase tracking-wider text-muted hover:text-[var(--primary)] transition-all disabled:opacity-30 disabled:pointer-events-none"
+                  >
+                    Próximo
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Detail: Módulos e Parâmetros */}
+            <div className="w-full md:w-2/3 bg-card border border-border rounded-none p-6 flex flex-col relative min-h-[400px] print:w-full print:border-none print:p-0 print:m-0">
+              {!selectedPerfilId ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
+                  <Database size={48} className="mb-4 opacity-20" />
+                  <p className="text-[12px] uppercase tracking-widest font-bold">Selecione um perfil para ver os detalhes</p>
+                </div>
+              ) : groupedPerfis[selectedPerfilId] ? (
+                <div className="space-y-6 h-full flex flex-col animate-in fade-in duration-300">
+                  <div className="flex items-start justify-between border-b border-border pb-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[9px] px-2 py-0.5 bg-[var(--primary)] text-background uppercase tracking-widest font-black">
+                          {groupedPerfis[selectedPerfilId].Sistema}
+                        </span>
+                        <span className="text-[10px] font-mono text-muted-foreground">CÓD: {selectedPerfilId}</span>
+                      </div>
+                      <h2 className="text-xl font-black uppercase text-foreground">
+                        {groupedPerfis[selectedPerfilId].Nome_Perfil}
+                      </h2>
+                      {groupedPerfis[selectedPerfilId].Especialidade && (
+                        <p className="text-xs text-muted-foreground mt-1">Esp: {groupedPerfis[selectedPerfilId].Especialidade}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 print:hidden">
+                      <button 
+                        onClick={exportPerfisToCSV}
+                        className="p-2 border border-border hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors text-muted flex items-center gap-2 group"
+                        title="Exportar CSV"
+                        disabled={profileDetailsLoading}
+                      >
+                        <Download size={14} />
+                        <span className="text-[10px] font-black uppercase tracking-wider hidden group-hover:inline">CSV</span>
+                      </button>
+                      <button 
+                        onClick={() => window.print()}
+                        className="p-2 border border-border hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors text-muted flex items-center gap-2 group"
+                        title="Exportar PDF"
+                        disabled={profileDetailsLoading}
+                      >
+                        <Printer size={14} />
+                        <span className="text-[10px] font-black uppercase tracking-wider hidden group-hover:inline">PDF</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto space-y-6 custom-scrollbar pr-2">
+                    {profileDetailsLoading && !profileDetailsCache[selectedPerfilId] ? (
+                      <div className="text-center p-8 text-muted-foreground flex flex-col items-center gap-2">
+                        <RefreshCw size={24} className="animate-spin text-[var(--primary)]" />
+                        <p className="text-[10px] uppercase font-bold tracking-widest mt-2">Carregando Detalhes...</p>
+                      </div>
+                    ) : profileDetailsCache[selectedPerfilId] && Object.keys(profileDetailsCache[selectedPerfilId]).length > 0 ? (
+                      Object.entries(profileDetailsCache[selectedPerfilId]).map(([modId, modData]: [string, any]) => {
+                        const isExpanded = expandedModules[modId] || false;
+                        return (
+                        <div key={modId} className="bg-background border border-border rounded-none overflow-hidden group">
+                          <button 
+                            onClick={() => setExpandedModules(prev => ({ ...prev, [modId]: !prev[modId] }))}
+                            className="w-full bg-card p-3 flex items-center justify-between border-b border-border hover:bg-[var(--primary)]/5 transition-colors text-left outline-none focus:bg-[var(--primary)]/5"
+                          >
+                            <div className="flex items-center gap-3">
+                              <Layout className="text-[var(--primary)]" size={16} />
+                              <div>
+                                <h4 className="text-[12px] font-black uppercase text-foreground">{modData.Titulo || `Módulo ${modData.ModuloId}`}</h4>
+                                <p className="text-[9px] font-mono text-muted-foreground mt-0.5">Módulo ID: {modData.ModuloId}</p>
+                              </div>
+                            </div>
+                            <div className="text-muted group-hover:text-[var(--primary)] transition-colors print:hidden">
+                              {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            </div>
+                          </button>
+                          
+                          <div className={`p-0 ${isExpanded ? 'block' : 'hidden print:block'}`}>
+                            {modData.Parametros.length > 0 ? (
+                              <table className="w-full text-left border-collapse">
+                                <thead className="bg-muted/30">
+                                  <tr>
+                                    <th className="p-2 text-[9px] font-black uppercase text-muted-foreground tracking-widest border-b border-r border-border w-1/3">Parâmetro</th>
+                                    <th className="p-2 text-[9px] font-black uppercase text-muted-foreground tracking-widest border-b border-border">Valor Atribuído</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {modData.Parametros.map((param: any, idx: number) => (
+                                    <tr key={idx} className="hover:bg-muted/10 transition-colors border-b border-border last:border-0">
+                                      <td className="p-3 text-[10px] font-mono text-foreground border-r border-border truncate max-w-xs" title={param.Descricao}>
+                                        {param.Parametro}
+                                      </td>
+                                      <td className="p-3 text-[10px] font-mono text-foreground break-all">
+                                        {param.Valor || <span className="text-muted-foreground italic opacity-50">Não definido</span>}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            ) : (
+                              <div className="p-4 text-[10px] text-muted-foreground uppercase font-bold tracking-widest text-center">
+                                Nenhum parâmetro vinculado
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )})
+                    ) : (
+                      <div className="text-center p-8 text-muted-foreground">
+                        <p className="text-[10px] uppercase font-bold tracking-widest">Nenhum módulo encontrado</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        )}
 
       {/* Modal de Tela Cheia para o Grafo */}
       {graphFullscreen && sidebarDoc && (

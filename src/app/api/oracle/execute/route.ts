@@ -26,6 +26,10 @@ export async function POST(request: Request) {
       sql = data.docMetadataQuery;
     } else if (body.query === 'ACTIONS') {
       sql = data.docActionsQuery;
+    } else if (body.query === 'AMBULATORY_PROFILES') {
+      sql = data.ambulatoryProfilesQuery;
+    } else if (body.query === 'AMBULATORY_PROFILE_DETAILS') {
+      sql = data.ambulatoryProfileDetailsQuery;
     } else if (body.query === 'V3') {
       sql = data.activeQueryV3;
     } else if (body.query === 'V2') {

@@ -16,8 +16,6 @@ import {
   Database,
   SearchCode,
   Settings as SettingsIcon,
-  Plus,
-  Trash2,
   Calendar,
   User,
   X,
@@ -32,9 +30,6 @@ import {
   ChevronRight,
   FileText,
   ShieldCheck,
-  Hash,
-  Layers,
-  Link as LinkIcon,
   BookOpen
 } from 'lucide-react';
 
@@ -53,7 +48,7 @@ import { DocMapping } from '@/lib/storage';
 import toast, { Toaster } from 'react-hot-toast';
 import { useUI } from '@/context/UIContext';
 import { useRouter } from 'next/navigation';
-import { cn, getToday, get30DaysAgo, getVal } from '@/lib/utils';
+import { getToday, get30DaysAgo, getVal } from '@/lib/utils';
 
 // Novos componentes modulares
 import { DiffText } from '@/components/similaridade/DiffText';
@@ -77,7 +72,7 @@ export default function SimilaridadePage() {
     }
   }, [docVersion, router]);
 
-  const [error, setError] = useState('');
+
   const [activeConnName, setActiveConnName] = useState('');
   const [similarityQuery, setSimilarityQuery] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
@@ -163,18 +158,17 @@ export default function SimilaridadePage() {
   async function handleSearch() {
     // Validação de Campos Obrigatórios
     if (!filters.documento || !filters.campo || !filters.dataInicio || !filters.dataFim) {
-      setError('Por favor, preencha o Cód. Documento, Identificador Campo e o período para consultar.');
+      toast.error('Por favor, preencha o Cód. Documento, Identificador Campo e o período para consultar.');
       return;
     }
 
     // Validação de Lógica de Datas
     if (filters.dataFim < filters.dataInicio) {
-      setError('A Data Fim não pode ser anterior à Data Início.');
+      toast.error('A Data Fim não pode ser anterior à Data Início.');
       return;
     }
 
     setLoading(true);
-    setError('');
     setHasSearched(true);
     setSimilarityData([]);
     setCurrentPage(1);
@@ -185,7 +179,6 @@ export default function SimilaridadePage() {
     console.log('Query SQL:', similarityQuery ? 'Personalizada (Storage)' : 'Padrão (Fallback)');
 
     setLoading(true);
-    setError('');
     setHasSearched(true);
     
     // Reset de seleções locais ao buscar novos dados
@@ -259,11 +252,11 @@ export default function SimilaridadePage() {
         setSimilarityData(result.rows || []);
       } else {
         console.error('Erro na API:', result.error);
-        setError(result.error || 'Erro ao consultar similaridade.');
+        toast.error(result.error || 'Erro ao consultar similaridade.');
       }
     } catch (err) {
       console.error('Erro de rede:', err);
-      setError('Erro de comunicação com o servidor.');
+      toast.error('Erro de comunicação com o servidor.');
     } finally {
       setLoading(false);
     }

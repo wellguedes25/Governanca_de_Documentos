@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Database, Save, Loader2, Play, CircleX, CircleCheck, BarChart3, Clock, TrendingUp, Search, ScanEye, Download, FileText, FileCode2, Info, LayoutIcon, Settings2, Terminal, Printer, Trash2, Edit2, Plus, GripVertical, Check } from 'lucide-react';
+import { Database, Save, Loader2, Play, CircleX, CircleCheck, BarChart3, Clock, TrendingUp, Search, ScanEye, Download, FileText, LayoutIcon, Settings2, Terminal, Printer, Check } from 'lucide-react';
 import { AIQueryAssistant } from '@/components/AIQueryAssistant';
 import { PageHeader } from '@/components/ui/PageHeader';
 
@@ -29,7 +29,7 @@ export default function ConfigConsultasPage() {
   // Custom Cards e Metadados
   const [customCards, setCustomCards] = useState<any[]>([]);
   const [cardSettings, setCardSettings] = useState<Record<string, any>>({});
-  const [isAddingCard, setIsAddingCard] = useState(false);
+
   const [editingCard, setEditingCard] = useState<any>(null);
   const [editingNative, setEditingNative] = useState<string | null>(null);
 
@@ -382,56 +382,7 @@ export default function ConfigConsultasPage() {
     }
   }
 
-  async function handleSaveCustomCard() {
-    try {
-      const cardToSave = {
-        ...(editingCard || newCard),
-        id: editingCard ? editingCard.id : Date.now().toString(),
-        order: editingCard ? editingCard.order : customCards.length
-      };
-      
-      const res = await fetch('/api/dashboard/custom', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cardToSave)
-      });
-      if (!res.ok) throw new Error('Falha ao salvar card');
-      
-      setIsAddingCard(false);
-      setEditingCard(null);
-      setNewCard({
-        title: '',
-        query: '',
-        type: 'kpi',
-        icon: 'FileText',
-        color: 'from-blue-500 to-indigo-600',
-        enabled: true,
-        valueType: 'number'
-      });
-      fetchData();
-      setMessage('Card customizado salvo!');
-      setTimeout(() => setMessage(''), 3000);
-    } catch (err) {
-      setMessage('Erro ao salvar card customizado.');
-    }
-  }
 
-  async function handleDeleteCustomCard(id: string) {
-    if (!confirm('Tem certeza que deseja excluir este card?')) return;
-    try {
-      const res = await fetch(`/api/dashboard/custom?id=${id}`, { method: 'DELETE' });
-      const data = await res.json();
-      
-      if (!res.ok) throw new Error(data.error || 'Falha ao excluir card');
-      
-      setMessage('Card excluído com sucesso!');
-      // Recarrega apenas os dados — sem reload de página completo
-      await fetchData();
-      setTimeout(() => setMessage(''), 3000);
-    } catch (err: any) {
-      setMessage(`Erro ao excluir card: ${err.message}`);
-    }
-  }
 
   const updateCardSetting = (id: string, field: string, value: string) => {
     setCardSettings(prev => ({

@@ -3,12 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useUI } from '@/context/UIContext';
 import { 
-  Zap, 
   ChevronRight, 
-  Building2, 
-  ShieldCheck, 
-  BarChart3,
-  Layers,
   Activity
 } from 'lucide-react';
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, RefreshCw, Filter, FileText, Download, GripVertical, Check, X, ChevronUp, ChevronDown, ListFilter, XCircle, FileSpreadsheet, Printer, AlertTriangle, Loader2, Info, History, Settings, ExternalLink, Zap, Unlink, Network, Database, ChevronRight, Layout } from 'lucide-react';
+import { Search, RefreshCw, Filter, FileText, Download, Check, X, ChevronUp, ChevronDown, ListFilter, XCircle, FileSpreadsheet, Printer, AlertTriangle, Loader2, Info, Settings, Zap, Unlink, Network, Database, ChevronRight, Layout } from 'lucide-react';
 import { useUI } from '@/context/UIContext';
 import { PageHeader } from '@/components/ui/PageHeader';
 import DocumentGraph from '@/components/DocumentGraph';

@@ -68,6 +68,11 @@ export default function ConfigConexoesPage() {
       body: JSON.stringify({ type: 'SET_ACTIVE', id }),
     });
     setActiveId(id);
+    
+    // Limpa o cache do navegador para forçar que os dashboards busquem novos dados
+    sessionStorage.clear();
+    setMessage('Conexão ativada e cache limpo!');
+    setTimeout(() => setMessage(''), 3000);
   }
 
   async function handleDelete(id: string) {

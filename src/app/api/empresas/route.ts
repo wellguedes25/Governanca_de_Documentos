@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { executeQuery, testConnection } from '@/lib/oracle';
+import { executeQuery } from '@/lib/oracle';
 import { getData } from '@/lib/storage';
 export const dynamic = 'force-dynamic';
 

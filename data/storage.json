@@ -22,7 +22,7 @@
       "connectString": "EXACCHML-SCAN:1521/MVDEV1.acsc.local"
     }
   ],
-  "activeConnectionId": "ya6fv732m",
+  "activeConnectionId": "1cs741i9t",
   "activeQuery": "SELECT CD_DOCUMENTO AS \"CÓDIGO\", NM_TITULO AS \"NOME\", COUNT(1) AS \"TOTAL\", MAX(DH_CRIACAO) AS \"ÚLTIMO USO\", /* DYNAMIC_HOSPITALS_PIVOT */ FROM (SELECT DISTINCT ED.CD_DOCUMENTO, UPPER(ED.DS_DOCUMENTO) AS NM_TITULO, A.CD_MULTI_EMPRESA, PDC.DH_CRIACAO FROM DBAMV.PW_EDITOR_CLINICO PEC JOIN DBAMV.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.PW_DOCUMENTO_CLINICO PDC ON PDC.CD_DOCUMENTO_CLINICO = PEC.CD_DOCUMENTO_CLINICO JOIN DBAMV.ATENDIME A ON A.CD_ATENDIMENTO = PDC.CD_ATENDIMENTO WHERE ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90) GROUP BY CD_DOCUMENTO, NM_TITULO ORDER BY NM_TITULO",
   "activeQueryV3": "SELECT CD_DOCUMENTO AS \"CÓDIGO\", NM_TITULO AS \"NOME\", COUNT(1) AS \"TOTAL\", MAX(DH_CRIACAO) AS \"ÚLTIMO USO\", /* DYNAMIC_HOSPITALS_PIVOT */ FROM (SELECT DISTINCT ED.CD_DOCUMENTO, UPPER(ED.DS_DOCUMENTO) AS NM_TITULO, A.CD_MULTI_EMPRESA, PDC.DH_CRIACAO FROM DBAMV.PW_EDITOR_CLINICO PEC JOIN EDITOR.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.PW_DOCUMENTO_CLINICO PDC ON PDC.CD_DOCUMENTO_CLINICO = PEC.CD_DOCUMENTO_CLINICO JOIN DBAMV.ATENDIME A ON A.CD_ATENDIMENTO = PDC.CD_ATENDIMENTO WHERE ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90) GROUP BY CD_DOCUMENTO, NM_TITULO ORDER BY NM_TITULO",
   "profileQuery": "SELECT DISTINCT CD_DOCUMENTO, NM_TITULO, DS_PERFIL_AMBULATORIAL, EMPRESA FROM (SELECT PMP.NM_VALOR AS CD_DOCUMENTO, PM.NM_TITULO, PA.DS_PERFIL_AMBULATORIAL, /* DYNAMIC_HOSPITALS_DECODE */ AS EMPRESA FROM DBAMV.PERFIL_AMBULATORIAL PA JOIN DBAMV.PW_PERFIL_MODULO PM ON PA.CD_PERFIL_AMBULATORIAL = PM.CD_PERFIL_AMBULATORIAL JOIN DBAMV.PW_PERFIL_MODULO_PARAMETRO PMP ON PM.CD_PERFIL_MODULO = PMP.CD_PERFIL_MODULO LEFT JOIN DBAMV.PERFIL_AMBULATORIAL_EMPRESA PAE ON PA.CD_PERFIL_AMBULATORIAL = PAE.CD_PERFIL_AMBULATORIAL WHERE PMP.CD_PARAMETRO = 'CD_DOCUMENTO' AND PA.SN_ATIVO = 'S' AND PA.TP_PERFIL = 'SIS' AND PMP.NM_VALOR = :CD_DOCUMENTO UNION ALL SELECT TB_OBJETO.CD_DOCUMENTO, PM.NM_TITULO, PA.DS_PERFIL_AMBULATORIAL, /* DYNAMIC_HOSPITALS_DECODE */ AS EMPRESA FROM DBAMV.PERFIL_AMBULATORIAL PA JOIN DBAMV.PW_PERFIL_MODULO PM ON PA.CD_PERFIL_AMBULATORIAL = PM.CD_PERFIL_AMBULATORIAL JOIN DBAMV.PW_PERFIL_MODULO_PARAMETRO PMP ON PM.CD_PERFIL_MODULO = PMP.CD_PERFIL_MODULO LEFT JOIN DBAMV.PERFIL_AMBULATORIAL_EMPRESA PAE ON PA.CD_PERFIL_AMBULATORIAL = PAE.CD_PERFIL_AMBULATORIAL JOIN (SELECT NM_VALOR AS CD_DOCUMENTO, TO_CHAR(PTDC.CD_OBJETO) AS CD_OBJETO FROM DBAMV.PW_TIPO_DOCUMENTO_CONSULTA PTDC JOIN DBAMV.PW_TIPO_DOCUMENTO_MODULO PTDM ON PTDC.CD_TIPO_DOCUMENTO_CONSULTA = PTDM.CD_TIPO_DOCUMENTO_CONSULTA JOIN DBAMV.PW_TIPO_DOCUMENTO_MODULO_PARAM PTDMP ON PTDM.CD_TIPO_DOCUMENTO_MODULO = PTDMP.CD_TIPO_DOCUMENTO_MODULO WHERE PTDMP.CD_PARAMETRO = 'CD_DOCUMENTO' AND NM_VALOR = :CD_DOCUMENTO) TB_OBJETO ON PMP.NM_VALOR = TB_OBJETO.CD_OBJETO WHERE PA.SN_ATIVO = 'S' AND PA.TP_PERFIL = 'SIS')",
@@ -34,7 +34,7 @@
       "id": 1,
       "nome": "ASSOCIACAO CONGREGACAO DE SANTA CATARINA",
       "sigla": "ACSC",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 3,
@@ -52,13 +52,13 @@
       "id": 5,
       "nome": "COLEGIO SANTA CATARINA - RJ",
       "sigla": "CSCR",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 6,
       "nome": "COLEGIO SANTA CATARINA - JF",
       "sigla": "CSCJ",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 7,
@@ -70,7 +70,7 @@
       "id": 8,
       "nome": "COLEGIO SANTA CATARINA - SP",
       "sigla": "CSCS",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 10,
@@ -88,31 +88,31 @@
       "id": 12,
       "nome": "ESCOLA SANTA CATARINA ",
       "sigla": "ESC",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 16,
       "nome": "COLEGIO SANTA CATARINA - GO",
       "sigla": "CSCG",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 18,
       "nome": "HOSPITAL SAO LUIS",
       "sigla": "HSL",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 19,
       "nome": "LAR MADRE REGINA",
       "sigla": "LMR",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 23,
       "nome": "CRECHE SAGRADA FAMILIA",
       "sigla": "CSF",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 25,
@@ -124,109 +124,109 @@
       "id": 26,
       "nome": "OS ACSC - REDE ASSIST SUP TEC S (STS)",
       "sigla": "ARASTS",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 28,
       "nome": "CENTRO DE REFERENCIA DO IDOSO",
       "sigla": "CRI",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 36,
       "nome": "AMBULATORIO MEDICO DE ESPEC ITAPEVI",
       "sigla": "AMEI",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 42,
       "nome": "CRECHE MONTEIRO LOBATO ",
       "sigla": "CML",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 43,
       "nome": "HOSPITAL AMPARO MATERNAL",
       "sigla": "HAM",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 45,
       "nome": "OBRA SOCIAL SANTA CATARINA ",
       "sigla": "OSSC",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 46,
       "nome": "HOSPITAL REGIONAL DE CACERES",
       "sigla": "HRC",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 47,
       "nome": "CRECHE SAO JOSE DO ITAMARATI",
       "sigla": "CSJI",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 48,
       "nome": "HOSP ESTADUAL CENTRAL ",
       "sigla": "HEC",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 49,
       "nome": "HOSPITAL ESTADUAL ALBERTO TORRES ",
       "sigla": "HEAT",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 50,
       "nome": "HOSP ESTADUAL PREF JOAO BATISTA CAFFARO",
       "sigla": "HEPJBC",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 51,
       "nome": "HOSPITAL SAO JOSE E MATERNIDADE CHIQUINH",
       "sigla": "HSJMC",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 52,
       "nome": "HOSPITAL SANTA ISABEL",
       "sigla": "HSI",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 53,
       "nome": "HOSPITAL NOSSA SENHORA DA CONCEICAO",
       "sigla": "HNSC",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 54,
       "nome": "PROVINCIA MADRE REGINA",
       "sigla": "PMR",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 60,
       "nome": "CANCER-CENTER - CSSJ",
       "sigla": "CCC",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 61,
       "nome": "HOSPITAL ESTADUAL FRANCISCO MORATO",
       "sigla": "HEFM",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 62,
       "nome": "COLEGIO VIRGEM PODEROSA",
       "sigla": "CVP",
-      "ativo": true
+      "ativo": false
     },
     {
       "id": 63,

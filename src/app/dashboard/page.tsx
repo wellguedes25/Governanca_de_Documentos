@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   FileText, Zap, Clock, Activity, Loader2, AlertTriangle,
-  RotateCcw, BarChart3, TrendingUp, Search,
-  Archive, Building2, Database, LayoutDashboard, ChevronRight
+  RotateCcw, BarChart3, TrendingUp,
+  Archive, Building2, Database, ChevronRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUI } from '@/context/UIContext';

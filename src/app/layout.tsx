@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Manrope } from "next/font/google";
 import "./globals.css";
-import Sidebar from "@/components/Sidebar";
+
 import { UIProvider } from "@/context/UIContext";
 import LayoutContent from "@/components/LayoutContent";
 

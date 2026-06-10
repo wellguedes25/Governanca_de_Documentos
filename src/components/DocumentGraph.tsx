@@ -409,8 +409,6 @@ export default function DocumentGraph({
 
   const handleReset = () => {
     if (zoomBehavior.current && svgRef.current) {
-      const width = containerRef.current?.clientWidth || 400;
-      const height = containerRef.current?.clientHeight || 300;
       d3.select(svgRef.current).transition().duration(500).call(
         zoomBehavior.current.transform, 
         d3.zoomIdentity.translate(0, 0).scale(isFullscreen ? 1 : 0.85)

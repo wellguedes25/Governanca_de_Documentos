@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   Plus, Search, Trash2, Edit3, Check, X, Upload, Download,
-  ShieldCheck, ShieldAlert, Loader2, BookOpen, Filter
+  ShieldCheck, ShieldAlert, Loader2, BookOpen
 } from 'lucide-react';
 
 interface SiglarioEntry {

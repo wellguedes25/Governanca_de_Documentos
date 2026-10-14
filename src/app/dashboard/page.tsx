@@ -567,36 +567,8 @@ export default function Dashboard() {
                  </div>
               </div>
 
-              {/* JCI / ONA GLOBAL */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                 {/* Redundancy */}
-                 <div className="border border-border p-6 flex flex-col gap-4 group hover:border-rose-500 transition-colors bg-card">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center justify-between">
-                      Redundância Clínica
-                      <AlertTriangle size={16} className="text-zinc-600 group-hover:text-rose-500" />
-                    </div>
-                    <div className="text-5xl font-black text-foreground tracking-tighter my-4 h-12 flex items-center">
-                      {loadingMap['globalQuality'] ? <Skeleton className="h-10 w-28" /> : `${globalQuality?.redundancia || '0.0'}%`}
-                    </div>
-                    <div className="border-t border-border pt-4 mt-auto">
-                      <p className="text-[9px] font-bold text-rose-500 bg-rose-500/10 px-2 py-1 uppercase tracking-widest inline-block">Plágio &gt; 80%</p>
-                    </div>
-                 </div>
-
-                 {/* Siglario */}
-                 <div className="border border-border p-6 flex flex-col gap-4 group hover:border-cyan-500 transition-colors bg-card">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center justify-between">
-                      Vocabulário Limpo (JCI)
-                      <FileText size={16} className="text-zinc-600 group-hover:text-cyan-500" />
-                    </div>
-                    <div className="text-5xl font-black text-foreground tracking-tighter my-4 h-12 flex items-center">
-                      {loadingMap['globalQuality'] ? <Skeleton className="h-10 w-28" /> : `${globalQuality?.aderencia || '100.0'}%`}
-                    </div>
-                    <div className="border-t border-border pt-4 mt-auto">
-                      <p className="text-[9px] font-bold text-cyan-500 bg-cyan-500/10 px-2 py-1 uppercase tracking-widest inline-block">S/ Siglas Proibidas</p>
-                    </div>
-                 </div>
-
+              {/* SLA ASSINATURA */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                  {/* SLA */}
                  <div className="border border-border p-6 flex flex-col gap-4 group hover:border-indigo-500 transition-colors bg-card">
                     <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center justify-between">

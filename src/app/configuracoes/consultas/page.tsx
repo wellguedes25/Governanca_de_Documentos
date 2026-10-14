@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Database, Save, Loader2, Play, CircleX, CircleCheck, BarChart3, Clock, TrendingUp, Search, ScanEye, Download, FileText, LayoutIcon, Settings2, Terminal, Printer, Check } from 'lucide-react';
+import { Database, Save, Loader2, CircleX, CircleCheck, BarChart3, Clock, TrendingUp, Search, FileText, LayoutIcon, Settings2, Terminal, Printer, Check } from 'lucide-react';
 import { AIQueryAssistant } from '@/components/AIQueryAssistant';
 import { PageHeader } from '@/components/ui/PageHeader';
 
@@ -11,7 +11,6 @@ export default function ConfigConsultasPage() {
   const [profileQuery, setProfileQuery] = useState('');
   const [docMetadataQuery, setDocMetadataQuery] = useState('');
   const [docActionsQuery, setDocActionsQuery] = useState('');
-  const [similarityQuery, setSimilarityQuery] = useState('');
   const [reportBaseUrl, setReportBaseUrl] = useState('');
   const [kpiTotal, setKpiTotal] = useState('');
   const [kpi24h, setKpi24h] = useState('');
@@ -35,7 +34,7 @@ export default function ConfigConsultasPage() {
   const [auditDays, setAuditDays] = useState(15);
   const [auditDocId, setAuditDocId] = useState<string | number>("0");
   
-  const [activeTab, setActiveTab] = useState<'v3' | 'v2' | 'instituicoes' | 'python' | 'downloads'>('v3');
+  const [activeTab, setActiveTab] = useState<'v3' | 'v2' | 'instituicoes'>('v3');
   
   // Custom Cards e Metadados
   const [customCards, setCustomCards] = useState<any[]>([]);
@@ -62,22 +61,11 @@ export default function ConfigConsultasPage() {
   const [message, setMessage] = useState('');
   const [activeConnName, setActiveConnName] = useState('');
 
-  // Motor de Processamento Python
-  const [scriptRunning, setScriptRunning] = useState<string | null>(null);
-  const [scriptLog, setScriptLog] = useState<Record<string, string>>({});
-  const [scriptStatus, setScriptStatus] = useState<Record<string, 'idle' | 'running' | 'success' | 'error'>>({});
-  const [scriptProgress, setScriptProgress] = useState<Record<string, number>>({});
-
   // Hospitais / Empresas
   const [hospitalsMapping, setHospitalsMapping] = useState<any[]>([]);
   const [dbHospitals, setDbHospitals] = useState<any[]>([]);
   const [loadingHospitals, setLoadingHospitals] = useState(false);
   const [hospitalsError, setHospitalsError] = useState<string | null>(null);
-
-  // Status de objetos no banco
-  const [dbObjectsStatus, setDbObjectsStatus] = useState<Record<string, boolean>>({});
-  const [checkingDbObjects, setCheckingDbObjects] = useState(false);
-  const [executingScript, setExecutingScript] = useState<string | null>(null);
 
   async function saveHospitalsMapping(newMapping: any[]) {
     try {
@@ -132,120 +120,6 @@ export default function ConfigConsultasPage() {
     fetchData();
   }, []);
 
-  async function checkDbObjects() {
-    setCheckingDbObjects(true);
-    try {
-      const res = await fetch('/api/scripts/check');
-      const data = await res.json();
-      if (!data.error) {
-        setDbObjectsStatus(data);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setCheckingDbObjects(false);
-    }
-  }
-
-  async function handleExecuteScript(filename: string) {
-    if (!confirm('Deseja realmente executar este script de infraestrutura no banco de dados ativo? O script atual será substituído/executado.')) return;
-    
-    setExecutingScript(filename);
-    try {
-      const res = await fetch('/api/scripts/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename }),
-      });
-      const data = await res.json();
-      
-      if (data.success) {
-        setMessage(data.message);
-        await checkDbObjects();
-      } else {
-        setMessage(data.error || 'Erro ao executar script');
-      }
-    } catch (e: any) {
-      setMessage('Erro de comunicação com o servidor');
-    } finally {
-      setExecutingScript(null);
-      setTimeout(() => setMessage(''), 4000);
-    }
-  }
-
-  useEffect(() => {
-    if (activeTab === 'downloads') {
-      checkDbObjects();
-    }
-  }, [activeTab, activeConnName]);
-
-  async function handleRunScript(script: 'siglario' | 'similaridade') {
-    setScriptRunning(script);
-    setScriptStatus(prev => ({ ...prev, [script]: 'running' }));
-    setScriptLog(prev => ({ ...prev, [script]: '' }));
-    setScriptProgress(prev => ({ ...prev, [script]: 0 }));
-
-    try {
-      // Auto-save: Garante que os parâmetros de auditoria sejam salvos antes de rodar
-      if (script === 'similaridade') {
-        await fetch('/api/connections', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            type: 'SAVE_AUDIT_PARAMS', 
-            auditDays,
-            auditDocId
-          }),
-        });
-      }
-
-      const res = await fetch('/api/scripts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ script }),
-      });
-      
-      if (!res.body) throw new Error('Falha ao iniciar stream de logs.');
-      
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let done = false;
-
-      while (!done) {
-        const { value, done: readerDone } = await reader.read();
-        done = readerDone;
-        if (value) {
-          const chunk = decoder.decode(value, { stream: true });
-          
-          // Parsing de progresso [PROGRESS] 45.2
-          const progressMatch = chunk.match(/\[PROGRESS\]\s+([\d.]+)/);
-          if (progressMatch) {
-            const p = parseFloat(progressMatch[1]);
-            setScriptProgress(prev => ({ ...prev, [script]: p }));
-          }
-
-          setScriptLog(prev => ({
-            ...prev,
-            [script]: (prev[script] || '') + chunk
-          }));
-        }
-      }
-
-      setScriptStatus(prev => ({ ...prev, [script]: 'success' }));
-      setMessage('Processamento concluído!');
-    } catch (err: any) {
-      setScriptLog(prev => ({ 
-        ...prev, 
-        [script]: (prev[script] || '') + `\n[ERRO FATAL] ${err.message}` 
-      }));
-      setScriptStatus(prev => ({ ...prev, [script]: 'error' }));
-      setMessage('Erro durante o processamento.');
-    } finally {
-      setScriptRunning(null);
-      setTimeout(() => setMessage(''), 4000);
-    }
-  }
-
   async function fetchData() {
     setIsInitialLoading(true);
     try {
@@ -259,7 +133,6 @@ export default function ConfigConsultasPage() {
       setDocMetadataQueryV3(storage.docMetadataQueryV3 || '');
       setDocActionsQuery(storage.docActionsQuery || '');
       setDocActionsQueryV3(storage.docActionsQueryV3 || '');
-      setSimilarityQuery(storage.similarityQuery || '');
       setReportBaseUrl(storage.reportBaseUrl || 'http://dev3-mvh5.acsc.org.br:84/mveditor/report?regId=');
       
       if (storage.kpiQueries) {
@@ -319,10 +192,9 @@ export default function ConfigConsultasPage() {
     }
   }
 
-  async function handleSave(type: 'MAIN' | 'MAIN_V3' | 'PROFILE' | 'PROFILE_V3' | 'DOC_METADATA' | 'DOC_METADATA_V3' | 'DOC_ACTIONS' | 'DOC_ACTIONS_V3' | 'SIMILARITY' | 'REPORT_URL' | 'KPI_TOTAL' | 'KPI_TOTAL_V3' | 'KPI_24H' | 'KPI_24H_V3' | 'KPI_ASSINADOS' | 'KPI_ASSINADOS_V3' | 'KPI_TOP10' | 'KPI_IDLE' | 'KPI_VOLUME3M' | 'KPI_UNIT_ADHERENCE' | 'KPI_UNIT_INACTIVITY' | 'SETTINGS' | 'AUDIT_PARAMS') {
+  async function handleSave(type: 'MAIN' | 'MAIN_V3' | 'PROFILE' | 'PROFILE_V3' | 'DOC_METADATA' | 'DOC_METADATA_V3' | 'DOC_ACTIONS' | 'DOC_ACTIONS_V3' | 'REPORT_URL' | 'KPI_TOTAL' | 'KPI_TOTAL_V3' | 'KPI_24H' | 'KPI_24H_V3' | 'KPI_ASSINADOS' | 'KPI_ASSINADOS_V3' | 'KPI_TOP10' | 'KPI_IDLE' | 'KPI_VOLUME3M' | 'KPI_UNIT_ADHERENCE' | 'KPI_UNIT_INACTIVITY' | 'SETTINGS' | 'AUDIT_PARAMS') {
     if (type === 'MAIN' || type === 'MAIN_V3') setLoading(true);
     else if (type === 'PROFILE' || type === 'PROFILE_V3' || type === 'DOC_METADATA' || type === 'DOC_METADATA_V3' || type === 'DOC_ACTIONS' || type === 'DOC_ACTIONS_V3') setProfileLoading(true);
-    else if (type === 'SIMILARITY') setProfileLoading(true); 
     else if (type === 'REPORT_URL') setProfileLoading(true); 
     else if (type === 'SETTINGS') setLoading(true); 
     else setKpiLoading(type);
@@ -339,7 +211,6 @@ export default function ConfigConsultasPage() {
       case 'DOC_METADATA_V3': bodyType = 'SAVE_DOC_METADATA_QUERY_V3'; bodyQuery = docMetadataQueryV3; break;
       case 'DOC_ACTIONS': bodyType = 'SAVE_DOC_ACTIONS_QUERY'; bodyQuery = docActionsQuery; break;
       case 'DOC_ACTIONS_V3': bodyType = 'SAVE_DOC_ACTIONS_QUERY_V3'; bodyQuery = docActionsQueryV3; break;
-      case 'SIMILARITY': bodyType = 'SAVE_SIMILARITY_QUERY'; bodyQuery = similarityQuery; break;
       case 'REPORT_URL': bodyType = 'SAVE_REPORT_URL'; bodyQuery = reportBaseUrl; break;
       case 'KPI_TOTAL': bodyType = 'SAVE_KPI_TOTAL'; bodyQuery = kpiTotal; break;
       case 'KPI_TOTAL_V3': bodyType = 'SAVE_KPI_TOTAL_V3'; bodyQuery = kpiTotalV3; break;
@@ -527,8 +398,6 @@ export default function ConfigConsultasPage() {
           { id: 'v3', label: 'Consultas V3 (HTML5)', icon: <Database size={14} className="text-emerald-500" />, badge: 'ATUAL' },
           { id: 'v2', label: 'Consultas V2 (Flex)', icon: <Database size={14} className="text-blue-500" />, badge: 'LEGADO' },
           { id: 'instituicoes', label: 'Instituições', icon: <LayoutIcon size={14} /> },
-          { id: 'python', label: 'Motores Python', icon: <Terminal size={14} /> },
-          { id: 'downloads', label: 'Integrações & Scripts', icon: <Download size={14} /> }
         ].map(tab => (
           <button
             key={tab.id}
@@ -1047,29 +916,9 @@ export default function ConfigConsultasPage() {
       {/* Consultas Globais Compartilhadas */}
       <div className="grid grid-cols-1 gap-4 mt-6 pb-8 border-t border-border pt-6">
         <h3 className="text-xs font-black uppercase tracking-wider text-muted flex items-center gap-2">
-          <ScanEye size={16} className="text-[var(--primary)]" />
-          Módulos Globais e Auditorias
+          <Settings2 size={16} className="text-[var(--primary)]" />
+          Módulos Globais e Metadados
         </h3>
-
-        {/* Motor de Similaridade (Busca de Redundância) */}
-        <div className="bg-background rounded-none p-4 border border-border shadow-none relative overflow-hidden group">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-[var(--primary)]"></div>
-          <h4 className="text-[10px] font-black text-foreground mb-2 uppercase tracking-[0.3em] flex items-center gap-2">
-            <ScanEye size={14} className="text-[var(--primary)]" />
-            Motor de Auditoria de Similaridade (Redundância EMR)
-          </h4>
-          <textarea 
-            className="w-full h-48 bg-card border border-border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none focus:border-[var(--primary)] transition-all"
-            value={similarityQuery}
-            onChange={(e) => setSimilarityQuery(e.target.value)}
-          />
-          <div className="flex justify-between items-center mt-2 pt-2 border-t border-border">
-            <p className="text-[10px] text-muted font-bold uppercase italic italic-wider">Variáveis Requeridas: <b className="text-[var(--primary)] text-[9px]">:CD_DOCUMENTO, :CD_CAMPO, :DATA_INI, :DATA_FIM</b></p>
-            <button onClick={() => handleSave('SIMILARITY')} disabled={profileLoading} title="Salvar Motor de Auditoria" className="flex items-center justify-center bg-card hover:bg-[var(--primary)] hover:text-black text-foreground p-2.5 rounded-none transition-all shadow-none group/btn border border-border">
-              {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
-            </button>
-          </div>
-        </div>
 
         {/* Metadados e Especificações Técnicas V2 */}
         <div className="bg-background rounded-none p-4 border border-blue-500/30 shadow-none relative overflow-hidden group">
@@ -1144,15 +993,11 @@ export default function ConfigConsultasPage() {
             >
               {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
             </button>
-          </div>
         </div>
-      </div>
 
-      <div className={activeTab === 'downloads' ? 'animate-in fade-in duration-300 block' : 'hidden'}>
-      <div className="grid grid-cols-1 gap-4">
         {/* Configuração do Relatório Dinâmico MV */}
-        <div className="bg-background rounded-none p-4 border border-border shadow-none relative overflow-hidden group mt-2">
-          <div className="absolute top-0 left-0 w-1.5 h-full -background"></div>
+        <div className="bg-background rounded-none p-4 border border-border shadow-none relative overflow-hidden group">
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-500"></div>
           <h4 className="text-[10px] font-black text-foreground mb-2 uppercase tracking-[0.3em] flex items-center gap-2">
             <Printer size={14} className="text-foreground" />
             Vínculo Report Web (Laudos PDF MV)
@@ -1162,310 +1007,20 @@ export default function ConfigConsultasPage() {
           </p>
           <input 
             type="text"
-            className={`w-full bg-card border border-border rounded-none px-4 py-2 text-[11px] font-mono font-bold text-foreground focus:outline-none -border transition-all`}
+            className="w-full bg-card border border-border rounded-none px-4 py-2 text-[11px] font-mono font-bold text-foreground focus:outline-none transition-all"
             value={reportBaseUrl}
             onChange={(e) => setReportBaseUrl(e.target.value)}
             placeholder="http://dev3-mvh5.acsc.org.br:84/mveditor/report?regId="
           />
-          <div className="flex justify-between items-center mt-4 pt-4 border-t border-slate-50">
+          <div className="flex justify-between items-center mt-4 pt-4 border-t border-border">
             <p className="text-[10px] text-muted font-bold uppercase italic italic-wider">Será complementado por: <b className="text-foreground text-[9px]">+ CD_REGISTRO</b></p>
-            <button onClick={() => handleSave('REPORT_URL')} disabled={profileLoading} title="Salvar URL do Laudo" className="flex items-center justify-center bg-card -background text-foreground p-2.5 rounded-none transition-all shadow-none group/btn">
+            <button onClick={() => handleSave('REPORT_URL')} disabled={profileLoading} title="Salvar URL do Laudo" className="flex items-center justify-center bg-card hover:bg-[var(--primary)] hover:text-black text-foreground p-2.5 rounded-none transition-all shadow-none group/btn border border-border">
               {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
             </button>
           </div>
         </div>
-
-        {/* ============================================================ */}
-        {/* Downloads de Infraestrutura SQL                              */}
-        {/* ============================================================ */}
-        <div className="bg-background rounded-none p-4 border border-border shadow-none relative overflow-hidden mt-2">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-400" />
-          
-          <div className="flex justify-between items-start mb-4 relative z-10">
-            <div>
-              <h4 className="text-sm font-black text-foreground uppercase tracking-tighter italic flex items-center gap-2">
-                <Download size={18} className="text-foreground" />
-                Downloads de Infraestrutura SQL
-              </h4>
-              <p className="text-[10px] text-muted font-bold uppercase tracking-widest mt-1">
-                Scripts necessários para provisionamento no Oracle DBAMV
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 relative z-10">
-            {[
-              { 
-                file: 'Create_Table_Siglario.sql', 
-                label: 'Tabela de Siglario', 
-                desc: 'DDL da TB_AUDITORIA_SIGLARIO',
-                objKey: 'TB_AUDITORIA_SIGLARIO'
-              },
-              { 
-                file: 'crate table auditoria_similaridade.sql', 
-                label: 'Tabela de Similaridade', 
-                desc: 'DDL da TB_AUDITORIA_SIMILARIDADE',
-                objKey: 'TB_AUDITORIA_SIMILARIDADE'
-              },
-              { 
-                file: 'Create_View_Similaridade.sql', 
-                label: 'View de Extração', 
-                desc: 'View V_AUDITORIA_COPIA_COLA',
-                objKey: 'V_AUDITORIA_COPIA_COLA'
-              }
-            ].map((item) => {
-              const isInstalled = dbObjectsStatus[item.objKey];
-              const isExecuting = executingScript === item.file;
-              
-              return (
-              <div key={item.file} className="flex flex-col p-3 bg-card border border-border rounded-none hover:border-slate-300 transition-all group shadow-none">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-background rounded-none border border-border group-hover:text-blue-600 transition-colors">
-                      <FileText size={16} />
-                    </div>
-                    <div>
-                      <h5 className="text-[10px] font-black uppercase text-slate-700">{item.label}</h5>
-                      <p className="text-[9px] text-muted font-medium italic mt-0.5">{item.desc}</p>
-                    </div>
-                  </div>
-                  {checkingDbObjects ? (
-                    <span className="text-[8px] font-black uppercase tracking-widest text-muted -background px-2 py-1 rounded-none flex items-center gap-1">
-                      <Loader2 size={8} className="animate-spin" /> ...
-                    </span>
-                  ) : isInstalled ? (
-                    <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-none flex items-center gap-1">
-                      <CircleCheck size={9} /> Instalado
-                    </span>
-                  ) : (
-                    <span className="text-[8px] font-black uppercase tracking-widest text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded-none flex items-center gap-1">
-                      Pendente
-                    </span>
-                  )}
-                </div>
-                
-                <div className="flex items-center gap-2 mt-auto pt-2 border-t border-slate-50">
-                  <button 
-                    onClick={() => handleExecuteScript(item.file)}
-                    disabled={isExecuting || checkingDbObjects}
-                    className={`flex-1 flex justify-center items-center gap-2 py-1.5 text-[9px] font-black uppercase tracking-widest transition-all rounded-none border ${isInstalled ? 'bg-background text-muted border-border hover:border-slate-300' : 'bg-[var(--primary)] text-foreground border-[var(--primary)] hover:brightness-110'}`}
-                  >
-                    {isExecuting ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-                    {isInstalled ? 'Reinstalar' : 'Instalar'}
-                  </button>
-                  <a 
-                    href={`/api/scripts/download?file=${encodeURIComponent(item.file)}`}
-                    className="p-1.5 bg-background text-muted hover:text-blue-600 rounded-none border border-border transition-all"
-                    title="Baixar Script"
-                  >
-                    <Download size={14} />
-                  </a>
-                </div>
-              </div>
-            )})}
-          </div>
-        </div>
-      </div>
-      </div>
-
-      <div className={activeTab === 'python' ? 'animate-in fade-in duration-300 block' : 'hidden'}>
-      <div className="grid grid-cols-1 gap-4">
-        {/* ============================================================ */}
-        {/* Motor de Processamento Python                                  */}
-        {/* ============================================================ */}
-        <div className="bg-background rounded-none p-4 border border-border shadow-none relative overflow-hidden mt-2">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-violet-600 to-indigo-600" />
-          <div className="absolute top-0 right-0 p-4 opacity-[0.03] grayscale pointer-events-none">
-            <Terminal size={160} />
-          </div>
-
-          <div className="flex justify-between items-start mb-5 relative z-10">
-            <div>
-              <h4 className="text-sm font-black text-foreground uppercase tracking-tighter italic flex items-center gap-2">
-                <Terminal size={18} className="text-violet-600" />
-                Motor de Processamento Python
-              </h4>
-              <p className="text-[10px] text-muted font-bold uppercase tracking-widest mt-1">
-                Execução manual dos motores de auditoria NLP
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-muted bg-card px-3 py-1.5 rounded-none border border-border">
-              <div className="w-1.5 h-1.5 rounded-none bg-emerald-400 animate-pulse" />
-              Python {'{'}Runtime{'}'}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
-            {/* Motor Siglário */}
-            {(['siglario', 'similaridade'] as const).map((script) => {
-              const meta = {
-                siglario: {
-                  label: 'Auditoria de Siglário',
-                  desc: 'Processar_Siglario.py',
-                  detail: 'Detecta siglas não padronizadas nos documentos clínicos via NLP.',
-                  color: 'from-orange-500 to-amber-500',
-                  border: 'hover:border-orange-400',
-                  btnColor: 'bg-orange-600 hover:bg-orange-500',
-                  textColor: 'text-orange-600',
-                },
-                similaridade: {
-                  label: 'Auditoria de Similaridade',
-                  desc: 'Processar_Similaridade.py',
-                  detail: 'Calcula grau de redundância textual entre documentos (PLN).',
-                  color: 'from-[var(--primary)] to-indigo-500',
-                  border: 'hover:border-blue-400',
-                  btnColor: 'bg-[var(--primary)] hover:bg-[var(--primary-dark)]',
-                  textColor: 'text-[var(--primary)]',
-                },
-              }[script];
-
-              const status = scriptStatus[script] || 'idle';
-              const log = scriptLog[script] || '';
-              const isRunning = scriptRunning === script;
-
-              return (
-                <div key={script} className={`bg-card rounded-none border border-border ${meta.border} transition-all overflow-hidden`}>
-                  {/* Accent bar */}
-                  <div className={`h-0.5 w-full bg-gradient-to-r ${meta.color}`} />
-
-                  <div className="p-4">
-                    {/* Header */}
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <h5 className={`text-[11px] font-black uppercase tracking-tighter ${meta.textColor}`}>{meta.label}</h5>
-                        <p className="text-[9px] font-mono text-muted mt-0.5">{meta.desc}</p>
-                      </div>
-                      {/* Status Badge */}
-                      {status === 'idle' && (
-                        <span className="text-[8px] font-black uppercase tracking-widest text-muted -background px-2 py-1 rounded-none">Aguardando</span>
-                      )}
-                      {status === 'running' && (
-                        <span className="text-[8px] font-black uppercase tracking-widest text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded-none flex items-center gap-1">
-                          <Loader2 size={8} className="animate-spin" /> Executando
-                        </span>
-                      )}
-                      {status === 'success' && (
-                        <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-none flex items-center gap-1">
-                          <CircleCheck size={9} /> Sucesso
-                        </span>
-                      )}
-                      {status === 'error' && (
-                        <span className="text-[8px] font-black uppercase tracking-widest text-rose-600 bg-rose-50 border border-rose-200 px-2 py-1 rounded-none flex items-center gap-1">
-                          <CircleX size={9} /> Erro
-                        </span>
-                      )}
-                    </div>
-
-                    <p className="text-[9px] text-muted font-bold mb-3 leading-relaxed">{meta.detail}</p>
-
-                    {/* Log Terminal */}
-                    <div className={`mt-3 transition-all duration-500 ${(log || isRunning) ? 'opacity-100 h-auto' : 'opacity-0 h-0 overflow-hidden'}`}>
-                      {/* Barra de Progresso */}
-                      {isRunning && (
-                        <div className="mb-3">
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-[8px] font-black uppercase tracking-widest text-[var(--primary)] animate-pulse">Processando Lotes...</span>
-                            <span className="text-[9px] font-black text-foreground">{scriptProgress[script] || 0}%</span>
-                          </div>
-                          <div className="h-1.5 w-full -accent rounded-none overflow-hidden">
-                            <div 
-                              className={`h-full bg-gradient-to-r ${meta.color} transition-all duration-500 ease-out`}
-                              style={{ width: `${scriptProgress[script] || 0}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex items-center justify-between mb-1 px-1">
-                        <span className="text-[8px] font-black uppercase tracking-widest text-muted flex items-center gap-1">
-                          <Terminal size={10} /> Console de Saída
-                        </span>
-                        {isRunning && (
-                          <span className="flex gap-1">
-                            <span className="w-1 h-1 rounded-none bg-emerald-500 animate-ping" />
-                            <span className="w-1 h-1 rounded-none bg-emerald-500 animate-ping delay-75" />
-                            <span className="w-1 h-1 rounded-none bg-emerald-500 animate-ping delay-150" />
-                          </span>
-                        )}
-                      </div>
-                      <div 
-                        className="bg-card rounded-none p-3 max-h-48 overflow-y-auto border border-border shadow-none group/console"
-                        ref={(el) => {
-                          if (el && isRunning) {
-                            el.scrollTop = el.scrollHeight;
-                          }
-                        }}
-                      >
-                        <pre className="text-[10px] font-mono text-emerald-400 leading-relaxed whitespace-pre-wrap break-words">
-                          {log || (isRunning ? '> Aguardando saída do motor...' : '')}
-                        </pre>
-                      </div>
-                    </div>
-
-                    {/* Run button */}
-                    <button
-                      onClick={() => handleRunScript(script)}
-                      disabled={scriptRunning !== null}
-                      className={`w-full flex items-center justify-center gap-2 ${meta.btnColor} text-foreground px-4 py-2.5 rounded-none text-[10px] font-black uppercase tracking-[0.15em] transition-all shadow-none disabled:opacity-40 disabled:cursor-not-allowed`}
-                    >
-                      {isRunning ? (
-                        <><Loader2 size={14} className="animate-spin" /> Processando...</>
-                      ) : (
-                        <><Play size={14} /> Executar Agora</>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <p className="text-[9px] text-muted font-bold uppercase tracking-widest mt-4 text-center italic relative z-10">
-            Parâmetros de janela e documento alvo são lidos do bloco abaixo.
-          </p>
-        </div>
-
-        {/* Parâmetros Globais de Auditoria */}
-        <div className="bg-background rounded-none p-4 border border-border shadow-none relative overflow-hidden group mt-2">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-rose-600"></div>
-          <h4 className="text-[10px] font-black text-foreground mb-4 uppercase tracking-[0.3em] flex items-center gap-2">
-            <ScanEye size={14} className="text-rose-600" />
-            Parâmetros Globais de Auditoria (Motores Python)
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] text-muted font-bold uppercase tracking-widest mb-1 block">Janela de Processamento (Dias)</label>
-              <input 
-                type="number"
-                className="w-full bg-card border border-border rounded-none px-3 py-2 text-[11px] font-bold text-slate-700 focus:outline-none focus:border-rose-500 transition-all"
-                value={auditDays}
-                onChange={(e) => setAuditDays(parseInt(e.target.value) || 0)}
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-muted font-bold uppercase tracking-widest mb-1 block">ID do Documento Alvo (Filtro)</label>
-              <input 
-                type="text"
-                placeholder="Ex: 916 ou 916, 917"
-                className="w-full bg-card border border-border rounded-none px-3 py-2 text-[11px] font-bold text-slate-700 focus:outline-none focus:border-rose-500 transition-all"
-                value={auditDocId}
-                onChange={(e) => setAuditDocId(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="flex justify-end mt-4 pt-4 border-t border-slate-50">
-            <button 
-              onClick={() => handleSave('AUDIT_PARAMS')} 
-              disabled={loading} 
-              title="Salvar Parâmetros de Motor"
-              className="flex items-center justify-center bg-card -background text-foreground p-2.5 rounded-none transition-all shadow-none group/btn"
-            >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
-            </button>
-          </div>
-        </div>
-      </div>
       </div>
     </div>
-  );
+  </div>
+);
 }

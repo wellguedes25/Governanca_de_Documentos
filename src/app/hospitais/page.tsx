@@ -33,18 +33,6 @@ interface Top5Item {
   USO: number;
 }
 
-interface RankingItem {
-  SIGLA: string;
-  TOTAL_OCORRENCIAS: number;
-}
-
-interface SimilarityItem {
-  DS_DOCUMENTO: string;
-  QTD_SIMILAR_80: number;
-  TOTAL_AUDITADO: number;
-  PERCENTUAL_PLAGIO: number;
-}
-
 interface SlaItem {
   FAIXA_SLA: string;
   TOTAL: number;
@@ -69,17 +57,7 @@ interface HospitalStats {
 }
 
 interface QualityStats {
-  similarity: SimilarityItem[];
   sla: SlaItem[];
-}
-
-interface VocabStats {
-  adherence: {
-    TOTAL_DOCUMENTOS: number;
-    DOCUMENTOS_LIMPOS: number;
-    INDICE_ADERENCIA: number;
-  };
-  ranking: RankingItem[];
 }
 
 interface HospitalItem extends HospitalMapping {
@@ -94,22 +72,16 @@ export default function HospitaisPage() {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<HospitalStats | null>(null);
   const [qualityData, setQualityData] = useState<QualityStats | null>(null);
-  const [vocabData, setVocabData] = useState<VocabStats | null>(null);
   const [hospitals, setHospitals] = useState<HospitalItem[]>([]);
   const [activeConnName, setActiveConnName] = useState('');
 
-  // Cálculos das métricas de SLA e Redundância
+  // Cálculos da métrica de SLA
   const slaRows = qualityData?.sla || [];
   const totalSigned = slaRows.reduce((acc: number, r: SlaItem) => acc + Number(r.TOTAL), 0);
   const within24h = slaRows
     .filter((r: SlaItem) => r.FAIXA_SLA !== 'Mais de 24h')
     .reduce((acc: number, r: SlaItem) => acc + Number(r.TOTAL), 0);
   const slaPercentage = totalSigned > 0 ? ((within24h / totalSigned) * 100).toFixed(1) : '100.0';
-
-  const similarityRows = qualityData?.similarity || [];
-  const totalSimilarityAudit = similarityRows.reduce((acc: number, r: SimilarityItem) => acc + Number(r.TOTAL_AUDITADO), 0);
-  const totalRedundant = similarityRows.reduce((acc: number, r: SimilarityItem) => acc + Number(r.QTD_SIMILAR_80), 0);
-  const redundancyRate = totalSimilarityAudit > 0 ? ((totalRedundant / totalSimilarityAudit) * 100).toFixed(1) : '0.0';
 
   // Proteção de rota
   useEffect(() => {
@@ -130,7 +102,6 @@ export default function HospitaisPage() {
           const cached = JSON.parse(cachedStr);
           setData(cached.stats);
           setQualityData(cached.quality);
-          setVocabData(cached.vocab);
           setError(null);
           return;
         } catch (e) {}
@@ -140,15 +111,13 @@ export default function HospitaisPage() {
     setLoading(true);
     setError(null);
     try {
-      const [resStats, resQuality, resVocab] = await Promise.all([
+      const [resStats, resQuality] = await Promise.all([
         fetch(`/api/hospitals/stats?id=${id}${force ? '&force=true' : ''}`),
-        fetch(`/api/hospitals/quality?id=${id}${force ? '&force=true' : ''}`),
-        fetch(`/api/hospitals/vocabulary?id=${id}${force ? '&force=true' : ''}`)
+        fetch(`/api/hospitals/quality?id=${id}${force ? '&force=true' : ''}`)
       ]);
       
       const jsonStats = await resStats.json();
       const jsonQuality = await resQuality.json();
-      const jsonVocab = await resVocab.json();
       
       if (jsonStats.error) {
         setError(jsonStats.error);
@@ -157,12 +126,10 @@ export default function HospitaisPage() {
       
       setData(jsonStats);
       setQualityData(jsonQuality);
-      setVocabData(jsonVocab);
 
       sessionStorage.setItem(cacheKey, JSON.stringify({
         stats: jsonStats,
-        quality: jsonQuality,
-        vocab: jsonVocab
+        quality: jsonQuality
       }));
     } catch (error) {
       const err = error as Error;
@@ -356,41 +323,8 @@ export default function HospitaisPage() {
 
           </div>
 
-          {/* KPI Grid - Linha 2: Qualidade Clínica & Segurança (Meta 2 JCI / CFM) */}
+          {/* KPI Grid - Linha 2: Eficiência & Segurança (SLA) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            
-            <div className="border border-border -background p-6 flex flex-col gap-4 group hover:border-cyan-500 transition-colors relative">
-              <div className="absolute top-0 right-0 w-8 h-8 -background group-hover:bg-cyan-500 transition-colors flex items-center justify-center">
-                 <Building2 size={14} className="text-muted group-hover:text-black" />
-              </div>
-              <div className="text-[10px] text-muted font-black uppercase tracking-widest">
-                Aderência ao Siglário
-                <span className="block mt-1 -muted">JCI Meta 2 (Comunicação Limpa)</span>
-              </div>
-              <div className="text-5xl font-black text-foreground tracking-tighter mt-2">
-                {vocabData?.adherence?.INDICE_ADERENCIA !== undefined ? `${Number(vocabData.adherence.INDICE_ADERENCIA).toFixed(1)}%` : '100.0%'}
-              </div>
-              <div className="mt-auto pt-4 border-t border-border">
-                <span className="text-[9px] font-black uppercase tracking-widest text-cyan-500 bg-cyan-500/10 px-2 py-1">Livre de Abrevições Proibidas</span>
-              </div>
-            </div>
-
-            <div className="border border-border -background p-6 flex flex-col gap-4 group hover:border-rose-500 transition-colors relative">
-              <div className="absolute top-0 right-0 w-8 h-8 -background group-hover:bg-rose-500 transition-colors flex items-center justify-center">
-                 <AlertTriangle size={14} className="text-muted group-hover:text-black" />
-              </div>
-              <div className="text-[10px] text-muted font-black uppercase tracking-widest">
-                Índice de Redundância
-                <span className="block mt-1 -muted">Evolutivas Clonadas &gt; 80%</span>
-              </div>
-              <div className="text-5xl font-black text-foreground tracking-tighter mt-2">
-                {redundancyRate}%
-              </div>
-              <div className="mt-auto pt-4 border-t border-border">
-                <span className="text-[9px] font-black uppercase tracking-widest text-rose-500 bg-rose-500/10 px-2 py-1">Controle de Plágio Clínico</span>
-              </div>
-            </div>
-
             <div className="border border-border -background p-6 flex flex-col gap-4 group hover:border-indigo-500 transition-colors relative">
               <div className="absolute top-0 right-0 w-8 h-8 -background group-hover:bg-indigo-500 transition-colors flex items-center justify-center">
                  <Clock size={14} className="text-muted group-hover:text-black" />
@@ -406,7 +340,6 @@ export default function HospitaisPage() {
                 <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500 bg-indigo-500/10 px-2 py-1">Tempo Limite de Faturamento</span>
               </div>
             </div>
-
           </div>
 
           {/* Main Content: Table & Ranking */}
@@ -517,85 +450,19 @@ export default function HospitaisPage() {
             </div>
           </div>
 
-          {/* Section: Auditoria Clínica e Segurança (Meta 2 JCI / CFM / ONA) */}
+          {/* Section: SLA de Assinatura */}
           <div className="border-t border-border pt-8 space-y-6">
             <h2 className="text-lg font-black text-foreground uppercase tracking-widest flex items-center gap-4">
               <span className="w-4 h-4 bg-[var(--primary)]"></span>
-              Painel de Rastreabilidade Assistencial (JCI / CFM)
+              Distribuição de SLA de Assinatura
             </h2>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               
-              {/* Acronyms Audit */}
-              <div className="border border-border bg-background p-6 md:p-8 relative">
-                <h3 className="text-sm font-black text-[var(--primary)] uppercase tracking-widest mb-6 flex items-center gap-3">
-                  <span className="w-2.5 h-2.5 bg-cyan-500 rounded-none"></span>
-                  Abreviações Proibidas (JCI)
-                </h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="py-2 text-[9px] font-black uppercase text-muted tracking-widest">Sigla</th>
-                        <th className="py-2 text-[9px] font-black uppercase text-muted tracking-widest text-right">Violados</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-800">
-                      {vocabData?.ranking && vocabData.ranking.length > 0 ? (
-                        vocabData.ranking.slice(0, 5).map((row: RankingItem, i: number) => (
-                          <tr key={i} className="text-xs group hover:bg-zinc-900 transition-colors">
-                            <td className="py-3 font-mono font-bold text-cyan-400 uppercase">{row.SIGLA}</td>
-                            <td className="py-3 text-right font-mono font-bold text-foreground">{row.TOTAL_OCORRENCIAS} docs</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={2} className="py-6 text-center text-xs text-muted uppercase tracking-wider font-bold">100% de Aderência Assistencial</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Redundancy Audit */}
-              <div className="border border-border bg-background p-6 md:p-8 relative">
-                <h3 className="text-sm font-black text-[var(--primary)] uppercase tracking-widest mb-6 flex items-center gap-3">
-                  <span className="w-2.5 h-2.5 bg-rose-500 rounded-none"></span>
-                  Documentos Redundantes
-                </h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="py-2 text-[9px] font-black uppercase text-muted tracking-widest">Documento</th>
-                        <th className="py-2 text-[9px] font-black uppercase text-muted tracking-widest text-right">Clonados (&gt;80%)</th>
-                        <th className="py-2 text-[9px] font-black uppercase text-muted tracking-widest text-right">Taxa</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-800">
-                      {similarityRows && similarityRows.length > 0 ? (
-                        similarityRows.slice(0, 5).map((row: SimilarityItem, i: number) => (
-                          <tr key={i} className="text-xs group hover:bg-zinc-900 transition-colors">
-                            <td className="py-3 truncate max-w-[120px] uppercase font-bold text-foreground">{row.DS_DOCUMENTO}</td>
-                            <td className="py-3 text-right font-mono text-muted">{row.QTD_SIMILAR_80} / {row.TOTAL_AUDITADO}</td>
-                            <td className="py-3 text-right font-mono font-bold text-rose-500">{row.PERCENTUAL_PLAGIO}%</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={3} className="py-6 text-center text-xs text-muted uppercase tracking-wider font-bold">Nenhuma cópia detectada</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
               {/* SLA Distribution */}
               <div className="border border-border bg-background p-6 md:p-8 relative">
                 <h3 className="text-sm font-black text-[var(--primary)] uppercase tracking-widest mb-6 flex items-center gap-3">
                   <span className="w-2.5 h-2.5 bg-indigo-500 rounded-none"></span>
-                  SLA de Assinatura
+                  SLA de Assinatura por Faixas
                 </h3>
                 <div className="space-y-4">
                   {['0-2h', '2-6h', '6-12h', '12-24h', 'Mais de 24h'].map(faixa => {

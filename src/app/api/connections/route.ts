@@ -66,8 +66,6 @@ export async function POST(request: Request) {
     data.docActionsQuery = body.query;
   } else if (body.type === 'SAVE_DOC_ACTIONS_QUERY_V3') {
     data.docActionsQueryV3 = body.query;
-  } else if (body.type === 'SAVE_SIMILARITY_QUERY') {
-    data.similarityQuery = body.query;
   } else if (body.type === 'SAVE_CLIENT_PATH') {
     data.oracleClientPath = body.path;
   } else if (body.type === 'SAVE_KPI_TOTAL') {

@@ -39,14 +39,6 @@ export interface DocMapping {
   fields: FieldMapping[];
 }
 
-export interface SiglarioEntry {
-  id: string;
-  sigla: string;
-  tipo: 'allowed' | 'forbidden';
-  significado?: string;
-  criadoEm: string;
-}
-
 export interface HospitalMapping {
   id: number;
   nome: string;
@@ -80,7 +72,6 @@ export interface StorageData {
     unitInactivity: string;
     volumeTurno: string;
     slaAssinatura: string;
-    similarityStats: string;
   };
   analyticQueriesV3?: {
     top10: string;
@@ -90,9 +81,7 @@ export interface StorageData {
     unitInactivity: string;
     volumeTurno: string;
     slaAssinatura: string;
-    similarityStats: string;
   };
-  similarityQuery: string;
   docMetadataQuery: string;
   docMetadataQueryV3?: string;
   docActionsQuery: string;
@@ -104,12 +93,6 @@ export interface StorageData {
   cardSettings: Record<string, { title?: string; icon?: string; color?: string }>;
   docMappings: DocMapping[];
   reportBaseUrl?: string;
-  siglarioAllowed?: string[];
-  siglarioForbidden?: string[];
-  siglarioEntries: SiglarioEntry[];
-  siglarioDocIds?: string;
-  siglarioFieldId?: string;
-  siglarioAuditDays?: number;
   auditDays?: number;
   auditDocId?: string | number;
   hospitalsMapping?: HospitalMapping[];
@@ -251,18 +234,6 @@ GROUP BY
         WHEN (PDC.DH_FECHAMENTO - PDC.DH_CRIACAO) * 24 <= 24 THEN '12-24h'
         ELSE 'Mais de 24h'
     END`,
-    similarityStats: `SELECT 
-    T.CD_DOCUMENTO,
-    T.DS_DOCUMENTO,
-    COUNT(CASE WHEN T.GRAU_SIMILARIDADE >= 80 THEN 1 END) AS QTD_SIMILAR_80,
-    COUNT(1) AS TOTAL_AUDITADO,
-    ROUND(COUNT(CASE WHEN T.GRAU_SIMILARIDADE >= 80 THEN 1 END) * 100 / NULLIF(COUNT(1), 0), 2) AS PERCENTUAL_PLAGIO
-FROM DBAMV.TB_AUDITORIA_SIMILARIDADE T
-JOIN DBAMV.ATENDIME A ON A.CD_ATENDIMENTO = T.CD_ATENDIMENTO
-WHERE A.CD_MULTI_EMPRESA = :ID
-  AND T.DH_FECHAMENTO >= TRUNC(SYSDATE) - 90
-GROUP BY T.CD_DOCUMENTO, T.DS_DOCUMENTO
-ORDER BY QTD_SIMILAR_80 DESC`,
   },
   analyticQueriesV3: {
     top10: '',
@@ -272,28 +243,7 @@ ORDER BY QTD_SIMILAR_80 DESC`,
     unitInactivity: '',
     volumeTurno: '',
     slaAssinatura: '',
-    similarityStats: '',
   },
-  similarityQuery: `SELECT 
-    T.CD_ATENDIMENTO as ATENDIMENTO,
-    T.CD_DOCUMENTO as DOCUMENTO,
-    T.DS_DOCUMENTO as NOME_DOCUMENTO,
-    T.IDENTIFICADOR_FILTRO as IDENTIFICADOR,
-    T.DH_FECHAMENTO as DATA_HORA,
-    T.CD_PRESTADOR || ' - ' || P.NM_PRESTADOR as PRESTADOR,
-    T.LEITO,
-    T.UNIDADE,
-    T.GRAU_SIMILARIDADE as SCORE
-FROM 
-    DBAMV.TB_AUDITORIA_SIMILARIDADE T
-LEFT JOIN 
-    DBAMV.PRESTADOR P ON P.CD_PRESTADOR = T.CD_PRESTADOR
-WHERE 
-    T.CD_DOCUMENTO = :CD_DOCUMENTO
-    AND T.IDENTIFICADOR_FILTRO = :IDENTIFICADOR
-    AND T.DH_FECHAMENTO BETWEEN TO_DATE(:DATA_INI, 'YYYY-MM-DD') AND TO_DATE(:DATA_FIM, 'YYYY-MM-DD') + 1
-ORDER BY 
-    T.CD_ATENDIMENTO DESC, T.DH_FECHAMENTO DESC`,
   docMetadataQuery: `SELECT DISTINCT
        edo.cd_documento             AS Codigo_Documento,
        edo.ds_documento             AS Descricao_Documento,
@@ -448,12 +398,6 @@ ORDER BY
     }
   ],
   reportBaseUrl: 'http://dev3-mvh5.acsc.org.br:84/mveditor/report?regId=',
-  siglarioAllowed: [],
-  siglarioForbidden: [],
-  siglarioEntries: [],
-  siglarioDocIds: "916,1048,772",
-  siglarioFieldId: "",
-  siglarioAuditDays: 15,
   auditDays: 15,
   auditDocId: "916,1048,772"
 };
@@ -498,12 +442,6 @@ export async function getData(): Promise<StorageData> {
         fields: m.fields.map((f: FieldMapping | string) => typeof f === 'string' ? { id: f, name: f } : f)
       })),
       reportBaseUrl: data.reportBaseUrl || INITIAL_DATA.reportBaseUrl,
-      siglarioAllowed: data.siglarioAllowed || INITIAL_DATA.siglarioAllowed,
-      siglarioForbidden: data.siglarioForbidden || INITIAL_DATA.siglarioForbidden,
-      siglarioEntries: data.siglarioEntries || INITIAL_DATA.siglarioEntries,
-      siglarioDocIds: data.siglarioDocIds || INITIAL_DATA.siglarioDocIds,
-      siglarioFieldId: data.siglarioFieldId !== undefined ? data.siglarioFieldId : INITIAL_DATA.siglarioFieldId,
-      siglarioAuditDays: data.siglarioAuditDays !== undefined ? Number(data.siglarioAuditDays) : INITIAL_DATA.siglarioAuditDays,
       auditDays: data.auditDays !== undefined ? Number(data.auditDays) : INITIAL_DATA.auditDays,
       auditDocId: data.auditDocId !== undefined ? data.auditDocId : INITIAL_DATA.auditDocId
     };

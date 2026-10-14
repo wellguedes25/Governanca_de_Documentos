@@ -52,18 +52,39 @@ export async function POST(request: Request) {
     data.activeConnectionId = body.id;
   } else if (body.type === 'SAVE_QUERY') {
     data.activeQuery = body.query;
+  } else if (body.type === 'SAVE_QUERY_V3') {
+    data.activeQueryV3 = body.query;
   } else if (body.type === 'SAVE_PROFILE_QUERY') {
     data.profileQuery = body.query;
+  } else if (body.type === 'SAVE_PROFILE_QUERY_V3') {
+    data.profileQueryV3 = body.query;
+  } else if (body.type === 'SAVE_DOC_METADATA_QUERY') {
+    data.docMetadataQuery = body.query;
+  } else if (body.type === 'SAVE_DOC_METADATA_QUERY_V3') {
+    data.docMetadataQueryV3 = body.query;
+  } else if (body.type === 'SAVE_DOC_ACTIONS_QUERY') {
+    data.docActionsQuery = body.query;
+  } else if (body.type === 'SAVE_DOC_ACTIONS_QUERY_V3') {
+    data.docActionsQueryV3 = body.query;
   } else if (body.type === 'SAVE_SIMILARITY_QUERY') {
     data.similarityQuery = body.query;
   } else if (body.type === 'SAVE_CLIENT_PATH') {
     data.oracleClientPath = body.path;
   } else if (body.type === 'SAVE_KPI_TOTAL') {
     data.kpiQueries.total = body.query;
+  } else if (body.type === 'SAVE_KPI_TOTAL_V3') {
+    if (!data.kpiQueriesV3) data.kpiQueriesV3 = { total: '', prod24h: '', assinados: '' };
+    data.kpiQueriesV3.total = body.query;
   } else if (body.type === 'SAVE_KPI_24H') {
     data.kpiQueries.prod24h = body.query;
+  } else if (body.type === 'SAVE_KPI_24H_V3') {
+    if (!data.kpiQueriesV3) data.kpiQueriesV3 = { total: '', prod24h: '', assinados: '' };
+    data.kpiQueriesV3.prod24h = body.query;
   } else if (body.type === 'SAVE_KPI_ASSINADOS') {
     data.kpiQueries.assinados = body.query;
+  } else if (body.type === 'SAVE_KPI_ASSINADOS_V3') {
+    if (!data.kpiQueriesV3) data.kpiQueriesV3 = { total: '', prod24h: '', assinados: '' };
+    data.kpiQueriesV3.assinados = body.query;
   } else if (body.type === 'SAVE_KPI_TOP10') {
     data.analyticQueries.top10 = body.query;
   } else if (body.type === 'SAVE_KPI_IDLE') {

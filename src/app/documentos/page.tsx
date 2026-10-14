@@ -244,17 +244,21 @@ export default function DocumentosPage() {
   // Ref para controle de redimensionamento
   const resizingCol = useRef<{ name: string; startX: number; startWidth: number } | null>(null);
 
-  // Carregamento inicial único
+  // Carregamento inicial e sincronização sensível à versão (V2 / V3)
   useEffect(() => {
-    // Tenta recuperar do cache primeiro para velocidade
-    const cached = sessionStorage.getItem('oracle_documentos_data');
-    if (cached && !oracleData) {
+    const currentVersion = docVersion || (typeof window !== 'undefined' ? (sessionStorage.getItem('app_doc_version') as 'V2' | 'V3') : null) || 'V2';
+    const cacheKey = `oracle_documentos_data_${currentVersion}`;
+    const cached = typeof window !== 'undefined' ? sessionStorage.getItem(cacheKey) : null;
+    
+    if (cached) {
       try {
         const parsed = JSON.parse(cached);
         setOracleData(parsed);
       } catch (e) {
         console.error('Erro ao ler cache:', e);
       }
+    } else {
+      setOracleData(null);
     }
     
     // Sempre busca o nome da conexão ativa
@@ -266,12 +270,12 @@ export default function DocumentosPage() {
         setInactiveHospitals(storage.hospitalsMapping.filter((h: any) => !h.ativo).map((h: any) => h.sigla.toUpperCase()));
       }
       
-      // Se não tem dados, busca agora
-      if (!oracleData && !cached) {
-        fetchInitialData();
+      // Se não tem dados para esta versão, busca no Oracle
+      if (!cached) {
+        fetchInitialData(true, currentVersion);
       }
     });
-  }, []);
+  }, [docVersion]);
 
   // Dispara busca de perfis ao selecionar documento
   useEffect(() => {
@@ -297,7 +301,7 @@ export default function DocumentosPage() {
       setMetadataActionsError(null);
       setActionsFilterDoc(null);
     }
-  }, [sidebarDoc, sidebarOpen]);
+  }, [sidebarDoc, sidebarOpen, docVersion]);
 
   async function fetchProfile(docId: string) {
     setProfileLoading(true);
@@ -307,6 +311,7 @@ export default function DocumentosPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           query: 'PROFILE', 
+          version: docVersion || 'V2',
           params: { CD_DOCUMENTO: docId } 
         })
       });
@@ -327,6 +332,7 @@ export default function DocumentosPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           query: 'METADATA', 
+          version: docVersion || 'V2',
           params: { CD_DOCUMENTO: docId } 
         })
       });
@@ -348,6 +354,7 @@ export default function DocumentosPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           query: 'ACTIONS', 
+          version: docVersion || 'V2',
           params: { CD_DOCUMENTO: docId } 
         })
       });
@@ -420,7 +427,7 @@ export default function DocumentosPage() {
   async function fetchInitialData(isManual = false, versionOverride?: 'V2' | 'V3') {
     if (loading) return; // Evita chamadas duplicadas
     
-    const targetVersion = versionOverride || docVersion || 'V2';
+    const targetVersion = versionOverride || docVersion || (typeof window !== 'undefined' ? (sessionStorage.getItem('app_doc_version') as 'V2' | 'V3') : null) || 'V2';
     setLoading(true);
     setError('');
     
@@ -451,7 +458,10 @@ export default function DocumentosPage() {
       if (execRes.ok) {
         const rows = result.rows || [];
         setOracleData(rows);
-        sessionStorage.setItem('oracle_documentos_data', JSON.stringify(rows));
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem(`oracle_documentos_data_${targetVersion}`, JSON.stringify(rows));
+          sessionStorage.setItem('oracle_documentos_data', JSON.stringify(rows));
+        }
       } else {
         setError(result.error || 'Erro ao carregar documentos.');
       }
@@ -1105,12 +1115,25 @@ export default function DocumentosPage() {
       <div 
         className={`fixed top-0 right-0 h-full bg-background border-l border-border z-[100] transition-all duration-500 ease-in-out transform flex flex-col ${sidebarOpen ? 'translate-x-0 w-[450px]' : 'translate-x-full w-[450px]'}`}
       >
-        {/* Lógica de Extração de Metadados (Fix: Oracle Aliases in Uppercase) */}
+        {/* Lógica de Extração de Metadados (Fix: Oracle Aliases in Uppercase e Compatibilidade V2/V3) */}
         {(() => {
-          // Busca a versão publicada (TIPO_VERSAO = 3) separando os layouts de Tela e Relatório
-          const telaSpecs = metadata.find(m => m.CODIGO_TIPO_VERSAO === 3 && m.CODIGO_TIPO_LAYOUT === 1);
-          const relatorioSpecs = metadata.find(m => m.CODIGO_TIPO_VERSAO === 3 && m.CODIGO_TIPO_LAYOUT === 2);
-          const fallbackSpecs = metadata.find(m => m.CODIGO_TIPO_VERSAO === 3) || metadata[0];
+          // Identifica a versão publicada/ativa mais recente (V2: TIPO_VERSAO = 3 ou STATUS_ATIVO = 'S'; V3: STATUS_ATIVO = 1)
+          const activePublishedVersion = metadata.find(m => m.CODIGO_TIPO_VERSAO === 3 || m.STATUS_ATIVO === 1 || m.STATUS_ATIVO === 'S')?.VALOR_VERSAO;
+          
+          const telaSpecs = metadata.find(m => 
+            (m.CODIGO_TIPO_VERSAO === 3 || m.STATUS_ATIVO === 1 || m.STATUS_ATIVO === 'S') && 
+            m.CODIGO_TIPO_LAYOUT === 1 && 
+            (activePublishedVersion !== undefined ? m.VALOR_VERSAO === activePublishedVersion : true)
+          );
+          const relatorioSpecs = metadata.find(m => 
+            (m.CODIGO_TIPO_VERSAO === 3 || m.STATUS_ATIVO === 1 || m.STATUS_ATIVO === 'S') && 
+            m.CODIGO_TIPO_LAYOUT === 2 && 
+            (activePublishedVersion !== undefined ? m.VALOR_VERSAO === activePublishedVersion : true)
+          );
+          const fallbackSpecs = metadata.find(m => 
+            (m.CODIGO_TIPO_VERSAO === 3 || m.STATUS_ATIVO === 1 || m.STATUS_ATIVO === 'S') && 
+            (activePublishedVersion !== undefined ? m.VALOR_VERSAO === activePublishedVersion : true)
+          ) || metadata[0];
 
           // Baseia-se primariamente na Tela para regras/campos. Se não houver Tela, tenta Relatório ou Fallback.
           const baseSpecs = telaSpecs || relatorioSpecs || fallbackSpecs;
@@ -1123,8 +1146,11 @@ export default function DocumentosPage() {
             CODIGO_LAYOUT_RODAPE: relatorioSpecs?.CODIGO_LAYOUT_RODAPE || baseSpecs.CODIGO_LAYOUT_RODAPE,
           } : undefined;
           
-          const hasTestVersion = metadata.some(m => m.CODIGO_TIPO_VERSAO === 1);
-          const publishedRow = metadata.find(m => m.CODIGO_TIPO_VERSAO === 3);
+          const hasTestVersion = metadata.some(m => m.CODIGO_TIPO_VERSAO === 1 && m.STATUS_ATIVO !== 1 && m.STATUS_ATIVO !== 'S');
+          const publishedRow = metadata.find(m => 
+            (m.CODIGO_TIPO_VERSAO === 3 || m.STATUS_ATIVO === 1 || m.STATUS_ATIVO === 'S') && 
+            (activePublishedVersion !== undefined ? m.VALOR_VERSAO === activePublishedVersion : true)
+          ) || metadata[0];
 
           return (
             <>
@@ -1213,9 +1239,11 @@ export default function DocumentosPage() {
                   </div>
                 ) : activeTab === 'history' ? (
                   <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
-                     {metadata.sort((a, b) => b.VALOR_VERSAO - a.VALOR_VERSAO).map((v, idx) => (
-                       <div key={idx} className={`relative pl-8 pb-6 border-l-2 ${v.STATUS_ATIVO === 'S' ? 'border-[var(--primary)]' : 'border-border'} last:pb-0`}>
-                         <div className={`absolute left-[-9px] top-0 w-4 h-4 rounded-none border-4 bg-background ${v.STATUS_ATIVO === 'S' ? 'border-[var(--primary)] scale-110 shadow-[0_0_10px_rgba(var(--primary-rgb),0.3)]' : 'border-border'}`}></div>
+                     {metadata.sort((a, b) => b.VALOR_VERSAO - a.VALOR_VERSAO).map((v, idx) => {
+                       const isAtivo = v.STATUS_ATIVO === 'S' || v.STATUS_ATIVO === 1;
+                       return (
+                       <div key={idx} className={`relative pl-8 pb-6 border-l-2 ${isAtivo ? 'border-[var(--primary)]' : 'border-border'} last:pb-0`}>
+                         <div className={`absolute left-[-9px] top-0 w-4 h-4 rounded-none border-4 bg-background ${isAtivo ? 'border-[var(--primary)] scale-110 shadow-[0_0_10px_rgba(var(--primary-rgb),0.3)]' : 'border-border'}`}></div>
                          <div className="flex items-center justify-between mb-1">
                            <span className="text-[11px] font-black text-foreground uppercase tracking-tighter">
                              Versão {v.VALOR_VERSAO}
@@ -1236,13 +1264,14 @@ export default function DocumentosPage() {
                               ID Versão: {v.CODIGO_VERSAO_DOCUMENTO}
                            </div>
                          </div>
-                         {v.STATUS_ATIVO === 'S' && v.CODIGO_TIPO_VERSAO === 3 && (
+                         {isAtivo && v.CODIGO_TIPO_VERSAO === 3 && (
                            <div className="mt-2 text-[9px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1 italic">
                              <Check size={10} strokeWidth={4} /> Versão Ativa em Produção
                            </div>
                          )}
                        </div>
-                     ))}
+                     );
+                     })}
                   </div>
                 ) : activeTab === 'actions' ? (
                   <div className="space-y-6 animate-in fade-in slide-in-from-right-4">

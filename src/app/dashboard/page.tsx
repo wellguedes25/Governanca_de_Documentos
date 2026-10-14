@@ -9,6 +9,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useUI } from '@/context/UIContext';
 import { useRouter } from 'next/navigation';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type DashboardTab = 'operacional' | 'unidades' | 'qualidade';
 
@@ -280,10 +281,11 @@ export default function Dashboard() {
               fetchStats(true);
               fetchAnalytics(true);
             }}
-            className="w-full flex items-center justify-between p-4 bg-card border border-border -border text-xs font-black uppercase tracking-widest transition-colors group"
+            disabled={statsLoading || analyticsLoading}
+            className="w-full flex items-center justify-between p-4 bg-card border border-border text-xs font-black uppercase tracking-widest transition-all hover:border-[var(--primary)] disabled:opacity-50 disabled:cursor-not-allowed group"
           >
-            Sincronizar
-            <RotateCcw size={14} className={cn("text-muted -foreground transition-colors", (statsLoading || analyticsLoading) && "animate-spin")} />
+            <span>{statsLoading || analyticsLoading ? 'Sincronizando...' : 'Sincronizar'}</span>
+            <RotateCcw size={14} className={cn("text-muted-foreground transition-all group-hover:text-[var(--primary)]", (statsLoading || analyticsLoading) && "animate-spin text-[var(--primary)]")} />
           </button>
         </div>
       </div>
@@ -349,12 +351,16 @@ export default function Dashboard() {
                   const card = getCardData(id);
                   return (
                     <div key={id} className="border border-border bg-card p-6 flex flex-col gap-4 group hover:border-[var(--primary)] transition-colors relative overflow-hidden">
-                      <div className="text-[10px] text-muted font-bold uppercase tracking-widest flex items-center justify-between">
+                      <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest flex items-center justify-between">
                         {card.title}
-                        <span className="text-zinc-700 group-hover:text-[var(--primary)] transition-colors">{card.icon}</span>
+                        <span className="text-zinc-600 group-hover:text-[var(--primary)] transition-colors">{card.icon}</span>
                       </div>
-                      <div className="text-4xl lg:text-4xl font-black text-foreground tracking-tighter my-2">
-                        {isCardLoading(id) ? <Loader2 className="animate-spin text-muted-foreground" /> : card.value}
+                      <div className="text-4xl lg:text-4xl font-black text-foreground tracking-tighter my-2 h-10 flex items-center">
+                        {isCardLoading(id) ? (
+                          <Skeleton className="h-9 w-32" />
+                        ) : (
+                          card.value
+                        )}
                       </div>
                       <div className="w-full h-1 bg-background mt-auto">
                         <div className="h-full bg-foreground group-hover:bg-[var(--primary)] transition-colors w-1/3" />
@@ -366,15 +372,29 @@ export default function Dashboard() {
 
               {/* Huge Data Block for Ranking */}
               <div className="border border-border bg-background p-6 md:p-12 relative overflow-hidden">
-                {/* Removed Huge RANK text per user request */}
                 <h2 className="text-xl font-black text-[var(--primary)] uppercase tracking-widest mb-12 relative z-10 flex items-center gap-4">
                   <span className="w-4 h-4 bg-[var(--primary)]"></span>
-                  Curva ABC
+                  Curva ABC (Top 10 Documentos)
                 </h2>
                 
                 <div className="space-y-6 relative z-10">
                   {loadingMap['top10'] ? (
-                     <div className="flex justify-center py-12"><Loader2 className="animate-spin text-muted-foreground" size={32} /></div>
+                    <div className="space-y-6">
+                      {[100, 82, 68, 54, 42, 30].map((widthPct, idx) => (
+                        <div key={idx} className="flex flex-col gap-2">
+                          <div className="flex justify-between items-end">
+                            <div className="flex items-center gap-4">
+                              <Skeleton className="h-4 w-6 font-mono" />
+                              <Skeleton className="h-4 w-44 md:w-80" />
+                            </div>
+                            <Skeleton className="h-4 w-16" />
+                          </div>
+                          <div className="h-4 w-full bg-card border border-border overflow-hidden">
+                            <Skeleton className="h-full" style={{ width: `${widthPct}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   ) : (
                     analytics?.top10?.map((doc: any, i: number) => {
                       const max = analytics.top10[0]?.QTD_TOTAL || 1;
@@ -415,7 +435,19 @@ export default function Dashboard() {
                 </h2>
                 <div className="space-y-8">
                   {loadingMap['unitAdherence'] ? (
-                    <div className="flex justify-center py-12"><Loader2 className="animate-spin text-muted-foreground" size={32} /></div>
+                    <div className="space-y-8">
+                      {[90, 75, 58, 42, 28].map((widthPct, idx) => (
+                        <div key={idx}>
+                          <div className="flex justify-between items-center mb-3">
+                            <Skeleton className="h-4 w-20" />
+                            <Skeleton className="h-4 w-16" />
+                          </div>
+                          <div className="h-6 w-full bg-card border border-border overflow-hidden">
+                            <Skeleton className="h-full" style={{ width: `${widthPct}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   ) : (
                     unitData.map((unit) => {
                       const percent = (unit.total / maxUnitTotal) * 100;
@@ -485,50 +517,50 @@ export default function Dashboard() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                  <div className="border border-border p-6 flex flex-col gap-4 group hover:border-[var(--primary)] transition-colors bg-card md:col-span-2">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center justify-between">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center justify-between">
                       Taxa de Assinatura
-                      <Zap size={16} className="text-zinc-700 group-hover:text-[var(--primary)]" />
+                      <Zap size={16} className="text-zinc-600 group-hover:text-[var(--primary)]" />
                     </div>
-                    <div className="text-6xl font-black text-foreground tracking-tighter my-4">
-                      {loadingMap['assinados'] ? <Loader2 className="animate-spin text-muted-foreground" /> : stats?.assinadosPercent}
+                    <div className="text-6xl font-black text-foreground tracking-tighter my-4 h-16 flex items-center">
+                      {loadingMap['assinados'] ? <Skeleton className="h-14 w-44" /> : (stats?.assinadosPercent || '0.0%')}
                     </div>
                     <div className="flex gap-8 border-t border-border pt-6 mt-auto font-mono">
                       <div>
                         <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-2">Assinados</p>
-                        <div className="text-xl font-black text-[var(--primary)]">
-                          {stats?.assinadosRaw || '0'}
+                        <div className="text-xl font-black text-[var(--primary)] h-7 flex items-center">
+                          {loadingMap['assinados'] ? <Skeleton className="h-5 w-20" /> : (stats?.assinadosRaw || '0')}
                         </div>
                       </div>
                       <div className="w-[1px] bg-background" />
                       <div>
                         <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-2">Total</p>
-                        <div className="text-xl font-black text-foreground">
-                          {stats?.totalRaw || '0'}
+                        <div className="text-xl font-black text-foreground h-7 flex items-center">
+                          {loadingMap['assinados'] ? <Skeleton className="h-5 w-20" /> : (stats?.totalRaw || '0')}
                         </div>
                       </div>
                     </div>
                  </div>
 
                  <div className="border border-border p-6 flex flex-col gap-4 group hover:border-red-500 transition-colors bg-card md:col-span-2">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center justify-between">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center justify-between">
                       Docs Ociosos
-                      <Archive size={16} className="text-zinc-700 group-hover:text-red-500" />
+                      <Archive size={16} className="text-zinc-600 group-hover:text-red-500" />
                     </div>
-                    <div className="text-6xl font-black text-foreground tracking-tighter my-4">
-                      {loadingMap['idle'] ? <Loader2 className="animate-spin text-muted-foreground" /> : Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR')}
+                    <div className="text-6xl font-black text-foreground tracking-tighter my-4 h-16 flex items-center">
+                      {loadingMap['idle'] ? <Skeleton className="h-14 w-44" /> : Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR')}
                     </div>
                     <div className="flex gap-8 border-t border-border pt-6 mt-auto font-mono">
                       <div>
                         <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-2">Ociosos</p>
-                        <div className="text-xl font-black text-red-500">
-                          {Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR')}
+                        <div className="text-xl font-black text-red-500 h-7 flex items-center">
+                          {loadingMap['idle'] ? <Skeleton className="h-5 w-20" /> : Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR')}
                         </div>
                       </div>
                       <div className="w-[1px] bg-background" />
                       <div>
                         <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-2">Modelos (Templates)</p>
-                        <div className="text-xl font-black text-foreground">
-                          {Number(analytics?.idle?.[0]?.TOTAL_TEMPLATES || 0).toLocaleString('pt-BR')}
+                        <div className="text-xl font-black text-foreground h-7 flex items-center">
+                          {loadingMap['idle'] ? <Skeleton className="h-5 w-20" /> : Number(analytics?.idle?.[0]?.TOTAL_TEMPLATES || 0).toLocaleString('pt-BR')}
                         </div>
                       </div>
                     </div>
@@ -539,12 +571,12 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                  {/* Redundancy */}
                  <div className="border border-border p-6 flex flex-col gap-4 group hover:border-rose-500 transition-colors bg-card">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center justify-between">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center justify-between">
                       Redundância Clínica
-                      <AlertTriangle size={16} className="text-zinc-700 group-hover:text-rose-500" />
+                      <AlertTriangle size={16} className="text-zinc-600 group-hover:text-rose-500" />
                     </div>
-                    <div className="text-5xl font-black text-foreground tracking-tighter my-4">
-                      {loadingMap['globalQuality'] ? <Loader2 className="animate-spin text-muted-foreground" /> : `${globalQuality?.redundancia || '0.0'}%`}
+                    <div className="text-5xl font-black text-foreground tracking-tighter my-4 h-12 flex items-center">
+                      {loadingMap['globalQuality'] ? <Skeleton className="h-10 w-28" /> : `${globalQuality?.redundancia || '0.0'}%`}
                     </div>
                     <div className="border-t border-border pt-4 mt-auto">
                       <p className="text-[9px] font-bold text-rose-500 bg-rose-500/10 px-2 py-1 uppercase tracking-widest inline-block">Plágio &gt; 80%</p>
@@ -553,12 +585,12 @@ export default function Dashboard() {
 
                  {/* Siglario */}
                  <div className="border border-border p-6 flex flex-col gap-4 group hover:border-cyan-500 transition-colors bg-card">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center justify-between">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center justify-between">
                       Vocabulário Limpo (JCI)
-                      <FileText size={16} className="text-zinc-700 group-hover:text-cyan-500" />
+                      <FileText size={16} className="text-zinc-600 group-hover:text-cyan-500" />
                     </div>
-                    <div className="text-5xl font-black text-foreground tracking-tighter my-4">
-                      {loadingMap['globalQuality'] ? <Loader2 className="animate-spin text-muted-foreground" /> : `${globalQuality?.aderencia || '100.0'}%`}
+                    <div className="text-5xl font-black text-foreground tracking-tighter my-4 h-12 flex items-center">
+                      {loadingMap['globalQuality'] ? <Skeleton className="h-10 w-28" /> : `${globalQuality?.aderencia || '100.0'}%`}
                     </div>
                     <div className="border-t border-border pt-4 mt-auto">
                       <p className="text-[9px] font-bold text-cyan-500 bg-cyan-500/10 px-2 py-1 uppercase tracking-widest inline-block">S/ Siglas Proibidas</p>
@@ -567,12 +599,12 @@ export default function Dashboard() {
 
                  {/* SLA */}
                  <div className="border border-border p-6 flex flex-col gap-4 group hover:border-indigo-500 transition-colors bg-card">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-muted flex items-center justify-between">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center justify-between">
                       SLA Assinatura 24h
-                      <Clock size={16} className="text-zinc-700 group-hover:text-indigo-500" />
+                      <Clock size={16} className="text-zinc-600 group-hover:text-indigo-500" />
                     </div>
-                    <div className="text-5xl font-black text-foreground tracking-tighter my-4">
-                      {loadingMap['globalQuality'] ? <Loader2 className="animate-spin text-muted-foreground" /> : `${globalQuality?.sla24h || '100.0'}%`}
+                    <div className="text-5xl font-black text-foreground tracking-tighter my-4 h-12 flex items-center">
+                      {loadingMap['globalQuality'] ? <Skeleton className="h-10 w-28" /> : `${globalQuality?.sla24h || '100.0'}%`}
                     </div>
                     <div className="border-t border-border pt-4 mt-auto">
                       <p className="text-[9px] font-bold text-indigo-500 bg-indigo-500/10 px-2 py-1 uppercase tracking-widest inline-block">Fechamento Rápido</p>

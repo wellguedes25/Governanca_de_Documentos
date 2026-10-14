@@ -60,6 +60,7 @@ export interface StorageData {
   activeQuery: string;
   activeQueryV3: string;
   profileQuery: string;
+  profileQueryV3?: string;
   oracleClientPath: string;
   kpiQueries: {
     total: string;
@@ -93,7 +94,9 @@ export interface StorageData {
   };
   similarityQuery: string;
   docMetadataQuery: string;
+  docMetadataQueryV3?: string;
   docActionsQuery: string;
+  docActionsQueryV3?: string;
   ambulatoryProfilesQuery: string;
   ambulatoryProfileDetailsQuery: string;
   enabledQueries: Record<string, boolean>;
@@ -118,6 +121,7 @@ export const INITIAL_DATA: StorageData = {
   activeQuery: 'SELECT CD_DOCUMENTO AS "CÓDIGO", NM_TITULO AS "NOME", COUNT(1) AS "TOTAL", MAX(DH_CRIACAO) AS "ÚLTIMO USO", /* DYNAMIC_HOSPITALS_PIVOT */ FROM (SELECT DISTINCT ED.CD_DOCUMENTO, UPPER(ED.DS_DOCUMENTO) AS NM_TITULO, A.CD_MULTI_EMPRESA, PDC.DH_CRIACAO FROM DBAMV.PW_EDITOR_CLINICO PEC JOIN DBAMV.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.PW_DOCUMENTO_CLINICO PDC ON PDC.CD_DOCUMENTO_CLINICO = PEC.CD_DOCUMENTO_CLINICO JOIN DBAMV.ATENDIME A ON A.CD_ATENDIMENTO = PDC.CD_ATENDIMENTO WHERE ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90) GROUP BY CD_DOCUMENTO, NM_TITULO ORDER BY NM_TITULO',
   activeQueryV3: 'SELECT CD_DOCUMENTO AS "CÓDIGO", NM_TITULO AS "NOME", COUNT(1) AS "TOTAL", MAX(DH_CRIACAO) AS "ÚLTIMO USO", /* DYNAMIC_HOSPITALS_PIVOT */ FROM (SELECT DISTINCT ED.CD_DOCUMENTO, UPPER(ED.DS_DOCUMENTO) AS NM_TITULO, A.CD_MULTI_EMPRESA, PDC.DH_CRIACAO FROM DBAMV.PW_EDITOR_CLINICO PEC JOIN EDITOR.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.PW_DOCUMENTO_CLINICO PDC ON PDC.CD_DOCUMENTO_CLINICO = PEC.CD_DOCUMENTO_CLINICO JOIN DBAMV.ATENDIME A ON A.CD_ATENDIMENTO = PDC.CD_ATENDIMENTO WHERE ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90) GROUP BY CD_DOCUMENTO, NM_TITULO ORDER BY NM_TITULO',
   profileQuery: 'SELECT DISTINCT CD_DOCUMENTO, NM_TITULO, DS_PERFIL_AMBULATORIAL, EMPRESA FROM (SELECT PMP.NM_VALOR AS CD_DOCUMENTO, PM.NM_TITULO, PA.DS_PERFIL_AMBULATORIAL, /* DYNAMIC_HOSPITALS_DECODE */ FROM DBAMV.PERFIL_AMBULATORIAL PA JOIN DBAMV.PW_PERFIL_MODULO PM ON PA.CD_PERFIL_AMBULATORIAL = PM.CD_PERFIL_AMBULATORIAL JOIN DBAMV.PW_PERFIL_MODULO_PARAMETRO PMP ON PM.CD_PERFIL_MODULO = PMP.CD_PERFIL_MODULO LEFT JOIN DBAMV.PERFIL_AMBULATORIAL_EMPRESA PAE ON PA.CD_PERFIL_AMBULATORIAL = PAE.CD_PERFIL_AMBULATORIAL WHERE PMP.CD_PARAMETRO = \'CD_DOCUMENTO\' AND PA.SN_ATIVO = \'S\' AND PA.TP_PERFIL = \'SIS\' AND PMP.NM_VALOR = :CD_DOCUMENTO UNION ALL SELECT TB_OBJETO.CD_DOCUMENTO, PM.NM_TITULO, PA.DS_PERFIL_AMBULATORIAL, /* DYNAMIC_HOSPITALS_DECODE */ FROM DBAMV.PERFIL_AMBULATORIAL PA JOIN DBAMV.PW_PERFIL_MODULO PM ON PA.CD_PERFIL_AMBULATORIAL = PM.CD_PERFIL_AMBULATORIAL JOIN DBAMV.PW_PERFIL_MODULO_PARAMETRO PMP ON PM.CD_PERFIL_MODULO = PMP.CD_PERFIL_MODULO LEFT JOIN DBAMV.PERFIL_AMBULATORIAL_EMPRESA PAE ON PA.CD_PERFIL_AMBULATORIAL = PAE.CD_PERFIL_AMBULATORIAL JOIN (SELECT NM_VALOR AS CD_DOCUMENTO, TO_CHAR(PTDC.CD_OBJETO) AS CD_OBJETO FROM DBAMV.PW_TIPO_DOCUMENTO_CONSULTA PTDC JOIN DBAMV.PW_TIPO_DOCUMENTO_MODULO PTDM ON PTDC.CD_TIPO_DOCUMENTO_CONSULTA = PTDM.CD_TIPO_DOCUMENTO_CONSULTA JOIN DBAMV.PW_TIPO_DOCUMENTO_MODULO_PARAM PTDMP ON PTDM.CD_TIPO_DOCUMENTO_MODULO = PTDMP.CD_TIPO_DOCUMENTO_MODULO WHERE PTDMP.CD_PARAMETRO = \'CD_DOCUMENTO\' AND NM_VALOR = :CD_DOCUMENTO) TB_OBJETO ON PMP.NM_VALOR = TB_OBJETO.CD_OBJETO WHERE PA.SN_ATIVO = \'S\' AND PA.TP_PERFIL = \'SIS\')',
+  profileQueryV3: 'SELECT DISTINCT CD_DOCUMENTO, NM_TITULO, DS_PERFIL_AMBULATORIAL, EMPRESA FROM (SELECT PMP.NM_VALOR AS CD_DOCUMENTO, PM.NM_TITULO, PA.DS_PERFIL_AMBULATORIAL, /* DYNAMIC_HOSPITALS_DECODE */ FROM DBAMV.PERFIL_AMBULATORIAL PA JOIN DBAMV.PW_PERFIL_MODULO PM ON PA.CD_PERFIL_AMBULATORIAL = PM.CD_PERFIL_AMBULATORIAL JOIN DBAMV.PW_PERFIL_MODULO_PARAMETRO PMP ON PM.CD_PERFIL_MODULO = PMP.CD_PERFIL_MODULO LEFT JOIN DBAMV.PERFIL_AMBULATORIAL_EMPRESA PAE ON PA.CD_PERFIL_AMBULATORIAL = PAE.CD_PERFIL_AMBULATORIAL WHERE PMP.CD_PARAMETRO IN (\'CD_DOCUMENTO_EDITOR_3\', \'CD_DOCUMENTO\') AND PA.SN_ATIVO = \'S\' AND PA.TP_PERFIL = \'SIS\' AND PMP.NM_VALOR = :CD_DOCUMENTO UNION ALL SELECT TB_OBJETO.CD_DOCUMENTO, PM.NM_TITULO, PA.DS_PERFIL_AMBULATORIAL, /* DYNAMIC_HOSPITALS_DECODE */ FROM DBAMV.PERFIL_AMBULATORIAL PA JOIN DBAMV.PW_PERFIL_MODULO PM ON PA.CD_PERFIL_AMBULATORIAL = PM.CD_PERFIL_AMBULATORIAL JOIN DBAMV.PW_PERFIL_MODULO_PARAMETRO PMP ON PM.CD_PERFIL_MODULO = PMP.CD_PERFIL_MODULO LEFT JOIN DBAMV.PERFIL_AMBULATORIAL_EMPRESA PAE ON PA.CD_PERFIL_AMBULATORIAL = PAE.CD_PERFIL_AMBULATORIAL JOIN (SELECT NM_VALOR AS CD_DOCUMENTO, TO_CHAR(PTDC.CD_OBJETO) AS CD_OBJETO FROM DBAMV.PW_TIPO_DOCUMENTO_CONSULTA PTDC JOIN DBAMV.PW_TIPO_DOCUMENTO_MODULO PTDM ON PTDC.CD_TIPO_DOCUMENTO_CONSULTA = PTDM.CD_TIPO_DOCUMENTO_CONSULTA JOIN DBAMV.PW_TIPO_DOCUMENTO_MODULO_PARAM PTDMP ON PTDM.CD_TIPO_DOCUMENTO_MODULO = PTDMP.CD_TIPO_DOCUMENTO_MODULO WHERE PTDMP.CD_PARAMETRO IN (\'CD_DOCUMENTO_EDITOR_3\', \'CD_DOCUMENTO\') AND NM_VALOR = :CD_DOCUMENTO) TB_OBJETO ON PMP.NM_VALOR = TB_OBJETO.CD_OBJETO WHERE PA.SN_ATIVO = \'S\' AND PA.TP_PERFIL = \'SIS\')',
   ambulatoryProfilesQuery: `SELECT pa.cd_perfil_ambulatorial AS Cod_Perfil, pa.ds_perfil_ambulatorial AS Nome_Perfil, pa.cd_especialidade AS Cod_Especialidade, esp.ds_especialid AS Especialidade, pa.cd_sistema AS Sistema, pa.tp_porta_entrada AS Porta_Entrada, pa.tp_atendimento AS Tipo_Atendimento, pa.cd_tip_presta AS Cod_Tipo_Prestador, tp.nm_tip_presta AS Nome_Tipo_Prestador, pa.cd_setor AS Cod_Setor, seto.nm_setor AS Nome_Setor, pa.cd_multi_empresa AS Empresa_Fixa FROM dbamv.perfil_ambulatorial pa LEFT JOIN dbamv.especialid esp ON esp.cd_especialid = pa.cd_especialidade LEFT JOIN dbamv.tip_presta tp ON tp.cd_tip_presta = pa.cd_tip_presta LEFT JOIN dbamv.setor seto ON seto.cd_setor = pa.cd_setor WHERE pa.sn_ativo = 'S' AND pa.tp_perfil = 'SIS'`,
   ambulatoryProfileDetailsQuery: `SELECT pm.cd_perfil_modulo AS Cod_Perfil_Modulo, pm.cd_modulo AS Modulo, pm.cd_perfil_modulo_pai AS Cod_Perfil_Modulo_Pai, pm.nm_titulo AS Titulo, pm.cd_perfil_modulo_agrupador AS Agrupador, pmp.cd_perfil_modulo_parametro AS Cod_Mod_Parametro, pmp.cd_modulo AS Modulo_Parametro, pmp.cd_parametro AS Parametro, pmp.cd_perfil_modulo AS Cod_Perfil_Mod_Origem, CASE WHEN pmp.cd_parametro = 'CD_OBJETO' AND po.nm_objeto IS NOT NULL THEN pmp.nm_valor || ' - ' || po.nm_objeto WHEN pmp.cd_parametro = 'CD_DOCUMENTO' AND ed.ds_documento IS NOT NULL THEN pmp.nm_valor || ' - ' || ed.ds_documento ELSE pmp.nm_valor END AS Valor_Parametro, pmp.ds_valor AS Desc_Valor_Parametro FROM dbamv.perfil_ambulatorial pa INNER JOIN dbamv.pw_perfil_modulo pm ON pa.cd_perfil_ambulatorial = pm.cd_perfil_ambulatorial INNER JOIN dbamv.pw_perfil_modulo_parametro pmp ON pm.cd_perfil_modulo = pmp.cd_perfil_modulo LEFT JOIN dbamv.pagu_objeto po ON pmp.cd_parametro = 'CD_OBJETO' AND TO_CHAR(po.cd_objeto) = pmp.nm_valor LEFT JOIN dbamv.editor_documento ed ON pmp.cd_parametro = 'CD_DOCUMENTO' AND TO_CHAR(ed.cd_documento) = pmp.nm_valor WHERE pa.sn_ativo = 'S' AND pa.tp_perfil = 'SIS' AND pa.cd_perfil_ambulatorial = :CD_PERFIL`,
   oracleClientPath: 'C:\\orant\\Client\\instantclient_23_0',
@@ -319,6 +323,34 @@ ORDER BY
  WHERE etl.ds_identificador NOT IN ('CABECALHO', 'RODAPE')
    AND edo.cd_documento = :CD_DOCUMENTO
  ORDER BY Codigo_Documento`,
+  docMetadataQueryV3: `SELECT DISTINCT
+       edo.cd_documento             AS "CODIGO_DOCUMENTO",
+       edo.ds_documento             AS "DESCRICAO_DOCUMENTO",
+       edo.ds_identificador         AS "IDENTIFICADOR_DOCUMENTO",
+       evd.cd_versao_documento      AS "CODIGO_VERSAO_DOCUMENTO",
+       etl.cd_tipo_layout           AS "CODIGO_TIPO_LAYOUT",
+       etl.ds_identificador         AS "IDENTIFICADOR_LAYOUT",
+       etl.ds_tipo_layout           AS "DESCRICAO_TIPO_LAYOUT",
+       evd.vl_versao                AS "VALOR_VERSAO",
+       evd.sn_ativo                 AS "STATUS_ATIVO",
+       CASE WHEN evd.sn_ativo = 1 THEN 3 ELSE 1 END AS "CODIGO_TIPO_VERSAO",
+       CASE WHEN evd.sn_ativo = 1 THEN 'Publicado' ELSE 'Rascunho' END AS "DESCRICAO_TIPO_VERSAO",
+       edl.cd_layout_cabecalho      AS "CODIGO_LAYOUT_CABECALHO",
+       (SELECT evdo.cd_documento
+          FROM editor.editor_layout el
+         INNER JOIN editor.editor_versao_documento evdo
+            ON el.cd_versao_documento = evdo.cd_versao_documento
+         WHERE el.cd_layout = edl.cd_layout_cabecalho) AS "DOCUMENTO_CABECALHO",
+       edl.cd_layout_rodape         AS "CODIGO_LAYOUT_RODAPE",
+       (SELECT COUNT(DISTINCT er.cd_regra) FROM editor.editor_regra er WHERE er.cd_layout = edl.cd_layout) AS "QUANTIDADE_REGRAS",
+       (SELECT COUNT(DISTINCT elc.cd_campo) FROM editor.editor_layout_campo elc WHERE elc.cd_layout = edl.cd_layout) AS "QUANTIDADE_CAMPOS"
+  FROM editor.editor_documento edo
+ INNER JOIN editor.editor_versao_documento evd ON edo.cd_documento = evd.cd_documento
+ INNER JOIN editor.editor_layout edl           ON evd.cd_versao_documento = edl.cd_versao_documento
+ INNER JOIN editor.editor_tipo_layout etl      ON edl.cd_tipo_layout = etl.cd_tipo_layout
+ WHERE etl.ds_identificador NOT IN ('CABECALHO', 'RODAPE')
+   AND edo.cd_documento = :CD_DOCUMENTO
+ ORDER BY evd.vl_versao DESC, etl.cd_tipo_layout ASC`,
   docActionsQuery: `SELECT DISTINCT
        ed.cd_documento               AS Codigo_Origem,
        ed.ds_documento               AS Descricao_Origem,
@@ -348,6 +380,34 @@ ORDER BY
 
  WHERE evd.cd_tipo_versao = 3  -- Apenas versões publicadas
    AND ev.cd_propriedade = 4   -- Focado na Propriedade de Ação
+   AND ev.lo_valor IS NOT NULL
+   AND REGEXP_LIKE(DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1), 'CD_DOCUMENTO[[:space:]](=|IN[[:space:]]\\()', 'i')
+   AND ed.cd_documento = :CD_DOCUMENTO
+ ORDER BY ec.ds_identificador`,
+  docActionsQueryV3: `SELECT DISTINCT
+       ed.cd_documento               AS "CODIGO_ORIGEM",
+       ed.ds_documento               AS "DESCRICAO_ORIGEM",
+       ec.cd_campo                   AS "CODIGO_METADADO",
+       ec.ds_campo                   AS "NOME_CAMPO",
+       ec.ds_identificador           AS "IDENTIFICADOR_CAMPO",
+       CASE 
+           WHEN REGEXP_LIKE(DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1), 'CD_DOCUMENTO[[:space:]]+IN[[:space:]]*\\(', 'i')
+           THEN REGEXP_SUBSTR(DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1), 'IN[[:space:]]*\\(([^)]+)\\)', 1, 1, 'i', 1)
+       END                           AS "GRUPO_DOCS_RELACIONADOS",
+       REGEXP_SUBSTR(
+           DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1),
+           'CD_DOCUMENTO[[:space:]]*=[[:space:]]*([0-9]+)',
+           1, 1, 'i', 1
+       )                             AS "DOCUMENTO_RELACIONADO",
+       DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1) AS "SCRIPT_ACAO_COMPLETO"
+  FROM editor.editor_documento ed
+ INNER JOIN editor.editor_versao_documento evd ON ed.cd_documento = evd.cd_documento
+ INNER JOIN editor.editor_layout el            ON evd.cd_versao_documento = el.cd_versao_documento
+ INNER JOIN editor.editor_layout_campo elc     ON el.cd_layout = elc.cd_layout
+ INNER JOIN editor.editor_campo ec             ON elc.cd_campo = ec.cd_campo
+ INNER JOIN editor.editor_campo_prop_val ev    ON ec.cd_campo = ev.cd_campo
+ WHERE evd.sn_ativo = 1
+   AND ev.cd_propriedade = 4
    AND ev.lo_valor IS NOT NULL
    AND REGEXP_LIKE(DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1), 'CD_DOCUMENTO[[:space:]](=|IN[[:space:]]\\()', 'i')
    AND ed.cd_documento = :CD_DOCUMENTO
@@ -420,6 +480,10 @@ export async function getData(): Promise<StorageData> {
       ...INITIAL_DATA,
       ...data,
       activeQueryV3: data.activeQueryV3 || INITIAL_DATA.activeQueryV3,
+      profileQuery: data.profileQuery || INITIAL_DATA.profileQuery,
+      profileQueryV3: data.profileQueryV3 || INITIAL_DATA.profileQueryV3,
+      docMetadataQueryV3: data.docMetadataQueryV3 || INITIAL_DATA.docMetadataQueryV3,
+      docActionsQueryV3: data.docActionsQueryV3 || INITIAL_DATA.docActionsQueryV3,
       kpiQueriesV3: data.kpiQueriesV3 || INITIAL_DATA.kpiQueriesV3,
       analyticQueriesV3: data.analyticQueriesV3 || INITIAL_DATA.analyticQueriesV3,
       ambulatoryProfilesQuery: data.ambulatoryProfilesQuery || INITIAL_DATA.ambulatoryProfilesQuery,

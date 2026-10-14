@@ -6,9 +6,11 @@ import { AIQueryAssistant } from '@/components/AIQueryAssistant';
 import { PageHeader } from '@/components/ui/PageHeader';
 
 export default function ConfigConsultasPage() {
-  // Queries Padrão
+  // Queries Padrão V2
   const [query, setQuery] = useState('');
   const [profileQuery, setProfileQuery] = useState('');
+  const [docMetadataQuery, setDocMetadataQuery] = useState('');
+  const [docActionsQuery, setDocActionsQuery] = useState('');
   const [similarityQuery, setSimilarityQuery] = useState('');
   const [reportBaseUrl, setReportBaseUrl] = useState('');
   const [kpiTotal, setKpiTotal] = useState('');
@@ -19,12 +21,21 @@ export default function ConfigConsultasPage() {
   const [kpiVolume3m, setKpiVolume3m] = useState('');
   const [kpiUnitAdherence, setKpiUnitAdherence] = useState('');
   const [kpiUnitInactivity, setKpiUnitInactivity] = useState('');
+
+  // Queries V3 (Editor 3.0 HTML5)
+  const [queryV3, setQueryV3] = useState('');
+  const [profileQueryV3, setProfileQueryV3] = useState('');
+  const [docMetadataQueryV3, setDocMetadataQueryV3] = useState('');
+  const [docActionsQueryV3, setDocActionsQueryV3] = useState('');
+  const [kpiTotalV3, setKpiTotalV3] = useState('');
+  const [kpi24hV3, setKpi24hV3] = useState('');
+  const [kpiAssinadosV3, setKpiAssinadosV3] = useState('');
   
   // Auditoria Params
   const [auditDays, setAuditDays] = useState(15);
   const [auditDocId, setAuditDocId] = useState<string | number>("0");
   
-  const [activeTab, setActiveTab] = useState<'instituicoes' | 'nativas' | 'python' | 'downloads'>('instituicoes');
+  const [activeTab, setActiveTab] = useState<'v3' | 'v2' | 'instituicoes' | 'python' | 'downloads'>('v3');
   
   // Custom Cards e Metadados
   const [customCards, setCustomCards] = useState<any[]>([]);
@@ -241,7 +252,13 @@ export default function ConfigConsultasPage() {
       const res = await fetch('/api/connections');
       const storage = await res.json();
       setQuery(storage.activeQuery || '');
+      setQueryV3(storage.activeQueryV3 || '');
       setProfileQuery(storage.profileQuery || '');
+      setProfileQueryV3(storage.profileQueryV3 || '');
+      setDocMetadataQuery(storage.docMetadataQuery || '');
+      setDocMetadataQueryV3(storage.docMetadataQueryV3 || '');
+      setDocActionsQuery(storage.docActionsQuery || '');
+      setDocActionsQueryV3(storage.docActionsQueryV3 || '');
       setSimilarityQuery(storage.similarityQuery || '');
       setReportBaseUrl(storage.reportBaseUrl || 'http://dev3-mvh5.acsc.org.br:84/mveditor/report?regId=');
       
@@ -249,6 +266,12 @@ export default function ConfigConsultasPage() {
         setKpiTotal(storage.kpiQueries.total || '');
         setKpi24h(storage.kpiQueries.prod24h || '');
         setKpiAssinados(storage.kpiQueries.assinados || '');
+      }
+
+      if (storage.kpiQueriesV3) {
+        setKpiTotalV3(storage.kpiQueriesV3.total || '');
+        setKpi24hV3(storage.kpiQueriesV3.prod24h || '');
+        setKpiAssinadosV3(storage.kpiQueriesV3.assinados || '');
       }
 
       if (storage.analyticQueries) {
@@ -296,9 +319,9 @@ export default function ConfigConsultasPage() {
     }
   }
 
-  async function handleSave(type: 'MAIN' | 'PROFILE' | 'SIMILARITY' | 'REPORT_URL' | 'KPI_TOTAL' | 'KPI_24H' | 'KPI_ASSINADOS' | 'KPI_TOP10' | 'KPI_IDLE' | 'KPI_VOLUME3M' | 'KPI_UNIT_ADHERENCE' | 'KPI_UNIT_INACTIVITY' | 'SETTINGS' | 'AUDIT_PARAMS') {
-    if (type === 'MAIN') setLoading(true);
-    else if (type === 'PROFILE') setProfileLoading(true);
+  async function handleSave(type: 'MAIN' | 'MAIN_V3' | 'PROFILE' | 'PROFILE_V3' | 'DOC_METADATA' | 'DOC_METADATA_V3' | 'DOC_ACTIONS' | 'DOC_ACTIONS_V3' | 'SIMILARITY' | 'REPORT_URL' | 'KPI_TOTAL' | 'KPI_TOTAL_V3' | 'KPI_24H' | 'KPI_24H_V3' | 'KPI_ASSINADOS' | 'KPI_ASSINADOS_V3' | 'KPI_TOP10' | 'KPI_IDLE' | 'KPI_VOLUME3M' | 'KPI_UNIT_ADHERENCE' | 'KPI_UNIT_INACTIVITY' | 'SETTINGS' | 'AUDIT_PARAMS') {
+    if (type === 'MAIN' || type === 'MAIN_V3') setLoading(true);
+    else if (type === 'PROFILE' || type === 'PROFILE_V3' || type === 'DOC_METADATA' || type === 'DOC_METADATA_V3' || type === 'DOC_ACTIONS' || type === 'DOC_ACTIONS_V3') setProfileLoading(true);
     else if (type === 'SIMILARITY') setProfileLoading(true); 
     else if (type === 'REPORT_URL') setProfileLoading(true); 
     else if (type === 'SETTINGS') setLoading(true); 
@@ -309,12 +332,21 @@ export default function ConfigConsultasPage() {
 
     switch(type) {
       case 'MAIN': bodyType = 'SAVE_QUERY'; bodyQuery = query; break;
+      case 'MAIN_V3': bodyType = 'SAVE_QUERY_V3'; bodyQuery = queryV3; break;
       case 'PROFILE': bodyType = 'SAVE_PROFILE_QUERY'; bodyQuery = profileQuery; break;
+      case 'PROFILE_V3': bodyType = 'SAVE_PROFILE_QUERY_V3'; bodyQuery = profileQueryV3; break;
+      case 'DOC_METADATA': bodyType = 'SAVE_DOC_METADATA_QUERY'; bodyQuery = docMetadataQuery; break;
+      case 'DOC_METADATA_V3': bodyType = 'SAVE_DOC_METADATA_QUERY_V3'; bodyQuery = docMetadataQueryV3; break;
+      case 'DOC_ACTIONS': bodyType = 'SAVE_DOC_ACTIONS_QUERY'; bodyQuery = docActionsQuery; break;
+      case 'DOC_ACTIONS_V3': bodyType = 'SAVE_DOC_ACTIONS_QUERY_V3'; bodyQuery = docActionsQueryV3; break;
       case 'SIMILARITY': bodyType = 'SAVE_SIMILARITY_QUERY'; bodyQuery = similarityQuery; break;
       case 'REPORT_URL': bodyType = 'SAVE_REPORT_URL'; bodyQuery = reportBaseUrl; break;
       case 'KPI_TOTAL': bodyType = 'SAVE_KPI_TOTAL'; bodyQuery = kpiTotal; break;
+      case 'KPI_TOTAL_V3': bodyType = 'SAVE_KPI_TOTAL_V3'; bodyQuery = kpiTotalV3; break;
       case 'KPI_24H': bodyType = 'SAVE_KPI_24H'; bodyQuery = kpi24h; break;
+      case 'KPI_24H_V3': bodyType = 'SAVE_KPI_24H_V3'; bodyQuery = kpi24hV3; break;
       case 'KPI_ASSINADOS': bodyType = 'SAVE_KPI_ASSINADOS'; bodyQuery = kpiAssinados; break;
+      case 'KPI_ASSINADOS_V3': bodyType = 'SAVE_KPI_ASSINADOS_V3'; bodyQuery = kpiAssinadosV3; break;
       case 'KPI_TOP10': bodyType = 'SAVE_KPI_TOP10'; bodyQuery = kpiTop10; break;
       case 'KPI_IDLE': bodyType = 'SAVE_KPI_IDLE'; bodyQuery = kpiIdle; break;
       case 'KPI_VOLUME3M': bodyType = 'SAVE_KPI_VOLUME3M'; bodyQuery = kpiVolume3m; break;
@@ -489,11 +521,12 @@ export default function ConfigConsultasPage() {
         )}
       </header>
 
-      {/* Menu de Abas */}
+      {/* Menu de Abas Principal */}
       <div className="flex flex-wrap gap-2 border-b border-border mb-6">
         {[
+          { id: 'v3', label: 'Consultas V3 (HTML5)', icon: <Database size={14} className="text-emerald-500" />, badge: 'ATUAL' },
+          { id: 'v2', label: 'Consultas V2 (Flex)', icon: <Database size={14} className="text-blue-500" />, badge: 'LEGADO' },
           { id: 'instituicoes', label: 'Instituições', icon: <LayoutIcon size={14} /> },
-          { id: 'nativas', label: 'Consultas Nativas', icon: <Settings2 size={14} /> },
           { id: 'python', label: 'Motores Python', icon: <Terminal size={14} /> },
           { id: 'downloads', label: 'Integrações & Scripts', icon: <Download size={14} /> }
         ].map(tab => (
@@ -508,6 +541,13 @@ export default function ConfigConsultasPage() {
           >
             {tab.icon}
             {tab.label}
+            {tab.badge && (
+              <span className={`text-[8px] px-1.5 py-0.2 font-mono ${
+                tab.badge === 'ATUAL' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-muted/30 text-muted'
+              }`}>
+                {tab.badge}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -585,181 +625,431 @@ export default function ConfigConsultasPage() {
       </section>
       </div>
 
-      <div className={activeTab === 'nativas' ? 'animate-in fade-in duration-300 block' : 'hidden'}>
-      {/* Grid de Configurações Existentes */}
-      <h2 className="text-foreground flex items-center gap-3 pt-2">
-        <Settings2 className="text-[var(--primary)]" size={24} />
-        Algoritmos Nativos DocOracle
-      </h2>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Motor Principal (Tela Documentos) */}
-        <div className="col-span-1 lg:col-span-2 bg-background rounded-none p-4 border border-border shadow-none relative group overflow-hidden">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-cyan-600"></div>
-          <QueryHeader title="Query Principal (Tela Documentos)" queryKey="main" icon={Database} defaultTitle="Query Principal" />
-          <textarea 
-            className={`w-full h-48 bg-card border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none transition-all ${
-              enabledQueries['main'] !== false ? 'border-border focus:border-[var(--primary)]' : 'border-border opacity-40 grayscale pointer-events-none'
-            }`}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <div className="flex justify-between items-center mt-4">
-            <AIQueryAssistant 
-              currentQuery={query} 
-              onApply={setQuery} 
-              context="Consulta principal para alimentar a tabela da tela de Documentos" 
-            />
-            <button 
-              onClick={() => handleSave('MAIN')}
-              disabled={loading}
-              title="Atualizar Motor SQL"
-              className="flex items-center justify-center bg-card -background text-foreground p-2.5 rounded-none transition-all shadow-none group/btn"
-            >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
-            </button>
+      {/* SEÇÃO CONSULTAS V3 (HTML5) */}
+      <div className={activeTab === 'v3' ? 'animate-in fade-in duration-300 block' : 'hidden'}>
+        <div className="flex items-center justify-between border-b border-border pb-3 pt-2 mb-6">
+          <div className="flex items-center gap-3">
+            <Database className="text-emerald-500" size={24} />
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-black text-foreground uppercase tracking-tight">Motor SQL - Editor 3.0 (HTML5)</h2>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 font-bold font-mono">ATUAL</span>
+              </div>
+              <p className="text-xs text-muted">Consultas nativas apontando para o schema <code className="text-emerald-400 font-mono">EDITOR.*</code> da nova arquitetura web.</p>
+            </div>
           </div>
         </div>
 
-        {/* KPI: Total de Documentos */}
-        <div className="bg-background rounded-none p-4 border border-border shadow-none relative group overflow-hidden">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-card"></div>
-          <QueryHeader title="Volume Total Docs" queryKey="total" icon={FileText} defaultTitle="Volume Total" />
-          <textarea 
-            className={`w-full h-32 bg-card border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none transition-all ${
-              enabledQueries['total'] !== false ? 'border-border focus:border-[var(--primary)]' : 'border-border opacity-40 grayscale pointer-events-none'
-            }`}
-            value={kpiTotal}
-            onChange={(e) => setKpiTotal(e.target.value)}
-          />
-          <div className="flex justify-between items-center mt-4">
-            <AIQueryAssistant 
-              currentQuery={kpiTotal} 
-              onApply={setKpiTotal} 
-              context="Contagem total de documentos preenchidos no banco Oracle" 
-            />
-            <button 
-              onClick={() => handleSave('KPI_TOTAL')}
-              disabled={kpiLoading === 'KPI_TOTAL'}
-              title="Atualizar Motor SQL"
-              className="flex items-center justify-center bg-card -background text-foreground p-2.5 rounded-none transition-all shadow-none group/btn"
-            >
-              {kpiLoading === 'KPI_TOTAL' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
-            </button>
-          </div>
-        </div>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Motor Principal V3 */}
+            <div className="col-span-1 lg:col-span-2 bg-background rounded-none p-4 border border-emerald-500/30 shadow-none relative group overflow-hidden">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500"></div>
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-2">
+                  <Database size={18} className="text-emerald-500" />
+                  <h4 className="text-sm font-black text-foreground uppercase italic tracking-tighter">
+                    Query Principal V3 (Tela de Documentos - HTML5)
+                  </h4>
+                  <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 font-mono">EDITOR.EDITOR_DOCUMENTO</span>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase">
+                  <div className="w-1.5 h-1.5 bg-emerald-400 animate-pulse"></div>
+                  Motor Ativo V3
+                </div>
+              </div>
+              <textarea 
+                className="w-full h-48 bg-card border border-border focus:border-emerald-500 rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none transition-all"
+                value={queryV3}
+                onChange={(e) => setQueryV3(e.target.value)}
+              />
+              <div className="flex justify-between items-center mt-4">
+                <AIQueryAssistant 
+                  currentQuery={queryV3} 
+                  onApply={setQueryV3} 
+                  context="Consulta principal da V3 para alimentar a tabela da tela de Documentos (Editor 3.0 HTML5 com schema EDITOR)" 
+                />
+                <button 
+                  onClick={() => handleSave('MAIN_V3')}
+                  disabled={loading}
+                  title="Atualizar Motor SQL V3"
+                  className="flex items-center justify-center bg-card hover:bg-emerald-600 hover:text-white text-foreground p-2.5 rounded-none transition-all shadow-none group/btn border border-border"
+                >
+                  {loading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
+                </button>
+              </div>
+            </div>
 
-        {/* Produção 24h */}
-        <div className="bg-background rounded-none p-4 border border-border shadow-none relative group overflow-hidden">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-orange-500"></div>
-          <QueryHeader title="Produção Snapshot" queryKey="prod24h" icon={Clock} defaultTitle="Produção 24h" />
-          <textarea 
-            className={`w-full h-32 bg-card border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none transition-all ${
-              enabledQueries['prod24h'] !== false ? 'border-border focus:border-orange-500' : 'border-border opacity-40 grayscale pointer-events-none'
-            }`}
-            value={kpi24h}
-            onChange={(e) => setKpi24h(e.target.value)}
-          />
-          <div className="flex justify-between items-center mt-4">
-            <AIQueryAssistant 
-              currentQuery={kpi24h} 
-              onApply={setKpi24h} 
-              context="Volume de documentos preenchidos nas últimas 24 horas no banco Oracle" 
-            />
-            <button onClick={() => handleSave('KPI_24H')} disabled={kpiLoading === 'KPI_24H'} title="Atualizar Motor Snapshot" className="flex items-center justify-center bg-card -background text-foreground p-2.5 rounded-none transition-all shadow-none group/btn">{kpiLoading === 'KPI_24H' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}</button>
-          </div>
-        </div>
+            {/* Perfil Vinculado V3 */}
+            <div className="col-span-1 lg:col-span-2 bg-background rounded-none p-4 border border-emerald-500/30 shadow-none relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500"></div>
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="text-[10px] font-black text-foreground uppercase tracking-[0.3em] flex items-center gap-2">
+                  <Search size={14} className="text-emerald-500" />
+                  Motor de Reconciliação de Perfis V3 (CD_DOCUMENTO_EDITOR_3)
+                </h4>
+                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 font-mono">V3 Profiles</span>
+              </div>
+              <p className="text-xs text-muted mb-3">
+                Busca de perfis no Editor 3.0 utilizando o parâmetro de perfil <code className="text-emerald-400 font-mono">CD_DOCUMENTO_EDITOR_3</code>.
+              </p>
+              <textarea 
+                className="w-full h-48 bg-card border border-border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none focus:border-emerald-500 transition-all"
+                value={profileQueryV3}
+                onChange={(e) => setProfileQueryV3(e.target.value)}
+              />
+              <div className="flex justify-between items-center mt-2 pt-2 border-t border-border">
+                <div className="flex flex-col">
+                  <p className="text-[10px] text-muted font-bold uppercase italic">Variável Requerida: <b className="text-emerald-500">:CD_DOCUMENTO</b></p>
+                  <AIQueryAssistant 
+                    currentQuery={profileQueryV3} 
+                    onApply={setProfileQueryV3} 
+                    context="Busca de perfis de atendimento vinculados ao Editor 3.0 com CD_DOCUMENTO_EDITOR_3 usando :CD_DOCUMENTO" 
+                  />
+                </div>
+                <button 
+                  onClick={() => handleSave('PROFILE_V3')} 
+                  disabled={profileLoading} 
+                  title="Salvar Motor de Perfis V3" 
+                  className="flex items-center justify-center bg-card hover:bg-emerald-600 hover:text-white text-foreground p-2.5 rounded-none transition-all shadow-none group/btn border border-border"
+                >
+                  {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
+                </button>
+              </div>
+            </div>
 
-        {/* Taxa de Assinatura */}
-        <div className="bg-background rounded-none p-4 border border-border shadow-none relative group overflow-hidden">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500"></div>
-          <QueryHeader title="Taxa Compliance" queryKey="assinados" icon={TrendingUp} defaultTitle="Taxa Assinatura" />
-          <textarea 
-            className={`w-full h-32 bg-card border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none transition-all ${
-              enabledQueries['assinados'] !== false ? 'border-border focus:border-emerald-500' : 'border-border opacity-40 grayscale pointer-events-none'
-            }`}
-             value={kpiAssinados}
-             onChange={(e) => setKpiAssinados(e.target.value)}
-          />
-          <div className="flex justify-between items-center mt-4">
-            <AIQueryAssistant 
-              currentQuery={kpiAssinados} 
-              onApply={setKpiAssinados} 
-              context="Taxa de documentos assinados vs total preenchido (compliance clínico)" 
-            />
-            <button onClick={() => handleSave('KPI_ASSINADOS')} disabled={kpiLoading === 'KPI_ASSINADOS'} title="Atualizar Motor Compliance" className="flex items-center justify-center bg-card -background text-foreground p-2.5 rounded-none transition-all shadow-none group/btn">{kpiLoading === 'KPI_ASSINADOS' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}</button>
-          </div>
-        </div>
+            {/* KPI: Total V3 */}
+            <div className="bg-background rounded-none p-4 border border-border shadow-none relative group overflow-hidden">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500"></div>
+              <h4 className="text-sm font-black text-foreground flex items-center gap-2 uppercase tracking-tight mb-3">
+                <FileText size={18} className="text-emerald-500" />
+                Volume Total Docs V3 (Opcional)
+              </h4>
+              <textarea 
+                className="w-full h-32 bg-card border border-border focus:border-emerald-500 rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none transition-all"
+                value={kpiTotalV3}
+                placeholder="Se vazio, utiliza a query global de documentos."
+                onChange={(e) => setKpiTotalV3(e.target.value)}
+              />
+              <div className="flex justify-between items-center mt-4">
+                <AIQueryAssistant 
+                  currentQuery={kpiTotalV3} 
+                  onApply={setKpiTotalV3} 
+                  context="Contagem total de documentos preenchidos no banco Oracle para a V3" 
+                />
+                <button 
+                  onClick={() => handleSave('KPI_TOTAL_V3')} 
+                  disabled={kpiLoading === 'KPI_TOTAL_V3'} 
+                  title="Salvar KPI Total V3" 
+                  className="flex items-center justify-center bg-card hover:bg-emerald-600 hover:text-white text-foreground p-2.5 rounded-none transition-all shadow-none border border-border"
+                >
+                  {kpiLoading === 'KPI_TOTAL_V3' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                </button>
+              </div>
+            </div>
 
-        {/* Volume 3 Meses */}
-        <div className="bg-background rounded-none p-4 border border-border shadow-none relative group overflow-hidden">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-cyan-500"></div>
-          <QueryHeader title="Timeline 90 Dias" queryKey="volume3m" icon={BarChart3} defaultTitle="Volume Global" />
-          <textarea 
-            className={`w-full h-32 bg-card border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none transition-all ${
-              enabledQueries['volume3m'] !== false ? 'border-border focus:border-cyan-500' : 'border-border opacity-40 grayscale pointer-events-none'
-            }`}
-            value={kpiVolume3m}
-            onChange={(e) => setKpiVolume3m(e.target.value)}
-          />
-          <div className="flex justify-between items-center mt-4">
-            <AIQueryAssistant 
-              currentQuery={kpiVolume3m} 
-              onApply={setKpiVolume3m} 
-              context="Série histórica de volume de documentos nos últimos 90 dias" 
-            />
-            <button onClick={() => handleSave('KPI_VOLUME3M')} disabled={kpiLoading === 'KPI_VOLUME3M'} title="Atualizar Motor Global" className="flex items-center justify-center bg-card -background text-foreground p-2.5 rounded-none transition-all shadow-none group/btn">{kpiLoading === 'KPI_VOLUME3M' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}</button>
+            {/* Produção 24h V3 */}
+            <div className="bg-background rounded-none p-4 border border-border shadow-none relative group overflow-hidden">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-orange-500"></div>
+              <h4 className="text-sm font-black text-foreground flex items-center gap-2 uppercase tracking-tight mb-3">
+                <Clock size={18} className="text-orange-500" />
+                Produção Snapshot 24h V3 (Opcional)
+              </h4>
+              <textarea 
+                className="w-full h-32 bg-card border border-border focus:border-orange-500 rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none transition-all"
+                value={kpi24hV3}
+                placeholder="Se vazio, utiliza a query global de documentos."
+                onChange={(e) => setKpi24hV3(e.target.value)}
+              />
+              <div className="flex justify-between items-center mt-4">
+                <AIQueryAssistant 
+                  currentQuery={kpi24hV3} 
+                  onApply={setKpi24hV3} 
+                  context="Volume de documentos preenchidos nas últimas 24 horas no banco Oracle para a V3" 
+                />
+                <button 
+                  onClick={() => handleSave('KPI_24H_V3')} 
+                  disabled={kpiLoading === 'KPI_24H_V3'} 
+                  title="Salvar KPI 24h V3" 
+                  className="flex items-center justify-center bg-card hover:bg-orange-600 hover:text-white text-foreground p-2.5 rounded-none transition-all shadow-none border border-border"
+                >
+                  {kpiLoading === 'KPI_24H_V3' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Metadados e Especificações Técnicas V3 */}
+            <div className="col-span-1 lg:col-span-2 bg-background rounded-none p-4 border border-emerald-500/30 shadow-none relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500"></div>
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="text-[10px] font-black text-foreground uppercase tracking-[0.3em] flex items-center gap-2">
+                  <Settings2 size={14} className="text-emerald-500" />
+                  Metadados e Especificações Técnicas V3 (Menu Lateral)
+                </h4>
+                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 font-mono">V3 Metadata</span>
+              </div>
+              <p className="text-xs text-muted mb-3">
+                Alimenta o menu lateral com quantidade de campos, regras, cabeçalho, rodapé e histórico de versões no schema <code className="text-emerald-400 font-mono">EDITOR</code>.
+              </p>
+              <textarea 
+                className="w-full h-48 bg-card border border-border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none focus:border-emerald-500 transition-all"
+                value={docMetadataQueryV3}
+                onChange={(e) => setDocMetadataQueryV3(e.target.value)}
+              />
+              <div className="flex justify-between items-center mt-2 pt-2 border-t border-border">
+                <div className="flex flex-col">
+                  <p className="text-[10px] text-muted font-bold uppercase italic">Variável Requerida: <b className="text-emerald-500">:CD_DOCUMENTO</b></p>
+                  <AIQueryAssistant 
+                    currentQuery={docMetadataQueryV3} 
+                    onApply={setDocMetadataQueryV3} 
+                    context="Consulta de metadados técnicos, regras e campos do Editor 3.0 HTML5 no schema EDITOR usando :CD_DOCUMENTO" 
+                  />
+                </div>
+                <button 
+                  onClick={() => handleSave('DOC_METADATA_V3')} 
+                  disabled={profileLoading} 
+                  title="Salvar Metadados V3" 
+                  className="flex items-center justify-center bg-card hover:bg-emerald-600 hover:text-white text-foreground p-2.5 rounded-none transition-all shadow-none group/btn border border-border"
+                >
+                  {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Vínculos SQL e Ações V3 */}
+            <div className="col-span-1 lg:col-span-2 bg-background rounded-none p-4 border border-emerald-500/30 shadow-none relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500"></div>
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="text-[10px] font-black text-foreground uppercase tracking-[0.3em] flex items-center gap-2">
+                  <Terminal size={14} className="text-emerald-500" />
+                  Vínculos SQL e Ações Entre Documentos V3
+                </h4>
+                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 font-mono">V3 Actions</span>
+              </div>
+              <p className="text-xs text-muted mb-3">
+                Mapeamento de chamadas dinâmicas, scripts e regras de relacionamento de documentos no Editor 3.0.
+              </p>
+              <textarea 
+                className="w-full h-48 bg-card border border-border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none focus:border-emerald-500 transition-all"
+                value={docActionsQueryV3}
+                onChange={(e) => setDocActionsQueryV3(e.target.value)}
+              />
+              <div className="flex justify-between items-center mt-2 pt-2 border-t border-border">
+                <div className="flex flex-col">
+                  <p className="text-[10px] text-muted font-bold uppercase italic">Variável Requerida: <b className="text-emerald-500">:CD_DOCUMENTO</b></p>
+                  <AIQueryAssistant 
+                    currentQuery={docActionsQueryV3} 
+                    onApply={setDocActionsQueryV3} 
+                    context="Consulta de ações e vínculos SQL de documentos no Editor 3.0 usando :CD_DOCUMENTO" 
+                  />
+                </div>
+                <button 
+                  onClick={() => handleSave('DOC_ACTIONS_V3')} 
+                  disabled={profileLoading} 
+                  title="Salvar Vínculos SQL V3" 
+                  className="flex items-center justify-center bg-card hover:bg-emerald-600 hover:text-white text-foreground p-2.5 rounded-none transition-all shadow-none group/btn border border-border"
+                >
+                  {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 mt-4 pb-8">
-        {/* Curva ABC Config */}
-        <div className="bg-background rounded-none p-4 border border-border shadow-none relative overflow-hidden group">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-600"></div>
-          <QueryHeader title="Analytics: Curva ABC de Documentação" queryKey="top10" icon={TrendingUp} defaultTitle="Ranking Top 10" />
-          <textarea 
-            className={`w-full h-48 bg-card border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none transition-all ${
-              enabledQueries['top10'] !== false ? 'border-border focus:border-indigo-500' : 'border-border opacity-40 grayscale pointer-events-none'
-            }`}
-             value={kpiTop10}
-             onChange={(e) => setKpiTop10(e.target.value)}
-          />
-          <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-50">
-            <AIQueryAssistant 
-              currentQuery={kpiTop10} 
-              onApply={setKpiTop10} 
-              context="Ranking dos 10 documentos mais utilizados (Curva ABC)" 
-            />
-            <button onClick={() => handleSave('KPI_TOP10')} disabled={kpiLoading === 'KPI_TOP10'} title="Salvar Algoritmo Analytics" className="flex items-center justify-center bg-card -background text-foreground p-2.5 rounded-none transition-all shadow-none group/btn">{kpiLoading === 'KPI_TOP10' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}</button>
+      {/* SEÇÃO CONSULTAS V2 (FLEX) */}
+      <div className={activeTab === 'v2' ? 'animate-in fade-in duration-300 block' : 'hidden'}>
+        <div className="flex items-center justify-between border-b border-border pb-3 pt-2 mb-6">
+          <div className="flex items-center gap-3">
+            <Database className="text-blue-500" size={24} />
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-black text-foreground uppercase tracking-tight">Motor SQL - Editor 2.0 (Flex)</h2>
+                <span className="text-[10px] bg-muted/40 text-muted px-2 py-0.5 font-bold font-mono">LEGADO</span>
+              </div>
+              <p className="text-xs text-muted">Consultas nativas apontando para o schema <code className="text-blue-400 font-mono">DBAMV.EDITOR_DOCUMENTO</code> do editor flex.</p>
+            </div>
           </div>
         </div>
 
-        {/* Perfil Vinculado (Documentos Page) */}
-        <div className="bg-background rounded-none p-4 border border-border shadow-none relative overflow-hidden group">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-600"></div>
-          <h4 className="text-[10px] font-black text-foreground mb-2 uppercase tracking-[0.3em] flex items-center gap-2">
-            <Search size={14} className="text-emerald-600" />
-            Motor de Reconciliação (Página de Documentos)
-          </h4>
-          <textarea 
-            className={`w-full h-48 bg-card border border-border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none focus:border-emerald-500 transition-all`}
-            value={profileQuery}
-            onChange={(e) => setProfileQuery(e.target.value)}
-          />
-          <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-50">
-            <div className="flex flex-col">
-              <p className="text-[10px] text-muted font-bold uppercase italic italic-wider">Variável Requerida: <b className="text-emerald-600">:CD_DOCUMENTO</b></p>
-              <AIQueryAssistant 
-                currentQuery={profileQuery} 
-                onApply={setProfileQuery} 
-                context="Busca de perfis de atendimento vinculados a um documento específico usando :CD_DOCUMENTO" 
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Motor Principal V2 */}
+            <div className="col-span-1 lg:col-span-2 bg-background rounded-none p-4 border border-border shadow-none relative group overflow-hidden">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-600"></div>
+              <QueryHeader title="Query Principal (Tela Documentos - V2 Flex)" queryKey="main" icon={Database} defaultTitle="Query Principal V2" />
+              <textarea 
+                className={`w-full h-48 bg-card border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none transition-all ${
+                  enabledQueries['main'] !== false ? 'border-border focus:border-[var(--primary)]' : 'border-border opacity-40 grayscale pointer-events-none'
+                }`}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
               />
+              <div className="flex justify-between items-center mt-4">
+                <AIQueryAssistant 
+                  currentQuery={query} 
+                  onApply={setQuery} 
+                  context="Consulta principal da V2 para alimentar a tabela da tela de Documentos (Editor 2.0 Flex com schema DBAMV.EDITOR_DOCUMENTO)" 
+                />
+                <button 
+                  onClick={() => handleSave('MAIN')}
+                  disabled={loading}
+                  title="Atualizar Motor SQL V2"
+                  className="flex items-center justify-center bg-card hover:bg-blue-600 hover:text-white text-foreground p-2.5 rounded-none transition-all shadow-none group/btn border border-border"
+                >
+                  {loading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
+                </button>
+              </div>
             </div>
-            <button onClick={() => handleSave('PROFILE')} disabled={profileLoading} title="Salvar Motor de Vínculo" className="flex items-center justify-center bg-card -background text-foreground p-2.5 rounded-none transition-all shadow-none group/btn">
-              {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
-            </button>
+
+            {/* KPI: Total de Documentos V2 */}
+            <div className="bg-background rounded-none p-4 border border-border shadow-none relative group overflow-hidden">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-card"></div>
+              <QueryHeader title="Volume Total Docs V2" queryKey="total" icon={FileText} defaultTitle="Volume Total V2" />
+              <textarea 
+                className={`w-full h-32 bg-card border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none transition-all ${
+                  enabledQueries['total'] !== false ? 'border-border focus:border-[var(--primary)]' : 'border-border opacity-40 grayscale pointer-events-none'
+                }`}
+                value={kpiTotal}
+                onChange={(e) => setKpiTotal(e.target.value)}
+              />
+              <div className="flex justify-between items-center mt-4">
+                <AIQueryAssistant 
+                  currentQuery={kpiTotal} 
+                  onApply={setKpiTotal} 
+                  context="Contagem total de documentos preenchidos no banco Oracle para a V2" 
+                />
+                <button 
+                  onClick={() => handleSave('KPI_TOTAL')}
+                  disabled={kpiLoading === 'KPI_TOTAL'}
+                  title="Atualizar KPI Total V2"
+                  className="flex items-center justify-center bg-card hover:bg-blue-600 hover:text-white text-foreground p-2.5 rounded-none transition-all shadow-none group/btn border border-border"
+                >
+                  {kpiLoading === 'KPI_TOTAL' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Produção 24h V2 */}
+            <div className="bg-background rounded-none p-4 border border-border shadow-none relative group overflow-hidden">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-orange-500"></div>
+              <QueryHeader title="Produção Snapshot V2" queryKey="prod24h" icon={Clock} defaultTitle="Produção 24h V2" />
+              <textarea 
+                className={`w-full h-32 bg-card border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none transition-all ${
+                  enabledQueries['prod24h'] !== false ? 'border-border focus:border-orange-500' : 'border-border opacity-40 grayscale pointer-events-none'
+                }`}
+                value={kpi24h}
+                onChange={(e) => setKpi24h(e.target.value)}
+              />
+              <div className="flex justify-between items-center mt-4">
+                <AIQueryAssistant 
+                  currentQuery={kpi24h} 
+                  onApply={setKpi24h} 
+                  context="Volume de documentos preenchidos nas últimas 24 horas no banco Oracle para a V2" 
+                />
+                <button onClick={() => handleSave('KPI_24H')} disabled={kpiLoading === 'KPI_24H'} title="Atualizar Motor Snapshot" className="flex items-center justify-center bg-card hover:bg-orange-600 hover:text-white text-foreground p-2.5 rounded-none transition-all shadow-none group/btn border border-border">{kpiLoading === 'KPI_24H' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}</button>
+              </div>
+            </div>
+
+            {/* Taxa de Assinatura */}
+            <div className="bg-background rounded-none p-4 border border-border shadow-none relative group overflow-hidden">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500"></div>
+              <QueryHeader title="Taxa Compliance V2" queryKey="assinados" icon={TrendingUp} defaultTitle="Taxa Assinatura V2" />
+              <textarea 
+                className={`w-full h-32 bg-card border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none transition-all ${
+                  enabledQueries['assinados'] !== false ? 'border-border focus:border-emerald-500' : 'border-border opacity-40 grayscale pointer-events-none'
+                }`}
+                 value={kpiAssinados}
+                 onChange={(e) => setKpiAssinados(e.target.value)}
+              />
+              <div className="flex justify-between items-center mt-4">
+                <AIQueryAssistant 
+                  currentQuery={kpiAssinados} 
+                  onApply={setKpiAssinados} 
+                  context="Taxa de documentos assinados vs total preenchido (compliance clínico)" 
+                />
+                <button onClick={() => handleSave('KPI_ASSINADOS')} disabled={kpiLoading === 'KPI_ASSINADOS'} title="Atualizar Motor Compliance" className="flex items-center justify-center bg-card hover:bg-emerald-600 hover:text-white text-foreground p-2.5 rounded-none transition-all shadow-none group/btn border border-border">{kpiLoading === 'KPI_ASSINADOS' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}</button>
+              </div>
+            </div>
+
+            {/* Volume 3 Meses */}
+            <div className="bg-background rounded-none p-4 border border-border shadow-none relative group overflow-hidden">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-cyan-500"></div>
+              <QueryHeader title="Timeline 90 Dias V2" queryKey="volume3m" icon={BarChart3} defaultTitle="Volume Global V2" />
+              <textarea 
+                className={`w-full h-32 bg-card border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none transition-all ${
+                  enabledQueries['volume3m'] !== false ? 'border-border focus:border-cyan-500' : 'border-border opacity-40 grayscale pointer-events-none'
+                }`}
+                value={kpiVolume3m}
+                onChange={(e) => setKpiVolume3m(e.target.value)}
+              />
+              <div className="flex justify-between items-center mt-4">
+                <AIQueryAssistant 
+                  currentQuery={kpiVolume3m} 
+                  onApply={setKpiVolume3m} 
+                  context="Série histórica de volume de documentos nos últimos 90 dias" 
+                />
+                <button onClick={() => handleSave('KPI_VOLUME3M')} disabled={kpiLoading === 'KPI_VOLUME3M'} title="Atualizar Motor Global" className="flex items-center justify-center bg-card hover:bg-cyan-600 hover:text-white text-foreground p-2.5 rounded-none transition-all shadow-none group/btn border border-border">{kpiLoading === 'KPI_VOLUME3M' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}</button>
+              </div>
+            </div>
+
+            {/* Curva ABC Config */}
+            <div className="col-span-1 lg:col-span-2 bg-background rounded-none p-4 border border-border shadow-none relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-600"></div>
+              <QueryHeader title="Analytics: Curva ABC de Documentação (V2)" queryKey="top10" icon={TrendingUp} defaultTitle="Ranking Top 10" />
+              <textarea 
+                className={`w-full h-48 bg-card border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none transition-all ${
+                  enabledQueries['top10'] !== false ? 'border-border focus:border-indigo-500' : 'border-border opacity-40 grayscale pointer-events-none'
+                }`}
+                 value={kpiTop10}
+                 onChange={(e) => setKpiTop10(e.target.value)}
+              />
+              <div className="flex justify-between items-center mt-2 pt-2 border-t border-border">
+                <AIQueryAssistant 
+                  currentQuery={kpiTop10} 
+                  onApply={setKpiTop10} 
+                  context="Ranking dos 10 documentos mais utilizados (Curva ABC)" 
+                />
+                <button onClick={() => handleSave('KPI_TOP10')} disabled={kpiLoading === 'KPI_TOP10'} title="Salvar Algoritmo Analytics" className="flex items-center justify-center bg-card hover:bg-indigo-600 hover:text-white text-foreground p-2.5 rounded-none transition-all shadow-none group/btn border border-border">{kpiLoading === 'KPI_TOP10' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}</button>
+              </div>
+            </div>
+
+            {/* Perfil Vinculado V2 */}
+            <div className="col-span-1 lg:col-span-2 bg-background rounded-none p-4 border border-border shadow-none relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-600"></div>
+              <h4 className="text-[10px] font-black text-foreground mb-2 uppercase tracking-[0.3em] flex items-center gap-2">
+                <Search size={14} className="text-emerald-600" />
+                Motor de Reconciliação V2 (CD_DOCUMENTO - Editor 2.0 Flex)
+              </h4>
+              <textarea 
+                className="w-full h-48 bg-card border border-border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none focus:border-emerald-500 transition-all"
+                value={profileQuery}
+                onChange={(e) => setProfileQuery(e.target.value)}
+              />
+              <div className="flex justify-between items-center mt-2 pt-2 border-t border-border">
+                <div className="flex flex-col">
+                  <p className="text-[10px] text-muted font-bold uppercase italic">Variável Requerida: <b className="text-emerald-600">:CD_DOCUMENTO</b></p>
+                  <AIQueryAssistant 
+                    currentQuery={profileQuery} 
+                    onApply={setProfileQuery} 
+                    context="Busca de perfis de atendimento vinculados a um documento no Editor 2.0 Flex usando :CD_DOCUMENTO" 
+                  />
+                </div>
+                <button onClick={() => handleSave('PROFILE')} disabled={profileLoading} title="Salvar Motor de Vínculo V2" className="flex items-center justify-center bg-card hover:bg-emerald-600 hover:text-white text-foreground p-2.5 rounded-none transition-all shadow-none group/btn border border-border">
+                  {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
+      </div>
+
+      {/* Consultas Globais Compartilhadas */}
+      <div className="grid grid-cols-1 gap-4 mt-6 pb-8 border-t border-border pt-6">
+        <h3 className="text-xs font-black uppercase tracking-wider text-muted flex items-center gap-2">
+          <ScanEye size={16} className="text-[var(--primary)]" />
+          Módulos Globais e Auditorias
+        </h3>
 
         {/* Motor de Similaridade (Busca de Redundância) */}
         <div className="bg-background rounded-none p-4 border border-border shadow-none relative overflow-hidden group">
@@ -769,18 +1059,93 @@ export default function ConfigConsultasPage() {
             Motor de Auditoria de Similaridade (Redundância EMR)
           </h4>
           <textarea 
-            className={`w-full h-48 bg-card border border-border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none focus:border-[var(--primary)] transition-all`}
+            className="w-full h-48 bg-card border border-border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none focus:border-[var(--primary)] transition-all"
             value={similarityQuery}
             onChange={(e) => setSimilarityQuery(e.target.value)}
           />
-          <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-50">
+          <div className="flex justify-between items-center mt-2 pt-2 border-t border-border">
             <p className="text-[10px] text-muted font-bold uppercase italic italic-wider">Variáveis Requeridas: <b className="text-[var(--primary)] text-[9px]">:CD_DOCUMENTO, :CD_CAMPO, :DATA_INI, :DATA_FIM</b></p>
-            <button onClick={() => handleSave('SIMILARITY')} disabled={profileLoading} title="Salvar Motor de Auditoria" className="flex items-center justify-center bg-card -background text-foreground p-2.5 rounded-none transition-all shadow-none group/btn">
+            <button onClick={() => handleSave('SIMILARITY')} disabled={profileLoading} title="Salvar Motor de Auditoria" className="flex items-center justify-center bg-card hover:bg-[var(--primary)] hover:text-black text-foreground p-2.5 rounded-none transition-all shadow-none group/btn border border-border">
               {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
             </button>
           </div>
         </div>
-      </div>
+
+        {/* Metadados e Especificações Técnicas V2 */}
+        <div className="bg-background rounded-none p-4 border border-blue-500/30 shadow-none relative overflow-hidden group">
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-500"></div>
+          <div className="flex justify-between items-center mb-2">
+            <h4 className="text-[10px] font-black text-foreground uppercase tracking-[0.3em] flex items-center gap-2">
+              <Settings2 size={14} className="text-blue-500" />
+              Metadados e Especificações Técnicas V2 (Menu Lateral)
+            </h4>
+            <span className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/30 px-2 py-0.5 font-mono">V2 Metadata</span>
+          </div>
+          <p className="text-xs text-muted mb-3">
+            Alimenta o menu lateral com quantidade de campos, regras, cabeçalho, rodapé e histórico de versões no schema <code className="text-blue-400 font-mono">DBAMV</code>.
+          </p>
+          <textarea 
+            className="w-full h-48 bg-card border border-border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none focus:border-blue-500 transition-all"
+            value={docMetadataQuery}
+            onChange={(e) => setDocMetadataQuery(e.target.value)}
+          />
+          <div className="flex justify-between items-center mt-2 pt-2 border-t border-border">
+            <div className="flex flex-col">
+              <p className="text-[10px] text-muted font-bold uppercase italic">Variável Requerida: <b className="text-blue-500">:CD_DOCUMENTO</b></p>
+              <AIQueryAssistant 
+                currentQuery={docMetadataQuery} 
+                onApply={setDocMetadataQuery} 
+                context="Consulta de metadados técnicos, regras e campos do Editor 2.0 Flex no schema DBAMV usando :CD_DOCUMENTO" 
+              />
+            </div>
+            <button 
+              onClick={() => handleSave('DOC_METADATA')} 
+              disabled={profileLoading} 
+              title="Salvar Metadados V2" 
+              className="flex items-center justify-center bg-card hover:bg-blue-600 hover:text-white text-foreground p-2.5 rounded-none transition-all shadow-none group/btn border border-border"
+            >
+              {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Vínculos SQL e Ações V2 */}
+        <div className="bg-background rounded-none p-4 border border-blue-500/30 shadow-none relative overflow-hidden group">
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-500"></div>
+          <div className="flex justify-between items-center mb-2">
+            <h4 className="text-[10px] font-black text-foreground uppercase tracking-[0.3em] flex items-center gap-2">
+              <Terminal size={14} className="text-blue-500" />
+              Vínculos SQL e Ações Entre Documentos V2
+            </h4>
+            <span className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/30 px-2 py-0.5 font-mono">V2 Actions</span>
+          </div>
+          <p className="text-xs text-muted mb-3">
+            Mapeamento de chamadas dinâmicas e scripts na propriedade de ação (cd_propriedade = 4) do Editor 2.0.
+          </p>
+          <textarea 
+            className="w-full h-48 bg-card border border-border rounded-none p-3 text-[11px] font-mono font-bold text-foreground focus:outline-none focus:border-blue-500 transition-all"
+            value={docActionsQuery}
+            onChange={(e) => setDocActionsQuery(e.target.value)}
+          />
+          <div className="flex justify-between items-center mt-2 pt-2 border-t border-border">
+            <div className="flex flex-col">
+              <p className="text-[10px] text-muted font-bold uppercase italic">Variável Requerida: <b className="text-blue-500">:CD_DOCUMENTO</b></p>
+              <AIQueryAssistant 
+                currentQuery={docActionsQuery} 
+                onApply={setDocActionsQuery} 
+                context="Consulta de ações e vínculos SQL de documentos no Editor 2.0 Flex usando :CD_DOCUMENTO" 
+              />
+            </div>
+            <button 
+              onClick={() => handleSave('DOC_ACTIONS')} 
+              disabled={profileLoading} 
+              title="Salvar Vínculos SQL V2" 
+              className="flex items-center justify-center bg-card hover:bg-blue-600 hover:text-white text-foreground p-2.5 rounded-none transition-all shadow-none group/btn border border-border"
+            >
+              {profileLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="group-hover/btn:scale-110 transition-transform" />}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className={activeTab === 'downloads' ? 'animate-in fade-in duration-300 block' : 'hidden'}>

@@ -32,18 +32,19 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
 
     const savedVersion = sessionStorage.getItem('app_doc_version') as 'V2' | 'V3' | null;
     if (savedVersion) {
-      setTimeout(() => {
-        setDocVersionState(savedVersion);
-      }, 0);
+      setDocVersionState(savedVersion);
     }
   }, []);
 
   const setDocVersion = (version: 'V2' | 'V3' | null) => {
     setDocVersionState(version);
+    setOracleData(null); // Limpar dados do contexto React para que a nova versão recarregue
     if (version) {
       sessionStorage.setItem('app_doc_version', version);
-      // Limpar cache de dados ao trocar de versão para forçar recarga
+      // Limpar caches legados e versionados
       sessionStorage.removeItem('oracle_documentos_data');
+      sessionStorage.removeItem('oracle_documentos_data_V2');
+      sessionStorage.removeItem('oracle_documentos_data_V3');
     } else {
       sessionStorage.removeItem('app_doc_version');
     }

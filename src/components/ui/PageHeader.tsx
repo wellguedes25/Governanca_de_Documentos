@@ -20,7 +20,7 @@ export function PageHeader({
   action
 }: PageHeaderProps) {
   return (
-    <div className={cn("flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6", className)}>
+    <div className={cn("flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6 pt-1 sm:pt-2", className)}>
       <div className="flex flex-col gap-1.5 w-full">
         <div className="flex items-center gap-3.5">
           {Icon && (

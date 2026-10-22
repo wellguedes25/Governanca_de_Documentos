@@ -1,7 +1,8 @@
 "use client";
 
 import Link from 'next/link';
-import { LayoutDashboard, FileText, Settings, Database, Building2, Activity, ShieldCheck, GitFork } from 'lucide-react';
+import Image from 'next/image';
+import { LayoutDashboard, FileText, Settings, Database, Building2, Activity, GitFork } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useUI } from '@/context/UIContext';
 import { cn } from '@/lib/utils';
@@ -65,8 +66,15 @@ export default function Sidebar() {
       {/* Brand & Version Badge */}
       <div className="flex items-center h-full pl-4 md:pl-6 gap-3">
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="w-9 h-9 rounded-lg bg-sky-600 group-hover:bg-sky-500 text-white flex items-center justify-center font-bold text-base shadow-xs shadow-sky-500/20 transition-all">
-            <ShieldCheck size={20} strokeWidth={2.2} />
+          <div className="relative w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform bg-slate-800/60 p-0.5 border border-slate-700/60">
+            <Image 
+              src="/logo_Icon.png" 
+              alt="Goverdoc Pro Logo" 
+              width={34} 
+              height={34} 
+              className="object-contain rounded-md"
+              priority
+            />
           </div>
           <div className="flex flex-col">
             <span className="font-bold text-sm tracking-tight text-white leading-none flex items-center gap-1">

@@ -20,8 +20,8 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row overflow-hidden selection:bg-[var(--primary)] selection:text-black">
       {/* Left Bar (Gateway Sidebar) */}
-      <div className="hidden md:flex w-24 border-r border-slate-200 flex-col items-center justify-between py-8 z-10 bg-white">
-        <div className="relative w-12 h-12 bg-slate-900 rounded-xl overflow-hidden flex items-center justify-center shadow-xs p-1 border border-slate-200 hover:scale-105 transition-transform">
+      <div className="hidden md:flex w-24 border-r border-slate-800 flex-col items-center justify-between py-8 z-10 bg-slate-900 shadow-xl">
+        <div className="relative w-12 h-12 bg-slate-800/80 rounded-xl overflow-hidden flex items-center justify-center shadow-md p-1 border border-slate-700/80 hover:scale-105 transition-transform">
           <Image 
             src="/logo_Icon.png" 
             alt="Goverdoc Pro Logo" 
@@ -32,11 +32,11 @@ export default function Home() {
           />
         </div>
         <div className="flex-1 flex items-center justify-center">
-          <div className="-rotate-90 whitespace-nowrap text-[10px] font-black tracking-[0.3em] uppercase text-muted-foreground">
+          <div className="-rotate-90 whitespace-nowrap text-[10px] font-extrabold tracking-[0.3em] uppercase text-slate-400">
             System Selection // Gateway
           </div>
         </div>
-        <div className="text-muted-foreground">
+        <div className="text-slate-400 hover:text-sky-400 transition-colors">
           <Activity size={24} />
         </div>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useUI } from '@/context/UIContext';
 import { 
   ChevronRight, 
@@ -20,8 +21,15 @@ export default function Home() {
     <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row overflow-hidden selection:bg-[var(--primary)] selection:text-black">
       {/* Left Bar (Gateway Sidebar) */}
       <div className="hidden md:flex w-24 border-r border-slate-200 flex-col items-center justify-between py-8 z-10 bg-white">
-        <div className="w-11 h-11 bg-sky-600 rounded-xl text-white flex items-center justify-center font-bold text-base shadow-xs">
-          GP
+        <div className="relative w-12 h-12 bg-slate-900 rounded-xl overflow-hidden flex items-center justify-center shadow-xs p-1 border border-slate-200 hover:scale-105 transition-transform">
+          <Image 
+            src="/logo_Icon.png" 
+            alt="Goverdoc Pro Logo" 
+            width={42} 
+            height={42} 
+            className="object-contain rounded-lg"
+            priority
+          />
         </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="-rotate-90 whitespace-nowrap text-[10px] font-black tracking-[0.3em] uppercase text-muted-foreground">

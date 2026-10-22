@@ -246,6 +246,13 @@ export function DocumentDetailsDrawer({
     });
   }, [rules, selectedRuleVersion, selectedRuleType, rulesSearchTerm]);
 
+  // Identifica a versão publicada mais recente do documento
+  const activePublishedVersion = useMemo(() => {
+    return metadata.find(m => 
+      m.CODIGO_TIPO_VERSAO === 3 || m.STATUS_ATIVO === 1 || m.STATUS_ATIVO === 'S'
+    )?.VALOR_VERSAO;
+  }, [metadata]);
+
   // Extrai versões únicas dos campos
   const fieldVersions = useMemo(() => {
     if (!fields || fields.length === 0) return [];
@@ -361,11 +368,6 @@ export function DocumentDetailsDrawer({
     URL.revokeObjectURL(url);
     toast.success('Campos exportados com sucesso!');
   };
-
-  // Identifica a versão publicada mais recente
-  const activePublishedVersion = metadata.find(m => 
-    m.CODIGO_TIPO_VERSAO === 3 || m.STATUS_ATIVO === 1 || m.STATUS_ATIVO === 'S'
-  )?.VALOR_VERSAO;
 
   const telaSpecs = metadata.find(m => 
     (m.CODIGO_TIPO_VERSAO === 3 || m.STATUS_ATIVO === 1 || m.STATUS_ATIVO === 'S') && 

@@ -23,6 +23,91 @@ interface DocumentDetailsDrawerProps {
   rulesError?: string | null;
 }
 
+export const getRuleTypeBadge = (tipo?: string) => {
+  const t = String(tipo || '').toUpperCase();
+  switch (t) {
+    case 'ENABLE':
+      return {
+        label: 'Habilitar',
+        color: 'bg-emerald-50 text-emerald-700 border-emerald-200'
+      };
+    case 'DISABLE':
+      return {
+        label: 'Desabilitar',
+        color: 'bg-rose-50 text-rose-700 border-rose-200'
+      };
+    case 'ANSWER':
+      return {
+        label: 'Preencher / Responder',
+        color: 'bg-sky-50 text-sky-700 border-sky-200'
+      };
+    case 'VALIDATE':
+      return {
+        label: 'Validar',
+        color: 'bg-amber-50 text-amber-700 border-amber-200'
+      };
+    case 'CLEAR':
+      return {
+        label: 'Limpar',
+        color: 'bg-slate-100 text-slate-700 border-slate-200'
+      };
+    case 'VISIBLE':
+      return {
+        label: 'Visível',
+        color: 'bg-teal-50 text-teal-700 border-teal-200'
+      };
+    case 'INVISIBLE':
+      return {
+        label: 'Invisível',
+        color: 'bg-zinc-100 text-zinc-700 border-zinc-200'
+      };
+    case 'REQUIRED':
+      return {
+        label: 'Obrigatório',
+        color: 'bg-orange-50 text-orange-700 border-orange-200'
+      };
+    case 'REFRESH':
+    case 'REFRESH_FIELD':
+      return {
+        label: 'Atualizar',
+        color: 'bg-cyan-50 text-cyan-800 border-cyan-200'
+      };
+    case 'ON_CLONE':
+    case 'ON_CLOSE':
+    case 'ON_COPY':
+      return {
+        label: 'Ao Finalizar',
+        color: 'bg-blue-50 text-blue-800 border-blue-200'
+      };
+    case 'ON_SAVE':
+      return {
+        label: 'Ao Salvar',
+        color: 'bg-blue-50 text-blue-800 border-blue-200'
+      };
+    case 'RUN':
+    case 'RUN_SET':
+      return {
+        label: 'Executar',
+        color: 'bg-emerald-50 text-emerald-800 border-emerald-200'
+      };
+    case 'FILTER':
+      return {
+        label: 'Filtrar',
+        color: 'bg-amber-50 text-amber-800 border-amber-200'
+      };
+    case 'INVALIDATE':
+      return {
+        label: 'Invalidar',
+        color: 'bg-rose-50 text-rose-800 border-rose-200'
+      };
+    default:
+      return {
+        label: tipo || 'Ação',
+        color: 'bg-slate-100 text-slate-700 border-slate-200'
+      };
+  }
+};
+
 export function DocumentDetailsDrawer({
   open,
   onClose,
@@ -76,19 +161,22 @@ export function DocumentDetailsDrawer({
     }
   }, [ruleVersions]);
 
-  // Estatísticas por tipo de regra na versão selecionada
+  // Estatísticas por tipo de regra (usando o rótulo traduzido) na versão selecionada
   const ruleTypeStats = useMemo(() => {
-    if (!rules || rules.length === 0) return { all: 0, byType: {} as Record<string, number> };
+    if (!rules || rules.length === 0) return { all: 0, byLabel: {} as Record<string, { count: number; color: string }> };
     const currentVersionRules = rules.filter(r => selectedRuleVersion === 'ALL' || r.VL_VERSAO === selectedRuleVersion);
-    const byType: Record<string, number> = {};
+    const byLabel: Record<string, { count: number; color: string }> = {};
     currentVersionRules.forEach(r => {
-      const t = String(r.TIPO_REGRA || 'OUTROS').toUpperCase();
-      byType[t] = (byType[t] || 0) + 1;
+      const badge = getRuleTypeBadge(r.TIPO_REGRA);
+      if (!byLabel[badge.label]) {
+        byLabel[badge.label] = { count: 0, color: badge.color };
+      }
+      byLabel[badge.label].count++;
     });
-    return { all: currentVersionRules.length, byType };
+    return { all: currentVersionRules.length, byLabel };
   }, [rules, selectedRuleVersion]);
 
-  // Regras filtradas por versão, tipo e busca
+  // Regras filtradas por versão, tipo traduzido e busca
   const filteredRules = useMemo(() => {
     if (!rules) return [];
     return rules.filter(r => {
@@ -96,11 +184,12 @@ export function DocumentDetailsDrawer({
         return false;
       }
       if (selectedRuleType !== 'ALL') {
-        const t = String(r.TIPO_REGRA || 'OUTROS').toUpperCase();
-        if (t !== selectedRuleType) return false;
+        const badge = getRuleTypeBadge(r.TIPO_REGRA);
+        if (badge.label !== selectedRuleType) return false;
       }
       if (rulesSearchTerm) {
         const term = rulesSearchTerm.toLowerCase();
+        const badge = getRuleTypeBadge(r.TIPO_REGRA);
         const matchName = String(r.DS_REGRA || '').toLowerCase().includes(term);
         const matchCond = String(r.CONDICAO || '').toLowerCase().includes(term);
         const matchFields = String(r.CAMPOS_AFETADOS || '').toLowerCase().includes(term);
@@ -108,7 +197,8 @@ export function DocumentDetailsDrawer({
         const matchScript = String(r.SCRIPT || '').toLowerCase().includes(term);
         const matchAlert = String(r.DS_ALERTA || '').toLowerCase().includes(term);
         const matchType = String(r.TIPO_REGRA || '').toLowerCase().includes(term);
-        if (!matchName && !matchCond && !matchFields && !matchProp && !matchScript && !matchAlert && !matchType) return false;
+        const matchLabel = badge.label.toLowerCase().includes(term);
+        if (!matchName && !matchCond && !matchFields && !matchProp && !matchScript && !matchAlert && !matchType && !matchLabel) return false;
       }
       return true;
     });
@@ -196,72 +286,6 @@ export function DocumentDetailsDrawer({
 
   const toggleFields = (id: string) => {
     setExpandedFields(prev => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const getRuleTypeBadge = (tipo?: string) => {
-    const t = String(tipo || '').toUpperCase();
-    switch (t) {
-      case 'ENABLE':
-        return {
-          label: 'Habilitar',
-          color: 'bg-emerald-50 text-emerald-700 border-emerald-200'
-        };
-      case 'DISABLE':
-        return {
-          label: 'Desabilitar',
-          color: 'bg-rose-50 text-rose-700 border-rose-200'
-        };
-      case 'ANSWER':
-        return {
-          label: 'Preencher / Responder',
-          color: 'bg-sky-50 text-sky-700 border-sky-200'
-        };
-      case 'VALIDATE':
-        return {
-          label: 'Validar',
-          color: 'bg-amber-50 text-amber-700 border-amber-200'
-        };
-      case 'CLEAR':
-        return {
-          label: 'Limpar',
-          color: 'bg-slate-100 text-slate-700 border-slate-200'
-        };
-      case 'VISIBLE':
-        return {
-          label: 'Visível',
-          color: 'bg-teal-50 text-teal-700 border-teal-200'
-        };
-      case 'INVISIBLE':
-        return {
-          label: 'Invisível',
-          color: 'bg-zinc-100 text-zinc-700 border-zinc-200'
-        };
-      case 'REQUIRED':
-        return {
-          label: 'Obrigatório',
-          color: 'bg-orange-50 text-orange-700 border-orange-200'
-        };
-      case 'REFRESH':
-        return {
-          label: 'Atualizar',
-          color: 'bg-cyan-50 text-cyan-800 border-cyan-200'
-        };
-      case 'ON_CLONE':
-        return {
-          label: 'Ao Finalizar',
-          color: 'bg-blue-50 text-blue-800 border-blue-200'
-        };
-      case 'RUN':
-        return {
-          label: 'Executar',
-          color: 'bg-emerald-50 text-emerald-800 border-emerald-200'
-        };
-      default:
-        return {
-          label: tipo || 'Ação',
-          color: 'bg-slate-100 text-slate-700 border-slate-200'
-        };
-    }
   };
 
   const copyToClipboard = (text: string, id: string) => {
@@ -646,7 +670,7 @@ export function DocumentDetailsDrawer({
                           </div>
 
                           {/* Filter Pills by Action Type */}
-                          {Object.keys(ruleTypeStats.byType).length > 0 && (
+                          {Object.keys(ruleTypeStats.byLabel).length > 0 && (
                             <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                               <button
                                 type="button"
@@ -660,14 +684,13 @@ export function DocumentDetailsDrawer({
                               >
                                 Todas ({ruleTypeStats.all})
                               </button>
-                              {Object.entries(ruleTypeStats.byType).map(([typeKey, count]) => {
-                                const badge = getRuleTypeBadge(typeKey);
-                                const isSelected = selectedRuleType === typeKey;
+                              {Object.entries(ruleTypeStats.byLabel).map(([label, info]) => {
+                                const isSelected = selectedRuleType === label;
                                 return (
                                   <button
-                                    key={typeKey}
+                                    key={label}
                                     type="button"
-                                    onClick={() => setSelectedRuleType(isSelected ? 'ALL' : typeKey)}
+                                    onClick={() => setSelectedRuleType(isSelected ? 'ALL' : label)}
                                     className={cn(
                                       "px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all border flex items-center gap-1.5",
                                       isSelected
@@ -675,12 +698,12 @@ export function DocumentDetailsDrawer({
                                         : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"
                                     )}
                                   >
-                                    <span>{badge.label}</span>
+                                    <span>{label}</span>
                                     <span className={cn(
                                       "px-1.5 py-0.2 rounded-full text-[9.5px]",
                                       isSelected ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-600"
                                     )}>
-                                      {count}
+                                      {info.count}
                                     </span>
                                   </button>
                                 );

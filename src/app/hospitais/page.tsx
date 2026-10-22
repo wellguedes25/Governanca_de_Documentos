@@ -14,7 +14,7 @@ import {
   Loader2
 } from 'lucide-react';
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
+import { cn, formatDateTime } from '@/lib/utils';
 import { useUI } from '@/context/UIContext';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -401,7 +401,7 @@ export default function HospitaisPage() {
                           {Number(item.USO_UNIDADE).toLocaleString('pt-BR')}
                         </td>
                         <td className="py-3 text-right font-mono text-slate-500 text-[11px]">
-                          {item.ULTIMO_USO ? new Date(item.ULTIMO_USO).toLocaleDateString('pt-BR') : '-'}
+                          {item.ULTIMO_USO ? formatDateTime(item.ULTIMO_USO) : '-'}
                         </td>
                       </tr>
                     ))}

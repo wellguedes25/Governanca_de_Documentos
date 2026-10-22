@@ -5,7 +5,7 @@ import {
   ChevronUp, ChevronDown, ChevronRight, Info, ExternalLink, 
   Database, FileSpreadsheet, Layers, Check, X, ShieldAlert, Sparkles 
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDateTime, isDateLike } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 interface DocumentosTableProps {
@@ -257,7 +257,13 @@ export function DocumentosTable({
                               )
                             ) : (
                               <span className="text-slate-700 text-xs">
-                                {val !== undefined && val !== null ? String(val) : '—'}
+                                {isDateLike(val, col) ? (
+                                  <span className="font-mono text-slate-800 text-[11px] font-semibold whitespace-nowrap">
+                                    {formatDateTime(val)}
+                                  </span>
+                                ) : (
+                                  val !== undefined && val !== null ? String(val) : '—'
+                                )}
                               </span>
                             )}
                           </td>

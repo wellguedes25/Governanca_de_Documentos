@@ -116,3 +116,4 @@ export function EdgeDetailsModal({ edge, onClose }: EdgeDetailsModalProps) {
     </div>
   );
 }
+

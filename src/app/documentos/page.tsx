@@ -45,6 +45,10 @@ export default function DocumentosPage() {
   const [metadataRulesLoading, setMetadataRulesLoading] = useState(false);
   const [metadataRulesError, setMetadataRulesError] = useState<string | null>(null);
 
+  const [metadataFields, setMetadataFields] = useState<any[]>([]);
+  const [metadataFieldsLoading, setMetadataFieldsLoading] = useState(false);
+  const [metadataFieldsError, setMetadataFieldsError] = useState<string | null>(null);
+
   // Estados para Perfis Ambulatoriais
   const [ambulatoryProfilesData, setAmbulatoryProfilesData] = useState<any[]>([]);
   const [ambulatoryProfilesLoading, setAmbulatoryProfilesLoading] = useState(false);
@@ -170,12 +174,15 @@ export default function DocumentosPage() {
       fetchMetadata(sidebarDoc);
       fetchActions(sidebarDoc);
       fetchRules(sidebarDoc);
+      fetchFields(sidebarDoc);
     } else if (!sidebarOpen) {
       setMetadata([]);
       setMetadataActions([]);
       setMetadataActionsError(null);
       setMetadataRules([]);
       setMetadataRulesError(null);
+      setMetadataFields([]);
+      setMetadataFieldsError(null);
     }
   }, [sidebarDoc, sidebarOpen, docVersion]);
 
@@ -249,6 +256,31 @@ export default function DocumentosPage() {
       setMetadataRulesError('Falha na comunicação com o servidor.');
     } finally {
       setMetadataRulesLoading(false);
+    }
+  }
+
+  async function fetchFields(docId: string) {
+    setMetadataFieldsLoading(true);
+    setMetadataFieldsError(null);
+    try {
+      const res = await fetch('/api/oracle/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          query: 'FIELDS', 
+          params: { CD_DOCUMENTO: docId } 
+        })
+      });
+      const result = await res.json();
+      if (result.error) {
+        setMetadataFieldsError(result.error);
+      } else {
+        setMetadataFields(result.rows || []);
+      }
+    } catch (err: any) {
+      setMetadataFieldsError('Falha na comunicação com o servidor.');
+    } finally {
+      setMetadataFieldsLoading(false);
     }
   }
 
@@ -585,6 +617,9 @@ export default function DocumentosPage() {
         rules={metadataRules}
         rulesLoading={metadataRulesLoading}
         rulesError={metadataRulesError}
+        fields={metadataFields}
+        fieldsLoading={metadataFieldsLoading}
+        fieldsError={metadataFieldsError}
       />
     </div>
   );

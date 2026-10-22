@@ -101,6 +101,36 @@ export async function POST(request: Request) {
       sql = (body.version === 'V3' ? (data.docActionsQueryV3 || data.docActionsQuery) : data.docActionsQuery);
     } else if (body.query === 'RULES' || body.query === 'DOC_RULES') {
       sql = data.docRulesQueryV3 || data.docActionsQueryV3 || data.docActionsQuery;
+    } else if (body.query === 'FIELDS' || body.query === 'DOC_FIELDS') {
+      sql = `
+        SELECT ec.cd_campo                                              AS "CD_CAMPO",
+               ec.ds_identificador                                      AS "DS_IDENTIFICADOR",
+               ec.ds_campo                                              AS "DS_CAMPO",
+               ec.cd_metadado                                           AS "CD_METADADO",
+               ec.sn_ativo                                              AS "SN_ATIVO",
+               ec.cd_tipo_visualizacao                                  AS "CD_TIPO_VISUALIZACAO",
+               NVL(etv.ds_tipo_visualizacao, 'Desconhecido')             AS "DS_TIPO_VISUALIZACAO",
+               el.cd_layout                                             AS "CD_LAYOUT",
+               etl.cd_tipo_layout                                       AS "CD_TIPO_LAYOUT",
+               NVL(etl.ds_tipo_layout, 'Layout Padrão')                 AS "DS_TIPO_LAYOUT",
+               evd.vl_versao                                            AS "VL_VERSAO",
+               evd.tp_versao                                            AS "TP_VERSAO",
+               evd.sn_publicado                                         AS "SN_PUBLICADO",
+               (
+                 SELECT COUNT(DISTINCT erc.cd_regra)
+                   FROM editor.editor_regra_campo erc
+                  WHERE erc.cd_campo = ec.cd_campo
+               )                                                        AS "QTD_REGRAS"
+          FROM editor.editor_documento ed
+          JOIN editor.editor_versao_documento evd ON evd.cd_documento = ed.cd_documento
+          JOIN editor.editor_layout el            ON el.cd_versao_documento = evd.cd_versao_documento
+          JOIN editor.editor_tipo_layout etl      ON etl.cd_tipo_layout = el.cd_tipo_layout
+          JOIN editor.editor_layout_campo elc     ON elc.cd_layout = el.cd_layout
+          JOIN editor.editor_campo ec             ON ec.cd_campo = elc.cd_campo
+          LEFT JOIN editor.editor_tipo_visualizacao etv ON etv.cd_tipo_visualizacao = ec.cd_tipo_visualizacao
+         WHERE ed.cd_documento = :CD_DOCUMENTO
+         ORDER BY evd.vl_versao DESC, el.cd_tipo_layout, ec.ds_identificador
+      `;
     } else if (body.query === 'AMBULATORY_PROFILES') {
       sql = data.ambulatoryProfilesQuery;
     } else if (body.query === 'AMBULATORY_PROFILE_DETAILS') {

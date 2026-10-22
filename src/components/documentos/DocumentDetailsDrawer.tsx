@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
+import Link from 'next/link';
 import { 
   X, AlertTriangle, CheckCircle, Database, FileText, 
   Layers, Code2, Unlink, Copy, Check, ChevronDown, ChevronUp, ExternalLink,
-  Search, ListFilter, Zap, SlidersHorizontal, CheckSquare
+  Search, ListFilter, Zap, SlidersHorizontal, CheckSquare, TableProperties,
+  Download, Sparkles, Filter, Hash, Eye
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -21,7 +23,36 @@ interface DocumentDetailsDrawerProps {
   rules?: any[];
   rulesLoading?: boolean;
   rulesError?: string | null;
+  fields?: any[];
+  fieldsLoading?: boolean;
+  fieldsError?: string | null;
 }
+
+export const getFieldTypeBadge = (tipo?: string) => {
+  const t = String(tipo || '').toUpperCase();
+  if (t.includes('TEXT') || t.includes('TEXTO')) {
+    return { label: tipo || 'Texto', color: 'bg-sky-50 text-sky-700 border-sky-200' };
+  }
+  if (t.includes('CHECKBOX') || t.includes('CHECK')) {
+    return { label: tipo || 'CheckBox', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+  }
+  if (t.includes('RADIO') || t.includes('COMBO') || t.includes('LIST')) {
+    return { label: tipo || 'Seleção', color: 'bg-blue-50 text-blue-700 border-blue-200' };
+  }
+  if (t.includes('DATE') || t.includes('DATA')) {
+    return { label: tipo || 'Data', color: 'bg-amber-50 text-amber-800 border-amber-200' };
+  }
+  if (t.includes('BUTTON') || t.includes('BOTAO')) {
+    return { label: tipo || 'Botão', color: 'bg-cyan-50 text-cyan-800 border-cyan-200' };
+  }
+  if (t.includes('TABLE') || t.includes('TABELA') || t.includes('GRID')) {
+    return { label: tipo || 'Tabela', color: 'bg-teal-50 text-teal-700 border-teal-200' };
+  }
+  if (t.includes('IMAGE') || t.includes('IMAGEM')) {
+    return { label: tipo || 'Imagem', color: 'bg-slate-100 text-slate-700 border-slate-200' };
+  }
+  return { label: tipo || 'Componente', color: 'bg-slate-100 text-slate-700 border-slate-200' };
+};
 
 export const getRuleTypeBadge = (tipo?: string) => {
   const t = String(tipo || '').toUpperCase();
@@ -119,9 +150,12 @@ export function DocumentDetailsDrawer({
   actionsError,
   rules = [],
   rulesLoading = false,
-  rulesError = null
+  rulesError = null,
+  fields = [],
+  fieldsLoading = false,
+  fieldsError = null
 }: DocumentDetailsDrawerProps) {
-  const [activeTab, setActiveTab] = useState<'specs' | 'history' | 'actions' | 'rules'>('specs');
+  const [activeTab, setActiveTab] = useState<'specs' | 'history' | 'actions' | 'rules' | 'fields'>('specs');
   const [actionsFilterDoc, setActionsFilterDoc] = useState<string | null>(null);
   const [selectedRuleVersion, setSelectedRuleVersion] = useState<number | 'ALL'>('ALL');
   const [selectedRuleType, setSelectedRuleType] = useState<string>('ALL');
@@ -129,6 +163,14 @@ export function DocumentDetailsDrawer({
   const [expandedScripts, setExpandedScripts] = useState<Record<string, boolean>>({});
   const [expandedFields, setExpandedFields] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Estados específicos para a aba de Campos / Metadados
+  const [fieldsSearchTerm, setFieldsSearchTerm] = useState('');
+  const [selectedFieldLayout, setSelectedFieldLayout] = useState<'ALL' | number>('ALL');
+  const [selectedFieldVersion, setSelectedFieldVersion] = useState<number | 'ALL'>('ALL');
+  const [selectedFieldStatus, setSelectedFieldStatus] = useState<'ALL' | '1' | '0'>('ALL');
+  const [selectedFieldType, setSelectedFieldType] = useState<string>('ALL');
+  const [selectedFieldHasRules, setSelectedFieldHasRules] = useState<'ALL' | 'WITH_RULES' | 'WITHOUT_RULES'>('ALL');
 
   // Extrai versões únicas das regras
   const ruleVersions = useMemo(() => {
@@ -203,6 +245,109 @@ export function DocumentDetailsDrawer({
       return true;
     });
   }, [rules, selectedRuleVersion, selectedRuleType, rulesSearchTerm]);
+
+  // Extrai versões únicas dos campos
+  const fieldVersions = useMemo(() => {
+    if (!fields || fields.length === 0) return [];
+    const map = new Map<number, { version: number; type: string; published: number; count: number }>();
+    fields.forEach(f => {
+      const v = f.VL_VERSAO;
+      if (v !== undefined && v !== null) {
+        if (!map.has(v)) {
+          map.set(v, {
+            version: v,
+            type: f.TP_VERSAO || (f.SN_PUBLICADO === 1 ? 'PUBLISHED' : 'HISTORY'),
+            published: f.SN_PUBLICADO ?? 0,
+            count: 0
+          });
+        }
+        map.get(v)!.count++;
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => b.version - a.version);
+  }, [fields]);
+
+  // Define a versão publicada mais recente como padrão para os campos
+  useEffect(() => {
+    if (fieldVersions.length > 0) {
+      const pub = fieldVersions.find(v => v.type === 'PUBLISHED' || v.published === 1);
+      setSelectedFieldVersion(pub ? pub.version : fieldVersions[0].version);
+    } else {
+      setSelectedFieldVersion('ALL');
+    }
+  }, [fieldVersions]);
+
+  // Lista de tipos de componentes únicos para o filtro
+  const uniqueComponentTypes = useMemo(() => {
+    if (!fields) return [];
+    const types = new Set<string>();
+    fields.forEach(f => {
+      if (f.DS_TIPO_VISUALIZACAO) types.add(f.DS_TIPO_VISUALIZACAO);
+    });
+    return Array.from(types).sort();
+  }, [fields]);
+
+  // Campos filtrados
+  const filteredFields = useMemo(() => {
+    if (!fields) return [];
+    return fields.filter(f => {
+      if (selectedFieldVersion !== 'ALL' && f.VL_VERSAO !== selectedFieldVersion) return false;
+      if (selectedFieldLayout !== 'ALL' && f.CD_TIPO_LAYOUT !== selectedFieldLayout) return false;
+      if (selectedFieldStatus !== 'ALL' && String(f.SN_ATIVO) !== selectedFieldStatus) return false;
+      if (selectedFieldType !== 'ALL' && f.DS_TIPO_VISUALIZACAO !== selectedFieldType) return false;
+      if (selectedFieldHasRules === 'WITH_RULES' && (!f.QTD_REGRAS || f.QTD_REGRAS === 0)) return false;
+      if (selectedFieldHasRules === 'WITHOUT_RULES' && f.QTD_REGRAS > 0) return false;
+
+      if (fieldsSearchTerm) {
+        const term = fieldsSearchTerm.toLowerCase();
+        const matchTag = String(f.DS_IDENTIFICADOR || '').toLowerCase().includes(term);
+        const matchName = String(f.DS_CAMPO || '').toLowerCase().includes(term);
+        const matchMeta = String(f.CD_METADADO || '').toLowerCase().includes(term);
+        const matchType = String(f.DS_TIPO_VISUALIZACAO || '').toLowerCase().includes(term);
+        const matchLayout = String(f.DS_TIPO_LAYOUT || '').toLowerCase().includes(term);
+        if (!matchTag && !matchName && !matchMeta && !matchType && !matchLayout) return false;
+      }
+      return true;
+    });
+  }, [fields, selectedFieldVersion, selectedFieldLayout, selectedFieldStatus, selectedFieldType, selectedFieldHasRules, fieldsSearchTerm]);
+
+  // KPIs dos campos filtrados
+  const fieldsKpis = useMemo(() => {
+    const total = filteredFields.length;
+    const active = filteredFields.filter(f => f.SN_ATIVO === 1).length;
+    const withMetadata = filteredFields.filter(f => f.CD_METADADO !== null && f.CD_METADADO !== undefined).length;
+    const withRules = filteredFields.filter(f => f.QTD_REGRAS > 0).length;
+    return { total, active, withMetadata, withRules };
+  }, [filteredFields]);
+
+  // Exportação CSV de Campos
+  const handleExportFieldsCSV = () => {
+    if (!filteredFields.length) {
+      toast.error('Nenhum campo para exportar.');
+      return;
+    }
+    const headers = ['Documento', 'Versão', 'Layout', 'Identificador', 'Descrição', 'Metadado_ID', 'Tipo_Componente', 'Status', 'Qtd_Regras'];
+    const rows = filteredFields.map(f => [
+      `"${docId || ''}"`,
+      `"${f.VL_VERSAO || ''}"`,
+      `"${f.DS_TIPO_LAYOUT || ''}"`,
+      `"${f.DS_IDENTIFICADOR || ''}"`,
+      `"${(f.DS_CAMPO || '').replace(/"/g, '""')}"`,
+      `"${f.CD_METADADO || ''}"`,
+      `"${f.DS_TIPO_VISUALIZACAO || ''}"`,
+      `"${f.SN_ATIVO === 1 ? 'Ativo' : 'Inativo'}"`,
+      `"${f.QTD_REGRAS || 0}"`
+    ]);
+    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `campos_doc_${docId}_v${selectedFieldVersion}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success('Campos exportados com sucesso!');
+  };
 
   // Identifica a versão publicada mais recente
   const activePublishedVersion = metadata.find(m => 
@@ -384,6 +529,18 @@ export function DocumentDetailsDrawer({
               <ListFilter size={14} />
               <span>Regras ({rules.length})</span>
             </button>
+            <button 
+              onClick={() => setActiveTab('fields')}
+              className={cn(
+                "py-3 px-3 text-xs font-semibold border-b-2 transition-all flex items-center gap-1.5",
+                activeTab === 'fields' 
+                  ? "border-sky-600 text-sky-700 font-bold" 
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              )}
+            >
+              <TableProperties size={14} />
+              <span>Campos ({fields.length})</span>
+            </button>
           </div>
 
           {/* Content Area */}
@@ -428,11 +585,20 @@ export function DocumentDetailsDrawer({
                           {activeSpecs.QUANTIDADE_REGRAS ?? 0}
                         </span>
                       </div>
-                      <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl">
-                        <span className="text-[11px] font-semibold text-slate-700 block">Quantidade de Campos</span>
-                        <span className="text-2xl font-bold text-slate-900 font-mono mt-1 block">
-                          {activeSpecs.QUANTIDADE_CAMPOS ?? 0}
-                        </span>
+                      <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl flex flex-col justify-between">
+                        <div>
+                          <span className="text-[11px] font-semibold text-slate-700 block">Quantidade de Campos</span>
+                          <span className="text-2xl font-bold text-slate-900 font-mono mt-1 block">
+                            {activeSpecs.QUANTIDADE_CAMPOS ?? 0}
+                          </span>
+                        </div>
+                        <button 
+                          onClick={() => setActiveTab('fields')}
+                          className="mt-2 pt-2 border-t border-slate-200/60 text-[11px] font-bold text-sky-700 hover:text-sky-900 flex items-center justify-between transition-colors group"
+                        >
+                          <span>Explorar metadados e campos</span>
+                          <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+                        </button>
                       </div>
                     </div>
 
@@ -731,7 +897,7 @@ export function DocumentDetailsDrawer({
                               const scriptText = rule.SCRIPT || '';
                               const badge = getRuleTypeBadge(rule.TIPO_REGRA);
 
-                              const fields = rule.CAMPOS_AFETADOS 
+                              const affectedFields = rule.CAMPOS_AFETADOS 
                                 ? String(rule.CAMPOS_AFETADOS).split(',').map((f: string) => f.trim()).filter(Boolean)
                                 : [];
 
@@ -799,13 +965,13 @@ export function DocumentDetailsDrawer({
                                     )}
 
                                     {/* Campos Afetados */}
-                                    {fields.length > 0 && (
+                                    {affectedFields.length > 0 && (
                                       <div className="space-y-1.5">
                                         <div className="flex items-center justify-between text-[11px]">
                                           <span className="font-bold text-slate-600 uppercase tracking-wide flex items-center gap-1">
-                                            <SlidersHorizontal size={12} className="text-slate-400" /> Campos Afetados ({rule.QTD_CAMPOS || fields.length}):
+                                            <SlidersHorizontal size={12} className="text-slate-400" /> Campos Afetados ({rule.QTD_CAMPOS || affectedFields.length}):
                                           </span>
-                                          {fields.length > 6 && (
+                                          {affectedFields.length > 6 && (
                                             <button
                                               type="button"
                                               onClick={() => toggleFields(ruleKey)}
@@ -814,13 +980,13 @@ export function DocumentDetailsDrawer({
                                               {isFieldsExpanded ? (
                                                 <>Recolher <ChevronUp size={12} /></>
                                               ) : (
-                                                <>Ver todos ({fields.length}) <ChevronDown size={12} /></>
+                                                <>Ver todos ({affectedFields.length}) <ChevronDown size={12} /></>
                                               )}
                                             </button>
                                           )}
                                         </div>
                                         <div className="flex flex-wrap gap-1.5">
-                                          {(isFieldsExpanded ? fields : fields.slice(0, 6)).map((fieldName: string, fIdx: number) => (
+                                          {(isFieldsExpanded ? affectedFields : affectedFields.slice(0, 6)).map((fieldName: string, fIdx: number) => (
                                             <span 
                                               key={fIdx}
                                               className="font-mono text-[11px] font-semibold bg-sky-50 text-sky-800 border border-sky-100 px-2 py-0.5 rounded-md"
@@ -828,13 +994,13 @@ export function DocumentDetailsDrawer({
                                               {fieldName}
                                             </span>
                                           ))}
-                                          {!isFieldsExpanded && fields.length > 6 && (
+                                          {!isFieldsExpanded && affectedFields.length > 6 && (
                                             <button
                                               type="button"
                                               onClick={() => toggleFields(ruleKey)}
                                               className="text-[10px] font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded-md transition-colors"
                                             >
-                                              +{fields.length - 6} mais
+                                              +{affectedFields.length - 6} mais
                                             </button>
                                           )}
                                         </div>
@@ -908,6 +1074,329 @@ export function DocumentDetailsDrawer({
                       <div className="py-12 text-center text-slate-400">
                         <Unlink size={32} className="mx-auto mb-2 opacity-40" />
                         <p className="text-xs font-semibold">Nenhuma regra cadastrada para este documento</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Tab: Campos / Metadados */}
+                {activeTab === 'fields' && (
+                  <div className="space-y-4">
+                    {fieldsLoading ? (
+                      <div className="space-y-4 py-8">
+                        <div className="skeleton h-10 w-full" />
+                        <div className="grid grid-cols-4 gap-2">
+                          <div className="skeleton h-16 w-full" />
+                          <div className="skeleton h-16 w-full" />
+                          <div className="skeleton h-16 w-full" />
+                          <div className="skeleton h-16 w-full" />
+                        </div>
+                        <div className="skeleton h-24 w-full" />
+                        <div className="skeleton h-24 w-full" />
+                      </div>
+                    ) : fieldsError ? (
+                      <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs">
+                        <div className="flex items-center gap-2 font-bold mb-1">
+                          <AlertTriangle size={14} /> Erro ao carregar campos
+                        </div>
+                        <p>{fieldsError}</p>
+                      </div>
+                    ) : fields.length > 0 ? (
+                      <div className="space-y-4">
+                        {/* Top Action Bar: Search, Version & Page Link */}
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-semibold text-slate-700">Versão:</span>
+                            <select
+                              value={selectedFieldVersion}
+                              onChange={(e) => setSelectedFieldVersion(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value))}
+                              className="text-xs font-bold bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-sky-500 shadow-2xs"
+                            >
+                              <option value="ALL">Todas as Versões ({fields.length})</option>
+                              {fieldVersions.map(v => (
+                                <option key={v.version} value={v.version}>
+                                  v{v.version} {v.published === 1 ? '★ Publicada' : ''} ({v.count} campos)
+                                </option>
+                              ))}
+                            </select>
+
+                            <Link
+                              href={`/documentos/${docId}/campos`}
+                              target="_blank"
+                              className="px-2.5 py-1.5 text-[11px] font-bold text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg flex items-center gap-1 transition-all"
+                              title="Abrir em página dedicada de tela cheia"
+                            >
+                              <ExternalLink size={12} />
+                              <span>Página Dedicada</span>
+                            </Link>
+
+                            <button
+                              onClick={handleExportFieldsCSV}
+                              className="px-2.5 py-1.5 text-[11px] font-bold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg flex items-center gap-1 transition-all shadow-2xs"
+                              title="Exportar CSV"
+                            >
+                              <Download size={12} />
+                              <span>CSV</span>
+                            </button>
+                          </div>
+
+                          <div className="relative flex-1 max-w-xs">
+                            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                              type="text"
+                              value={fieldsSearchTerm}
+                              onChange={(e) => setFieldsSearchTerm(e.target.value)}
+                              placeholder="Buscar tag, nome, metadado..."
+                              className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-sky-500 shadow-2xs"
+                            />
+                            {fieldsSearchTerm && (
+                              <button
+                                onClick={() => setFieldsSearchTerm('')}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                              >
+                                ×
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* KPI Summary Cards */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                            <span className="text-[10.5px] font-medium text-slate-500 block">Campos no Filtro</span>
+                            <span className="text-xl font-bold text-slate-900 font-mono mt-0.5 block">
+                              {fieldsKpis.total}
+                            </span>
+                          </div>
+                          <div className="p-2.5 bg-emerald-50/60 border border-emerald-100 rounded-xl">
+                            <span className="text-[10.5px] font-medium text-emerald-800 block">Campos Ativos</span>
+                            <span className="text-xl font-bold text-emerald-900 font-mono mt-0.5 block">
+                              {fieldsKpis.active}
+                            </span>
+                          </div>
+                          <div className="p-2.5 bg-sky-50/60 border border-sky-100 rounded-xl">
+                            <span className="text-[10.5px] font-medium text-sky-800 block">Metadados Padrão</span>
+                            <span className="text-xl font-bold text-sky-900 font-mono mt-0.5 block">
+                              {fieldsKpis.withMetadata}
+                            </span>
+                          </div>
+                          <div className="p-2.5 bg-amber-50/60 border border-amber-100 rounded-xl">
+                            <span className="text-[10.5px] font-medium text-amber-800 block">Com Regras</span>
+                            <span className="text-xl font-bold text-amber-900 font-mono mt-0.5 block">
+                              {fieldsKpis.withRules}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Layout and Filter Pills */}
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          {/* Layout */}
+                          <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[11px]">
+                            <button
+                              onClick={() => setSelectedFieldLayout('ALL')}
+                              className={cn(
+                                "px-2 py-1 rounded-md font-medium transition-all",
+                                selectedFieldLayout === 'ALL'
+                                  ? "bg-white text-slate-900 font-bold shadow-2xs"
+                                  : "text-slate-600 hover:text-slate-900"
+                              )}
+                            >
+                              Todos Layouts
+                            </button>
+                            <button
+                              onClick={() => setSelectedFieldLayout(1)}
+                              className={cn(
+                                "px-2 py-1 rounded-md font-medium transition-all",
+                                selectedFieldLayout === 1
+                                  ? "bg-sky-600 text-white font-bold shadow-2xs"
+                                  : "text-slate-600 hover:text-slate-900"
+                              )}
+                            >
+                              Tela
+                            </button>
+                            <button
+                              onClick={() => setSelectedFieldLayout(2)}
+                              className={cn(
+                                "px-2 py-1 rounded-md font-medium transition-all",
+                                selectedFieldLayout === 2
+                                  ? "bg-teal-700 text-white font-bold shadow-2xs"
+                                  : "text-slate-600 hover:text-slate-900"
+                              )}
+                            >
+                              Relatório
+                            </button>
+                          </div>
+
+                          {/* Status */}
+                          <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[11px]">
+                            <button
+                              onClick={() => setSelectedFieldStatus('ALL')}
+                              className={cn(
+                                "px-2 py-1 rounded-md font-medium transition-all",
+                                selectedFieldStatus === 'ALL'
+                                  ? "bg-white text-slate-900 font-bold shadow-2xs"
+                                  : "text-slate-600 hover:text-slate-900"
+                              )}
+                            >
+                              Todos Status
+                            </button>
+                            <button
+                              onClick={() => setSelectedFieldStatus('1')}
+                              className={cn(
+                                "px-2 py-1 rounded-md font-medium transition-all",
+                                selectedFieldStatus === '1'
+                                  ? "bg-emerald-600 text-white font-bold shadow-2xs"
+                                  : "text-slate-600 hover:text-slate-900"
+                              )}
+                            >
+                              Ativos
+                            </button>
+                            <button
+                              onClick={() => setSelectedFieldStatus('0')}
+                              className={cn(
+                                "px-2 py-1 rounded-md font-medium transition-all",
+                                selectedFieldStatus === '0'
+                                  ? "bg-slate-700 text-white font-bold shadow-2xs"
+                                  : "text-slate-600 hover:text-slate-900"
+                              )}
+                            >
+                              Inativos
+                            </button>
+                          </div>
+
+                          {/* Regras */}
+                          <button
+                            onClick={() => setSelectedFieldHasRules(selectedFieldHasRules === 'WITH_RULES' ? 'ALL' : 'WITH_RULES')}
+                            className={cn(
+                              "px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all border flex items-center gap-1",
+                              selectedFieldHasRules === 'WITH_RULES'
+                                ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
+                                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"
+                            )}
+                          >
+                            <Zap size={11} />
+                            <span>Apenas com Regras</span>
+                          </button>
+                        </div>
+
+                        {/* List of Fields */}
+                        {filteredFields.length > 0 ? (
+                          <div className="space-y-2.5">
+                            {filteredFields.map((field, fIdx) => {
+                              const fKey = `fld_${field.CD_CAMPO}_${field.VL_VERSAO}_${field.CD_LAYOUT}_${fIdx}`;
+                              const typeBadge = getFieldTypeBadge(field.DS_TIPO_VISUALIZACAO);
+                              const isCopied = copiedId === field.DS_IDENTIFICADOR;
+
+                              return (
+                                <div 
+                                  key={fKey}
+                                  className="bg-white border border-slate-200/90 hover:border-slate-300 rounded-xl p-3 shadow-2xs transition-all flex flex-col gap-2 group"
+                                >
+                                  {/* Row 1: Identifier + Badges */}
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                      <button
+                                        onClick={() => {
+                                          copyToClipboard(field.DS_IDENTIFICADOR, field.DS_IDENTIFICADOR);
+                                          toast.success(`Identificador ${field.DS_IDENTIFICADOR} copiado!`);
+                                        }}
+                                        className="font-mono text-xs font-bold text-sky-800 bg-sky-50 hover:bg-sky-100 px-2 py-0.5 rounded border border-sky-100 flex items-center gap-1 transition-colors"
+                                        title="Clique para copiar identificador técnico"
+                                      >
+                                        <span>{field.DS_IDENTIFICADOR}</span>
+                                        {isCopied ? <Check size={11} className="text-emerald-600 shrink-0" /> : <Copy size={11} className="opacity-40 group-hover:opacity-80 shrink-0" />}
+                                      </button>
+
+                                      <span className={cn(
+                                        "px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider",
+                                        typeBadge.color
+                                      )}>
+                                        {typeBadge.label}
+                                      </span>
+
+                                      <span className={cn(
+                                        "px-2 py-0.5 rounded text-[10px] font-bold border uppercase",
+                                        field.CD_TIPO_LAYOUT === 1
+                                          ? "bg-sky-50 text-sky-700 border-sky-100"
+                                          : "bg-teal-50 text-teal-700 border-teal-100"
+                                      )}>
+                                        {field.DS_TIPO_LAYOUT || (field.CD_TIPO_LAYOUT === 1 ? 'Tela' : 'Relatório')}
+                                      </span>
+
+                                      <span className={cn(
+                                        "px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase",
+                                        field.SN_ATIVO === 1
+                                          ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                          : "bg-slate-100 text-slate-500 border border-slate-200"
+                                      )}>
+                                        {field.SN_ATIVO === 1 ? 'Ativo' : 'Inativo'}
+                                      </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <span className="text-[10px] font-mono text-slate-400">
+                                        ID #{field.CD_CAMPO}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* Row 2: Rótulo Visível */}
+                                  <div className="text-xs text-slate-800 font-medium">
+                                    {field.DS_CAMPO && field.DS_CAMPO !== field.DS_IDENTIFICADOR ? (
+                                      <span>{field.DS_CAMPO}</span>
+                                    ) : (
+                                      <span className="italic text-slate-400">Sem rótulo amigável (usa identificador técnico)</span>
+                                    )}
+                                  </div>
+
+                                  {/* Row 3: Metadado + Vínculo com Regras */}
+                                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 text-[11px] text-slate-500">
+                                    <div className="flex items-center gap-2">
+                                      {field.CD_METADADO ? (
+                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 font-mono text-[10px] font-bold">
+                                          <Sparkles size={10} className="text-emerald-600" />
+                                          Metadado #{field.CD_METADADO}
+                                        </span>
+                                      ) : (
+                                        <span className="text-[10px] text-slate-400">Campo Específico</span>
+                                      )}
+                                      <span className="text-slate-300">•</span>
+                                      <span className="font-mono text-[10px] text-slate-500">v{field.VL_VERSAO}</span>
+                                    </div>
+
+                                    <div>
+                                      {field.QTD_REGRAS > 0 ? (
+                                        <button
+                                          onClick={() => {
+                                            setRulesSearchTerm(field.DS_IDENTIFICADOR);
+                                            setActiveTab('rules');
+                                          }}
+                                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-[10px] transition-colors"
+                                          title="Ver regras aplicadas a este campo"
+                                        >
+                                          <Zap size={10} className="text-amber-600" />
+                                          <span>{field.QTD_REGRAS} {field.QTD_REGRAS === 1 ? 'regra' : 'regras'}</span>
+                                        </button>
+                                      ) : (
+                                        <span className="text-[10px] text-slate-400">Sem regras</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="py-12 text-center text-slate-400 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                            <Search size={28} className="mx-auto mb-2 opacity-40 text-slate-400" />
+                            <p className="text-xs font-semibold">Nenhum campo encontrado com os filtros atuais</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="py-12 text-center text-slate-400">
+                        <TableProperties size={32} className="mx-auto mb-2 opacity-40" />
+                        <p className="text-xs font-semibold">Nenhum campo cadastrado para este documento</p>
                       </div>
                     )}
                   </div>

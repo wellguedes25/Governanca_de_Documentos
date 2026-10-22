@@ -240,13 +240,6 @@ export async function GET(request: Request) {
       const sourceDoc = docMap.get(sDocNum)!;
       const targetDoc = docMap.get(tDocNum)!;
 
-      // Marca o campo alvo como tendo vínculo
-      const targetField = targetDoc.fields.get(re.targetFieldTag);
-      if (targetField) {
-        targetField.hasLink = true;
-        targetField.isTarget = true;
-      }
-
       // Procura se o script cita expressamente algum campo do documento de origem
       let matchedSourceFieldTag: string | undefined = undefined;
       for (const [sTag, sField] of sourceDoc.fields.entries()) {
@@ -259,7 +252,19 @@ export async function GET(request: Request) {
         }
       }
 
-      const edgeKey = `${sDocNum}_${matchedSourceFieldTag || 'root'}->${tDocNum}_${re.targetFieldTag}`;
+      // Se não encontrou campo correspondente no documento de origem, não cria vínculo espúrio
+      if (!matchedSourceFieldTag) {
+        return;
+      }
+
+      // Marca o campo alvo como tendo vínculo legítimo
+      const targetField = targetDoc.fields.get(re.targetFieldTag);
+      if (targetField) {
+        targetField.hasLink = true;
+        targetField.isTarget = true;
+      }
+
+      const edgeKey = `${sDocNum}_${matchedSourceFieldTag}->${tDocNum}_${re.targetFieldTag}`;
       if (!edgeKeySet.has(edgeKey)) {
         edgeKeySet.add(edgeKey);
         edges.push({
@@ -276,7 +281,7 @@ export async function GET(request: Request) {
     });
 
     // 4. Monta os nós no formato React Flow Custom Node
-    const nodes: LineageDocNode[] = [];
+    let nodes: LineageDocNode[] = [];
     docMap.forEach((docData, docId) => {
       const allFields = Array.from(docData.fields.values());
       const linked = allFields.filter(f => f.hasLink);
@@ -301,12 +306,30 @@ export async function GET(request: Request) {
       });
     });
 
+    // 5. Integridade Referencial Estrita:
+    // Apenas arestas cujos nós de origem E destino existem no grafo são mantidas
+    const nodeIds = new Set(nodes.map(n => n.id));
+    const validEdges = edges.filter(e => 
+      nodeIds.has(`doc_${e.sourceDocId}`) && nodeIds.has(`doc_${e.targetDocId}`)
+    );
+
+    // Em modo "apenas vinculados", elimina qualquer bloco isolado:
+    // Todo nó retornado DEVE obrigatoriamente possuir ao menos uma aresta válida conectada
+    if (onlyLinked) {
+      const connectedDocIds = new Set<string>();
+      validEdges.forEach(e => {
+        connectedDocIds.add(e.sourceDocId);
+        connectedDocIds.add(e.targetDocId);
+      });
+      nodes = nodes.filter(n => connectedDocIds.has(String(n.docId)));
+    }
+
     return NextResponse.json({
       nodes,
-      edges,
+      edges: validEdges,
       summary: {
         totalDocs: nodes.length,
-        totalEdges: edges.length,
+        totalEdges: validEdges.length,
         linkedDocs: nodes.filter(n => n.linkedFieldsCount > 0).length
       }
     });
@@ -315,3 +338,4 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: err.message || 'Erro ao processar linhagem' }, { status: 500 });
   }
 }
+

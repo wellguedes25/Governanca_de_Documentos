@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   FileText, Zap, Clock, Activity, Loader2, AlertTriangle,
   RotateCcw, BarChart3, TrendingUp,
-  Archive, Building2, Database, ChevronRight
+  Archive, Building2, Database, ChevronRight, ShieldCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUI } from '@/context/UIContext';
@@ -120,7 +120,7 @@ export default function Dashboard() {
       const data = await res.json();
       if (data.error) {
         setError(data.error);
-        return; // Retorna sem lançar exceção para não quebrar o React Client Component
+        throw new Error(data.error);
       }
       setError(null);
 
@@ -138,51 +138,46 @@ export default function Dashboard() {
   }, [docVersion]);
 
   const fetchGlobalQuality = useCallback(async (force = false) => {
-    const cacheKey = `dashboard_global_quality_${docVersion || 'V2'}`;
+    const cacheKey = `dashboard_quality_${docVersion || 'V2'}`;
     if (!force) {
       const cached = sessionStorage.getItem(cacheKey);
       if (cached) {
         try {
           setGlobalQuality(JSON.parse(cached));
-          setLoadingMap(prev => ({ ...prev, 'globalQuality': false }));
+          setLoadingMap(prev => ({ ...prev, globalQuality: false }));
           return;
-        } catch (e) {}
+        } catch (e) {
+          console.error("Cache parse error", e);
+        }
       }
     }
 
-    setLoadingMap(prev => ({ ...prev, 'globalQuality': true }));
+    setLoadingMap(prev => ({ ...prev, globalQuality: true }));
     try {
-      const res = await fetch(`/api/dashboard/quality`);
+      const res = await fetch(`/api/dashboard/quality?version=${docVersion || 'V2'}`);
       const data = await res.json();
-      if (!data.error) {
-        setGlobalQuality(data);
-        sessionStorage.setItem(cacheKey, JSON.stringify(data));
-      }
-    } catch (e) {
-      console.error(e);
+      if (data.error) throw new Error(data.error);
+      setGlobalQuality(data);
+      sessionStorage.setItem(cacheKey, JSON.stringify(data));
+    } catch (err) {
+      console.error("Erro ao carregar qualidade global:", err);
     } finally {
-      setLoadingMap(prev => ({ ...prev, 'globalQuality': false }));
+      setLoadingMap(prev => ({ ...prev, globalQuality: false }));
     }
   }, [docVersion]);
 
-  // Inicialização de Configurações
   useEffect(() => {
-    async function loadConfig() {
-      try {
-        const res = await fetch('/api/connections');
-        const data = await res.json();
-        setEnabledQueries(data.enabledQueries || {});
-      } catch (err) {
-        console.error('Erro ao carregar config:', err);
-      }
-    }
-    loadConfig();
+    fetch('/api/connections')
+      .then(res => res.json())
+      .then(data => {
+        if (data.enabledQueries) {
+          setEnabledQueries(data.enabledQueries);
+        }
+      })
+      .catch(console.error);
   }, []);
 
-  // Carregamento Sob Demanda baseado na Aba Ativa
   useEffect(() => {
-    if (Object.keys(enabledQueries).length === 0) return;
-
     if (activeTab === 'operacional') {
       if (enabledQueries['total'] !== false) fetchStats(false, 'total');
       if (enabledQueries['prod24h'] !== false) fetchStats(false, 'prod24h');
@@ -200,14 +195,14 @@ export default function Dashboard() {
 
   const getCardData = (id: string) => {
     const cardMap: Record<string, any> = {
-      total: { title: 'Volume Geral (90d)', value: stats?.total || '0', icon: <FileText size={20} /> },
-      prod24h: { title: 'Produção 24h', value: stats?.prod24h || '0', icon: <Activity size={20} /> },
+      total: { title: 'Volume Geral (90d)', value: stats?.total || '0', icon: <FileText size={18} /> },
+      prod24h: { title: 'Produção 24h', value: stats?.prod24h || '0', icon: <Activity size={18} /> },
     };
 
     if (id === 'hospitais') return {
       title: 'Hospitais Mapeados',
       value: '7 UN',
-      icon: <Building2 size={20} />
+      icon: <Building2 size={18} />
     };
 
     if (id === 'volumeTurno') {
@@ -216,16 +211,15 @@ export default function Dashboard() {
       return {
         title: 'Turno Dia / Noite',
         value: `${dia} / ${noite}`,
-        icon: <Clock size={20} />
+        icon: <Clock size={18} />
       };
     }
 
-    return cardMap[id] || { title: 'Indicador', value: '0', icon: <BarChart3 size={20} /> };
+    return cardMap[id] || { title: 'Indicador', value: '0', icon: <BarChart3 size={18} /> };
   };
 
   const isCardLoading = (id: string) => loadingMap[id];
 
-  // Dados para o gráfico de Unidades
   const unitData: Array<{ sigla: string; total: number }> = (analytics?.unitAdherence || []).map((u: any) => ({
     sigla: u.SIGLA_UNIDADE || '??',
     total: Number(u.QTD_TOTAL_PREENCHIDA || 0)
@@ -235,357 +229,320 @@ export default function Dashboard() {
   if (!docVersion) return null;
 
   return (
-    <div className="h-screen bg-background text-foreground flex flex-col md:flex-row overflow-hidden selection:bg-[var(--primary)] selection:text-black font-mono">
+    <div className="flex flex-col md:flex-row min-h-screen pb-16 gap-6">
       
-      {/* 10% Asymmetric Left Bar (Sidebar) */}
-      <div className="hidden md:flex w-64 border-r border-border flex-col justify-between py-8 z-10 bg-background">
-        
-        <div className="px-6 mb-12">
-          <div className="w-12 h-12 bg-white text-black flex items-center justify-center font-black text-xl mb-6">
-            MP
+      {/* Telemetry Tab Selector Bar */}
+      <div className="w-full md:w-60 bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs flex flex-col justify-between shrink-0 self-start">
+        <div>
+          <div className="flex items-center gap-2.5 pb-4 mb-4 border-b border-slate-100">
+            <div className="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center font-bold">
+              <ShieldCheck size={18} />
+            </div>
+            <div>
+              <h2 className="text-xs font-bold text-slate-900 tracking-tight leading-none">
+                Telemetria
+              </h2>
+              <span className="text-[10px] text-sky-700 font-bold uppercase tracking-wider">
+                PEP MV · {docVersion}
+              </span>
+            </div>
           </div>
-          <div className="text-[10px] font-black uppercase tracking-[0.2em] text-muted mb-2">
-            Medlytics Gateway
+
+          <div className="flex flex-col gap-1.5">
+            {[
+              { id: 'operacional', label: 'Operacional', icon: <TrendingUp size={15} /> },
+              { id: 'unidades', label: 'Unidades', icon: <Building2 size={15} /> },
+              { id: 'qualidade', label: 'Qualidade & SLA', icon: <Zap size={15} /> }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as DashboardTab)}
+                className={cn(
+                  "flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all border",
+                  activeTab === tab.id 
+                    ? "bg-sky-50/80 text-sky-800 border-sky-200/90 font-bold shadow-2xs" 
+                    : "bg-white text-slate-600 border-transparent hover:bg-slate-50 hover:text-slate-900"
+                )}
+              >
+                <span className={cn(activeTab === tab.id ? "text-sky-600" : "text-slate-400")}>
+                  {tab.icon}
+                </span>
+                <span>{tab.label}</span>
+                {activeTab === tab.id && <ChevronRight size={14} className="ml-auto text-sky-600" />}
+              </button>
+            ))}
           </div>
-          <h1 className="text-2xl font-black uppercase tracking-tighter text-[var(--primary)]">
-            Telemetria <span className="text-foreground block">{docVersion}</span>
-          </h1>
         </div>
 
-        <div className="flex-1 flex flex-col gap-2 px-4">
-          {[
-            { id: 'operacional', label: 'Operacional', icon: <TrendingUp size={16} /> },
-            { id: 'unidades', label: 'Unidades', icon: <Building2 size={16} /> },
-            { id: 'qualidade', label: 'Qualidade', icon: <Zap size={16} /> }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as DashboardTab)}
-              className={cn(
-                "flex items-center gap-4 px-4 py-4 text-xs font-black uppercase tracking-widest transition-all border border-transparent",
-                activeTab === tab.id 
-                  ? "bg-[var(--primary)] text-black border-[var(--primary)]" 
-                  : "text-muted -foreground -border -background"
-              )}
-            >
-              {tab.icon}
-              {tab.label}
-              {activeTab === tab.id && <ChevronRight size={16} className="ml-auto" />}
-            </button>
-          ))}
-        </div>
-
-        <div className="px-6 mt-auto">
+        <div className="pt-6 mt-6 border-t border-slate-100">
           <button
             onClick={() => {
               fetchStats(true);
               fetchAnalytics(true);
             }}
             disabled={statsLoading || analyticsLoading}
-            className="w-full flex items-center justify-between p-4 bg-card border border-border text-xs font-black uppercase tracking-widest transition-all hover:border-[var(--primary)] disabled:opacity-50 disabled:cursor-not-allowed group"
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100/80 transition-all disabled:opacity-50"
           >
             <span>{statsLoading || analyticsLoading ? 'Sincronizando...' : 'Sincronizar'}</span>
-            <RotateCcw size={14} className={cn("text-muted-foreground transition-all group-hover:text-[var(--primary)]", (statsLoading || analyticsLoading) && "animate-spin text-[var(--primary)]")} />
+            <RotateCcw size={13} className={cn("text-slate-400", (statsLoading || analyticsLoading) && "animate-spin text-sky-600")} />
           </button>
         </div>
       </div>
 
-      {/* Mobile Header (fallback) */}
-      <div className="md:hidden flex flex-col border-b border-border bg-background p-4 gap-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-             <div className="w-8 h-8 bg-white text-black flex items-center justify-center font-black text-sm">MP</div>
-             <h1 className="text-lg font-black uppercase tracking-tighter text-[var(--primary)]">Telemetria {docVersion}</h1>
-          </div>
-          <button onClick={() => { fetchStats(true); fetchAnalytics(true); }}>
-            <RotateCcw size={16} className={cn("text-muted", (statsLoading || analyticsLoading) && "animate-spin")} />
-          </button>
-        </div>
-        
-        <div className="flex flex-wrap gap-2">
-          {[
-            { id: 'operacional', label: 'Operacional' },
-            { id: 'unidades', label: 'Unidades' },
-            { id: 'qualidade', label: 'Qualidade' }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as DashboardTab)}
-              className={cn(
-                "px-3 py-2 text-[10px] font-black uppercase tracking-widest border transition-all",
-                activeTab === tab.id ? "bg-[var(--primary)] text-black border-[var(--primary)]" : "text-muted border-border"
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 90% Main Content Area */}
-      <div className="flex-1 flex flex-col h-full overflow-y-auto p-4 md:p-12 space-y-8 bg-background">
-        
-        {/* Error State */}
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col space-y-6">
+        {/* Error Alert */}
         {error && (
-          <div className="border border-red-500 bg-red-500/10 p-6 flex flex-col md:flex-row items-start md:items-center gap-6">
-            <div className="w-12 h-12 bg-red-500 text-black flex items-center justify-center font-black shrink-0">
-              <AlertTriangle size={24} />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-sm font-black text-red-500 uppercase tracking-widest mb-1">Falha Crítica de Sincronização</h3>
-              <p className="text-red-400 text-xs uppercase tracking-widest">
-                System Error: {error}
-              </p>
+          <div className="border border-rose-200 bg-rose-50 p-4 rounded-xl flex items-center gap-3 text-xs text-rose-700">
+            <AlertTriangle size={18} className="text-rose-600 shrink-0" />
+            <div>
+              <p className="font-bold text-rose-900">Falha ao obter telemetria do banco</p>
+              <p className="text-rose-600">{error}</p>
             </div>
           </div>
         )}
 
-        {/* Tab Content Rendering */}
-        <div className="animate-in fade-in duration-500">
-          
-          {/* TAB: OPERACIONAL */}
-          {activeTab === 'operacional' && (
-            <div className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {['total', 'prod24h', 'hospitais', 'volumeTurno'].map(id => {
-                  const card = getCardData(id);
-                  return (
-                    <div key={id} className="border border-border bg-card p-6 flex flex-col gap-4 group hover:border-[var(--primary)] transition-colors relative overflow-hidden">
-                      <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest flex items-center justify-between">
-                        {card.title}
-                        <span className="text-zinc-600 group-hover:text-[var(--primary)] transition-colors">{card.icon}</span>
-                      </div>
-                      <div className="text-4xl lg:text-4xl font-black text-foreground tracking-tighter my-2 h-10 flex items-center">
-                        {isCardLoading(id) ? (
-                          <Skeleton className="h-9 w-32" />
-                        ) : (
-                          card.value
-                        )}
-                      </div>
-                      <div className="w-full h-1 bg-background mt-auto">
-                        <div className="h-full bg-foreground group-hover:bg-[var(--primary)] transition-colors w-1/3" />
+        {/* TAB: OPERACIONAL */}
+        {activeTab === 'operacional' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* KPI Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {['total', 'prod24h', 'hospitais', 'volumeTurno'].map(id => {
+                const card = getCardData(id);
+                return (
+                  <div key={id} className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs flex flex-col justify-between hover:border-sky-300 transition-all">
+                    <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-2">
+                      <span>{card.title}</span>
+                      <div className="p-1.5 rounded-lg bg-sky-50 text-sky-600 border border-sky-100">
+                        {card.icon}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="text-2xl font-bold font-mono tabular-nums text-slate-900 my-1">
+                      {isCardLoading(id) ? <Skeleton className="h-7 w-24" /> : card.value}
+                    </div>
+                    <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden mt-3">
+                      <div className="h-full bg-sky-600 rounded-full w-2/5" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
 
-              {/* Huge Data Block for Ranking */}
-              <div className="border border-border bg-background p-6 md:p-12 relative overflow-hidden">
-                <h2 className="text-xl font-black text-[var(--primary)] uppercase tracking-widest mb-12 relative z-10 flex items-center gap-4">
-                  <span className="w-4 h-4 bg-[var(--primary)]"></span>
-                  Curva ABC (Top 10 Documentos)
-                </h2>
-                
-                <div className="space-y-6 relative z-10">
-                  {loadingMap['top10'] ? (
-                    <div className="space-y-6">
-                      {[100, 82, 68, 54, 42, 30].map((widthPct, idx) => (
-                        <div key={idx} className="flex flex-col gap-2">
-                          <div className="flex justify-between items-end">
-                            <div className="flex items-center gap-4">
-                              <Skeleton className="h-4 w-6 font-mono" />
-                              <Skeleton className="h-4 w-44 md:w-80" />
-                            </div>
-                            <Skeleton className="h-4 w-16" />
-                          </div>
-                          <div className="h-4 w-full bg-card border border-border overflow-hidden">
-                            <Skeleton className="h-full" style={{ width: `${widthPct}%` }} />
-                          </div>
+            {/* Curva ABC (Top 10 Documentos) */}
+            <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-xs">
+              <div className="flex items-center justify-between pb-4 mb-5 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <BarChart3 size={17} className="text-sky-600" />
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                    Curva ABC (Top 10 Documentos Mais Utilizados)
+                  </h3>
+                </div>
+                <span className="text-xs text-slate-500 font-medium">Janela: Últimos 90 dias</span>
+              </div>
+              
+              <div className="space-y-4">
+                {loadingMap['top10'] ? (
+                  <div className="space-y-4">
+                    {[100, 80, 65, 50, 40].map((widthPct, idx) => (
+                      <div key={idx} className="space-y-1.5">
+                        <div className="flex justify-between items-center">
+                          <Skeleton className="h-4 w-52" />
+                          <Skeleton className="h-4 w-14" />
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    analytics?.top10?.map((doc: any, i: number) => {
-                      const max = analytics.top10[0]?.QTD_TOTAL || 1;
-                      const percent = (doc.QTD_TOTAL / max) * 100;
-                      return (
-                        <div key={i} className="group/bar flex flex-col gap-2">
-                          <div className="flex justify-between items-end">
-                            <span className="text-xs font-black text-foreground uppercase tracking-widest flex items-center gap-4">
-                              <span className="text-muted-foreground font-mono w-6">#{String(i + 1).padStart(2, '0')}</span>
+                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-slate-200" style={{ width: `${widthPct}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  analytics?.top10?.map((doc: any, i: number) => {
+                    const max = analytics.top10[0]?.QTD_TOTAL || 1;
+                    const percent = (doc.QTD_TOTAL / max) * 100;
+                    return (
+                      <div key={i} className="group space-y-1.5">
+                        <div className="flex justify-between items-center text-xs">
+                          <div className="flex items-center gap-2 truncate max-w-lg">
+                            <span className="font-mono font-bold text-slate-400 text-[11px] w-5">
+                              #{String(i + 1).padStart(2, '0')}
+                            </span>
+                            <span className="font-medium text-slate-800 truncate group-hover:text-sky-700 transition-colors">
                               {doc.DS_DOCUMENTO}
                             </span>
-                            <span className="text-sm font-black text-[var(--primary)] font-mono">
-                              {Number(doc.QTD_TOTAL).toLocaleString('pt-BR')}
-                            </span>
                           </div>
-                          <div className="h-4 w-full bg-card border border-border">
-                            <div
-                              className="h-full bg-foreground group-hover/bar:bg-[var(--primary)] transition-colors duration-300"
-                              style={{ width: `${percent}%` }}
-                            />
-                          </div>
+                          <span className="font-mono font-bold text-slate-900 tabular-nums ml-2">
+                            {Number(doc.QTD_TOTAL).toLocaleString('pt-BR')}
+                          </span>
                         </div>
-                      )
-                    })
-                  )}
-                </div>
+                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-sky-600 to-sky-400 rounded-full transition-all duration-500"
+                            style={{ width: `${percent}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* TAB: UNIDADES */}
-          {activeTab === 'unidades' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 border border-border bg-background p-6 md:p-12">
-                <h2 className="text-xl font-black text-foreground uppercase tracking-widest mb-12 flex items-center gap-4">
-                  <span className="w-4 h-4 bg-white"></span>
-                  Produção por Unidade
-                </h2>
-                <div className="space-y-8">
-                  {loadingMap['unitAdherence'] ? (
-                    <div className="space-y-8">
-                      {[90, 75, 58, 42, 28].map((widthPct, idx) => (
-                        <div key={idx}>
-                          <div className="flex justify-between items-center mb-3">
-                            <Skeleton className="h-4 w-20" />
-                            <Skeleton className="h-4 w-16" />
-                          </div>
-                          <div className="h-6 w-full bg-card border border-border overflow-hidden">
-                            <Skeleton className="h-full" style={{ width: `${widthPct}%` }} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    unitData.map((unit) => {
-                      const percent = (unit.total / maxUnitTotal) * 100;
-                      return (
-                        <div key={unit.sigla} className="group">
-                          <div className="flex justify-between items-center mb-3">
-                            <span className="text-sm font-black text-muted-foreground uppercase tracking-widest transition-colors">
-                              {unit.sigla}
-                            </span>
-                            <span className="text-sm font-black text-foreground font-mono">
-                              {unit.total.toLocaleString('pt-BR')}
-                            </span>
-                          </div>
-                          <div className="h-6 w-full bg-card border border-border relative">
-                            {/* Grid markers inside bar */}
-                            <div className="absolute inset-0 grid grid-cols-4 pointer-events-none">
-                              <div className="border-r border-border"></div>
-                              <div className="border-r border-border"></div>
-                              <div className="border-r border-border"></div>
-                              <div></div>
-                            </div>
-                            <div
-                              className="h-full bg-foreground group-hover:bg-[var(--primary)] transition-colors duration-500"
-                              style={{ width: `${percent}%` }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
+        {/* TAB: UNIDADES */}
+        {activeTab === 'unidades' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-200">
+            <div className="lg:col-span-2 bg-white border border-slate-200/80 rounded-xl p-6 shadow-xs">
+              <div className="flex items-center justify-between pb-4 mb-5 border-b border-slate-100">
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
+                  <Building2 size={16} className="text-sky-600" />
+                  Produção por Unidade Hospitalar
+                </h3>
+                <span className="text-xs text-slate-500 font-medium">Documentos gerados</span>
               </div>
-
-              <div className="space-y-8">
-                 <div className="border border-[var(--primary)] bg-[var(--primary)]/5 p-8 text-foreground relative overflow-hidden">
-                   <h4 className="text-xs font-black uppercase tracking-[0.2em] mb-8 flex items-center gap-3 text-[var(--primary)]">
-                     <div className="w-2 h-2 bg-[var(--primary)] animate-pulse"></div>
-                     Status da Rede
-                   </h4>
-                   <div className="space-y-6 font-mono">
-                      <div className="flex justify-between items-end border-b border-border pb-2">
-                        <span className="text-[10px] uppercase text-muted">Database Oracle</span>
-                        <span className="text-xs font-black text-[var(--primary)]">ESTÁVEL</span>
+              <div className="space-y-4">
+                {loadingMap['unitAdherence'] ? (
+                  <div className="space-y-4">
+                    {[90, 75, 58, 42].map((widthPct, idx) => (
+                      <div key={idx} className="space-y-1.5">
+                        <Skeleton className="h-4 w-28" />
+                        <Skeleton className="h-3 w-full" />
                       </div>
-                      <div className="flex justify-between items-end border-b border-border pb-2">
-                        <span className="text-[10px] uppercase text-muted">Latência Média</span>
-                        <span className="text-xs font-black text-foreground">42ms</span>
+                    ))}
+                  </div>
+                ) : (
+                  unitData.map((unit) => {
+                    const percent = (unit.total / maxUnitTotal) * 100;
+                    return (
+                      <div key={unit.sigla} className="group space-y-1.5">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-bold text-slate-800 font-mono">
+                            {unit.sigla}
+                          </span>
+                          <span className="font-mono font-bold text-slate-900 tabular-nums">
+                            {unit.total.toLocaleString('pt-BR')}
+                          </span>
+                        </div>
+                        <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-sky-600 group-hover:bg-sky-500 transition-all rounded-full duration-500"
+                            style={{ width: `${percent}%` }}
+                          />
+                        </div>
                       </div>
-                   </div>
-                 </div>
-
-                 <div className="border border-border p-8 group hover:border-[var(--primary)] transition-colors bg-card">
-                  <h3 className="text-xs font-black text-muted-foreground flex items-center gap-3 mb-4 uppercase tracking-widest transition-colors">
-                    <Database size={16} />
-                    INFO UNIDADE
-                  </h3>
-                  <p className="text-[10px] text-muted leading-relaxed font-bold uppercase tracking-widest">
-                    Dados segmentados unidades hospitalares. Sincronização granular via DBLink por Medylitcs Pro.
-                  </p>
-                </div>
+                    );
+                  })
+                )}
               </div>
             </div>
-          )}
 
-          {/* TAB: QUALIDADE */}
-          {activeTab === 'qualidade' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                 <div className="border border-border p-6 flex flex-col gap-4 group hover:border-[var(--primary)] transition-colors bg-card md:col-span-2">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center justify-between">
-                      Taxa de Assinatura
-                      <Zap size={16} className="text-zinc-600 group-hover:text-[var(--primary)]" />
-                    </div>
-                    <div className="text-6xl font-black text-foreground tracking-tighter my-4 h-16 flex items-center">
-                      {loadingMap['assinados'] ? <Skeleton className="h-14 w-44" /> : (stats?.assinadosPercent || '0.0%')}
-                    </div>
-                    <div className="flex gap-8 border-t border-border pt-6 mt-auto font-mono">
-                      <div>
-                        <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-2">Assinados</p>
-                        <div className="text-xl font-black text-[var(--primary)] h-7 flex items-center">
-                          {loadingMap['assinados'] ? <Skeleton className="h-5 w-20" /> : (stats?.assinadosRaw || '0')}
-                        </div>
-                      </div>
-                      <div className="w-[1px] bg-background" />
-                      <div>
-                        <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-2">Total</p>
-                        <div className="text-xl font-black text-foreground h-7 flex items-center">
-                          {loadingMap['assinados'] ? <Skeleton className="h-5 w-20" /> : (stats?.totalRaw || '0')}
-                        </div>
-                      </div>
-                    </div>
-                 </div>
-
-                 <div className="border border-border p-6 flex flex-col gap-4 group hover:border-red-500 transition-colors bg-card md:col-span-2">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center justify-between">
-                      Docs Ociosos
-                      <Archive size={16} className="text-zinc-600 group-hover:text-red-500" />
-                    </div>
-                    <div className="text-6xl font-black text-foreground tracking-tighter my-4 h-16 flex items-center">
-                      {loadingMap['idle'] ? <Skeleton className="h-14 w-44" /> : Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR')}
-                    </div>
-                    <div className="flex gap-8 border-t border-border pt-6 mt-auto font-mono">
-                      <div>
-                        <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-2">Ociosos</p>
-                        <div className="text-xl font-black text-red-500 h-7 flex items-center">
-                          {loadingMap['idle'] ? <Skeleton className="h-5 w-20" /> : Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR')}
-                        </div>
-                      </div>
-                      <div className="w-[1px] bg-background" />
-                      <div>
-                        <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-2">Modelos (Templates)</p>
-                        <div className="text-xl font-black text-foreground h-7 flex items-center">
-                          {loadingMap['idle'] ? <Skeleton className="h-5 w-20" /> : Number(analytics?.idle?.[0]?.TOTAL_TEMPLATES || 0).toLocaleString('pt-BR')}
-                        </div>
-                      </div>
-                    </div>
-                 </div>
+              <div className="bg-sky-50/60 border border-sky-100 rounded-xl p-5 shadow-xs space-y-3">
+                <div className="flex items-center gap-2 text-sky-800 font-bold text-xs uppercase tracking-wider">
+                  <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse"></span>
+                  Status da Rede Oracle
+                </div>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between py-1 border-b border-sky-200/50">
+                    <span className="text-slate-600">Conexão Ativa:</span>
+                    <span className="font-bold text-sky-900">ESTÁVEL</span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="text-slate-600">Sincronização:</span>
+                    <span className="font-bold text-slate-800 font-mono">Automática</span>
+                  </div>
+                </div>
               </div>
 
-              {/* SLA ASSINATURA */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                 {/* SLA */}
-                 <div className="border border-border p-6 flex flex-col gap-4 group hover:border-indigo-500 transition-colors bg-card">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center justify-between">
-                      SLA Assinatura 24h
-                      <Clock size={16} className="text-zinc-600 group-hover:text-indigo-500" />
-                    </div>
-                    <div className="text-5xl font-black text-foreground tracking-tighter my-4 h-12 flex items-center">
-                      {loadingMap['globalQuality'] ? <Skeleton className="h-10 w-28" /> : `${globalQuality?.sla24h || '100.0'}%`}
-                    </div>
-                    <div className="border-t border-border pt-4 mt-auto">
-                      <p className="text-[9px] font-bold text-indigo-500 bg-indigo-500/10 px-2 py-1 uppercase tracking-widest inline-block">Fechamento Rápido</p>
-                    </div>
-                 </div>
+              <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs">
+                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2 mb-2">
+                  <Database size={14} className="text-sky-600" />
+                  Segmentação Hospitalar
+                </h4>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Os dados de cada unidade são integrados diretamente através do schema DBAMV da ACSC para auditoria clínica contínua.
+                </p>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* TAB: QUALIDADE & SLA */}
+        {activeTab === 'qualidade' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {/* Taxa de Assinatura */}
+              <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-2">
+                    <span>Taxa de Assinatura</span>
+                    <Zap size={16} className="text-amber-500" />
+                  </div>
+                  <div className="text-4xl font-bold font-mono tracking-tight text-slate-900 my-2">
+                    {loadingMap['assinados'] ? <Skeleton className="h-10 w-28" /> : (stats?.assinadosPercent || '0.0%')}
+                  </div>
+                </div>
+                <div className="flex gap-4 border-t border-slate-100 pt-3 mt-4 text-xs font-mono">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">Assinados</span>
+                    <span className="font-bold text-sky-800">{stats?.assinadosRaw || '0'}</span>
+                  </div>
+                  <div className="w-px h-6 bg-slate-200" />
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">Total</span>
+                    <span className="font-bold text-slate-700">{stats?.totalRaw || '0'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* SLA de Assinatura em 24h */}
+              <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-2">
+                    <span>SLA Fechamento 24h</span>
+                    <Clock size={16} className="text-emerald-600" />
+                  </div>
+                  <div className="text-4xl font-bold font-mono tracking-tight text-emerald-600 my-2">
+                    {loadingMap['globalQuality'] ? <Skeleton className="h-10 w-28" /> : `${globalQuality?.sla24h || '100.0'}%`}
+                  </div>
+                </div>
+                <div className="border-t border-slate-100 pt-3 mt-4">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                    Conformidade Clínica
+                  </span>
+                </div>
+              </div>
+
+              {/* Documentos Ociosos */}
+              <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-2">
+                    <span>Documentos Ociosos</span>
+                    <Archive size={16} className="text-rose-500" />
+                  </div>
+                  <div className="text-4xl font-bold font-mono tracking-tight text-slate-900 my-2">
+                    {loadingMap['idle'] ? <Skeleton className="h-10 w-28" /> : Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR')}
+                  </div>
+                </div>
+                <div className="flex gap-4 border-t border-slate-100 pt-3 mt-4 text-xs font-mono">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">Ociosos</span>
+                    <span className="font-bold text-rose-600">
+                      {Number(analytics?.idle?.[0]?.TOTAL_DOCS_OCIOSOS || 0).toLocaleString('pt-BR')}
+                    </span>
+                  </div>
+                  <div className="w-px h-6 bg-slate-200" />
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">Templates</span>
+                    <span className="font-bold text-slate-700">
+                      {Number(analytics?.idle?.[0]?.TOTAL_TEMPLATES || 0).toLocaleString('pt-BR')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

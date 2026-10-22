@@ -39,9 +39,9 @@ interface SlaItem {
 }
 
 const COLORS = [
-  'bg-[var(--primary)]', 'bg-emerald-500', 'bg-amber-500', 'bg-indigo-500', 
-  'bg-purple-500', 'bg-rose-500', '-accent', 'bg-cyan-500', 
-  'bg-fuchsia-500', 'bg-lime-500', 'bg-sky-500', 'bg-orange-500'
+  'bg-sky-600', 'bg-emerald-600', 'bg-amber-600', 'bg-teal-600', 
+  'bg-cyan-600', 'bg-rose-600', 'bg-slate-700', 'bg-blue-600', 
+  'bg-emerald-500', 'bg-lime-600', 'bg-sky-500', 'bg-orange-500'
 ];
 
 interface HospitalStats {
@@ -271,53 +271,65 @@ export default function HospitaisPage() {
           {/* KPI Grid - Linha 1: Métricas Operacionais */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             
-            <div className="border border-border -background p-6 flex flex-col gap-4 group hover:border-[var(--primary)] transition-colors relative">
-              <div className="absolute top-0 right-0 w-8 h-8 -background group-hover:bg-[var(--primary)] transition-colors flex items-center justify-center">
-                 <FileText size={14} className="text-muted group-hover:text-black" />
+            <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs flex flex-col justify-between hover:border-sky-300 transition-all">
+              <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-2">
+                <div>
+                  <span className="block text-slate-700 font-bold">Total Preenchido</span>
+                  <span className="text-[10px] text-slate-400 font-normal">{selectedHospital.nome}</span>
+                </div>
+                <div className="p-1.5 rounded-lg bg-sky-50 text-sky-600 border border-sky-100">
+                  <FileText size={16} />
+                </div>
               </div>
-              <div className="text-[10px] text-muted font-black uppercase tracking-widest">
-                Total Preenchido
-                <span className="block mt-1 -muted">{selectedHospital.nome}</span>
-              </div>
-              <div className="text-5xl font-black text-foreground tracking-tighter mt-2">
+              <div className="text-3xl font-bold font-mono tabular-nums text-slate-900 my-1">
                 {Number(data?.kpis?.TOTAL_DOCS || 0).toLocaleString('pt-BR')}
               </div>
-              <div className="mt-auto pt-4 border-t border-border">
-                <span className="text-[9px] font-black uppercase tracking-widest text-[var(--primary)] bg-[var(--primary)]/10 px-2 py-1">Volume 90d</span>
+              <div className="mt-3 pt-2.5 border-t border-slate-100">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-sky-800 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200">
+                  Volume 90d
+                </span>
               </div>
             </div>
 
-            <div className="border border-border -background p-6 flex flex-col gap-4 group hover:border-emerald-500 transition-colors relative">
-              <div className="absolute top-0 right-0 w-8 h-8 -background group-hover:bg-emerald-500 transition-colors flex items-center justify-center">
-                 <Activity size={14} className="text-muted group-hover:text-black" />
+            <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs flex flex-col justify-between hover:border-emerald-300 transition-all">
+              <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-2">
+                <div>
+                  <span className="block text-slate-700 font-bold">Documentos Ativos</span>
+                  <span className="text-[10px] text-slate-400 font-normal">Modelos únicos em uso</span>
+                </div>
+                <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100">
+                  <Activity size={16} />
+                </div>
               </div>
-              <div className="text-[10px] text-muted font-black uppercase tracking-widest">
-                Documentos Ativos
-                <span className="block mt-1 -muted">Modelos únicos em uso</span>
-              </div>
-              <div className="text-5xl font-black text-foreground tracking-tighter mt-2">
+              <div className="text-3xl font-bold font-mono tabular-nums text-slate-900 my-1">
                 {data?.kpis?.DOCS_ATIVOS || 0}
               </div>
-              <div className="mt-auto pt-4 border-t border-border">
-                <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-2 py-1">Aderência Local</span>
+              <div className="mt-3 pt-2.5 border-t border-slate-100">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  Aderência Local
+                </span>
               </div>
             </div>
 
-            <div className="border border-border -background p-6 flex flex-col gap-4 group hover:border-amber-500 transition-colors relative">
-              <div className="absolute top-0 right-0 w-8 h-8 -background group-hover:bg-amber-500 transition-colors flex items-center justify-center">
-                 <Clock size={14} className="text-muted group-hover:text-black" />
+            <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs flex flex-col justify-between hover:border-amber-300 transition-all">
+              <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-2">
+                <div>
+                  <span className="block text-slate-700 font-bold">Recência de Uso</span>
+                  <span className="text-[10px] text-slate-400 font-normal">Última Atividade</span>
+                </div>
+                <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600 border border-amber-100">
+                  <Clock size={16} />
+                </div>
               </div>
-              <div className="text-[10px] text-muted font-black uppercase tracking-widest">
-                Recência de Uso
-                <span className="block mt-1 -muted">Última Atividade</span>
-              </div>
-              <div className="text-2xl font-black text-foreground tracking-tighter mt-2">
+              <div className="text-xl font-bold font-mono tabular-nums text-slate-900 my-1 truncate">
                 {data.kpis.ULTIMO_REGISTRO 
                   ? new Date(data.kpis.ULTIMO_REGISTRO).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
                   : 'N/A'}
               </div>
-              <div className="mt-auto pt-4 border-t border-border">
-                <span className="text-[9px] font-black uppercase tracking-widest text-amber-500 bg-amber-500/10 px-2 py-1">Status em Tempo Real</span>
+              <div className="mt-3 pt-2.5 border-t border-slate-100">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                  Tempo Real
+                </span>
               </div>
             </div>
 
@@ -325,68 +337,71 @@ export default function HospitaisPage() {
 
           {/* KPI Grid - Linha 2: Eficiência & Segurança (SLA) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="border border-border -background p-6 flex flex-col gap-4 group hover:border-indigo-500 transition-colors relative">
-              <div className="absolute top-0 right-0 w-8 h-8 -background group-hover:bg-indigo-500 transition-colors flex items-center justify-center">
-                 <Clock size={14} className="text-muted group-hover:text-black" />
+            <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs flex flex-col justify-between hover:border-emerald-300 transition-all">
+              <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-2">
+                <div>
+                  <span className="block text-slate-700 font-bold">SLA de Assinatura (24h)</span>
+                  <span className="text-[10px] text-slate-400 font-normal">Fechamento do Registro (CFM)</span>
+                </div>
+                <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100">
+                  <Clock size={16} />
+                </div>
               </div>
-              <div className="text-[10px] text-muted font-black uppercase tracking-widest">
-                SLA de Assinatura (24h)
-                <span className="block mt-1 -muted">Fechamento do Registro (CFM)</span>
-              </div>
-              <div className="text-5xl font-black text-foreground tracking-tighter mt-2">
+              <div className="text-3xl font-bold font-mono tabular-nums text-emerald-600 my-1">
                 {slaPercentage}%
               </div>
-              <div className="mt-auto pt-4 border-t border-border">
-                <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500 bg-indigo-500/10 px-2 py-1">Tempo Limite de Faturamento</span>
+              <div className="mt-3 pt-2.5 border-t border-slate-100">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  Tempo Limite de Faturamento
+                </span>
               </div>
             </div>
           </div>
 
           {/* Main Content: Table & Ranking */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
             {/* Table block */}
-            <div className="lg:col-span-2 border border-border bg-background p-6 md:p-8 relative">
-              <h2 className="text-xl font-black text-foreground uppercase tracking-widest mb-8 flex items-center gap-4">
-                <span className="w-4 h-4 bg-white"></span>
-                Últimos Registros
-                <span className="-muted ml-auto text-xs">{selectedHospital.sigla}</span>
-              </h2>
+            <div className="lg:col-span-2 bg-white border border-slate-200/80 rounded-xl p-6 shadow-xs">
+              <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
+                  <FileText size={16} className="text-sky-600" />
+                  Últimos Registros
+                </h3>
+                <span className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-sky-50 text-sky-800 border border-sky-100">
+                  {selectedHospital.sigla}
+                </span>
+              </div>
               
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+              <div className="overflow-x-auto scrollbar-thin">
+                <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b-2 border-border">
-                      <th className="py-4 text-[10px] font-black uppercase text-muted tracking-widest">Documento</th>
-                      <th className="py-4 text-[10px] font-black uppercase text-muted tracking-widest text-center">Versão</th>
-                      <th className="py-4 text-[10px] font-black uppercase text-muted tracking-widest text-right">Volume</th>
-                      <th className="py-4 text-[10px] font-black uppercase text-muted tracking-widest text-right">Último Uso</th>
+                    <tr className="border-b border-slate-200 text-slate-500 font-semibold">
+                      <th className="py-2.5">Documento</th>
+                      <th className="py-2.5 text-center">Versão</th>
+                      <th className="py-2.5 text-right">Volume</th>
+                      <th className="py-2.5 text-right">Último Uso</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800">
+                  <tbody className="divide-y divide-slate-100">
                     {data?.details?.slice(0, 5).map((item: DetailItem) => (
-                      <tr key={item.CD_DOCUMENTO} className="group -background transition-colors">
-                        <td className="py-4">
-                          <div className="flex items-center gap-4">
-                            <div className="w-8 h-8 bg-card flex items-center justify-center border border-border group-hover:border-[var(--primary)] group-hover:text-[var(--primary)] transition-colors">
-                              <FileText size={14} />
-                            </div>
-                            <div>
-                              <p className="text-xs font-black text-foreground tracking-tight uppercase">{item.NOME}</p>
-                              <p className="text-[10px] font-bold text-muted">ID: {item.CD_DOCUMENTO}</p>
-                            </div>
+                      <tr key={item.CD_DOCUMENTO} className="group hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3">
+                          <div>
+                            <p className="font-semibold text-slate-800 text-xs">{item.NOME}</p>
+                            <p className="text-[10px] text-slate-400 font-mono mt-0.5">ID: {item.CD_DOCUMENTO}</p>
                           </div>
                         </td>
-                        <td className="py-4 text-center">
-                          <span className="text-[10px] font-black bg-card px-2 py-1 border border-border text-muted -foreground transition-colors">V{item.VERSAO || '1'}</span>
-                        </td>
-                        <td className="py-4 text-right">
-                          <span className="text-sm font-black text-[var(--primary)]">{Number(item.USO_UNIDADE).toLocaleString('pt-BR')}</span>
-                        </td>
-                        <td className="py-4 text-right">
-                          <span className="text-[10px] font-black uppercase text-muted -foreground transition-colors">
-                            {item.ULTIMO_USO ? new Date(item.ULTIMO_USO).toLocaleDateString('pt-BR') : '-'}
+                        <td className="py-3 text-center font-mono">
+                          <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-bold">
+                            v{item.VERSAO || '1.0'}
                           </span>
+                        </td>
+                        <td className="py-3 text-right font-mono font-bold text-sky-800 tabular-nums">
+                          {Number(item.USO_UNIDADE).toLocaleString('pt-BR')}
+                        </td>
+                        <td className="py-3 text-right font-mono text-slate-500 text-[11px]">
+                          {item.ULTIMO_USO ? new Date(item.ULTIMO_USO).toLocaleDateString('pt-BR') : '-'}
                         </td>
                       </tr>
                     ))}
@@ -396,54 +411,52 @@ export default function HospitaisPage() {
             </div>
 
             {/* Ranking Section */}
-            <div className="space-y-8">
+            <div className="space-y-6">
               
-              <div className="border border-border bg-background p-6 md:p-8 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 text-[6vw] lg:text-[4vw] font-black -foreground/40 pointer-events-none leading-none select-none">
-                  TOP 5
-                </div>
-                <h3 className="text-lg font-black text-[var(--primary)] uppercase tracking-widest mb-8 flex items-center gap-3 relative z-10">
-                  <TrendingUp size={20} /> Top Documentos
+              <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-xs">
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide mb-5 flex items-center gap-2">
+                  <TrendingUp size={16} className="text-sky-600" />
+                  Top 5 Documentos
                 </h3>
                 
-                <div className="space-y-6 relative z-10">
+                <div className="space-y-4">
                   {data?.top5?.map((doc: Top5Item, i: number) => {
                     const max = data?.top5?.[0]?.USO || 1;
                     const percent = (doc.USO / max) * 100;
                     return (
-                      <div key={i} className="group/bar flex flex-col gap-2">
-                        <div className="flex justify-between items-end">
-                          <span className="text-[10px] font-black text-foreground uppercase tracking-widest truncate max-w-[70%]">
-                            <span className="-muted font-mono mr-2">#{i + 1}</span>
+                      <div key={i} className="group space-y-1.5">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-medium text-slate-700 truncate max-w-[70%]">
+                            <span className="font-mono text-slate-400 font-bold mr-1.5">#{i + 1}</span>
                             {doc.NOME}
                           </span>
-                          <span className="text-xs font-black text-[var(--primary)] font-mono">
+                          <span className="font-mono font-bold text-slate-900 tabular-nums">
                             {Number(doc.USO).toLocaleString('pt-BR')}
                           </span>
                         </div>
-                        <div className="h-3 w-full bg-card border border-border">
+                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                           <div
                             className={cn(
-                              "h-full transition-all duration-500 ease-out",
-                              i === 0 ? "bg-[var(--primary)]" : "-card group-hover/bar:bg-zinc-500"
+                              "h-full rounded-full transition-all duration-500",
+                              i === 0 ? "bg-sky-600" : "bg-sky-400"
                             )}
                             style={{ width: `${percent}%` }}
                           />
                         </div>
                       </div>
-                    )
+                    );
                   })}
                 </div>
               </div>
 
               {/* Info Card */}
-              <div className="border border-border -background p-8 group hover:border-white transition-colors">
-                <h4 className="text-xs font-black text-muted -foreground flex items-center gap-3 mb-4 uppercase tracking-widest transition-colors">
-                  <Activity size={16} />
+              <div className="bg-sky-50/60 border border-sky-100 rounded-xl p-5 shadow-xs">
+                <h4 className="text-xs font-bold text-sky-900 flex items-center gap-2 mb-2 uppercase tracking-wide">
+                  <Activity size={14} className="text-sky-600" />
                   Insight Operacional
                 </h4>
-                <p className="text-[10px] text-muted leading-relaxed font-bold uppercase tracking-widest">
-                  Esta unidade representa <span className="text-foreground">{(data.globalTotal > 0 ? ((Number(data.kpis.TOTAL_DOCS) / Number(data.globalTotal)) * 100) : 0).toFixed(1)}%</span> do volume total transacionado do ambiente <span className="text-foreground">{activeConnName || 'selecionado'}</span> nos últimos 90 dias.
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Esta unidade representa <span className="font-bold text-sky-900">{(data.globalTotal > 0 ? ((Number(data.kpis.TOTAL_DOCS) / Number(data.globalTotal)) * 100) : 0).toFixed(1)}%</span> do volume total transacionado do ambiente <span className="font-semibold text-slate-800">{activeConnName || 'selecionado'}</span> nos últimos 90 dias.
                 </p>
               </div>
 
@@ -451,17 +464,17 @@ export default function HospitaisPage() {
           </div>
 
           {/* Section: SLA de Assinatura */}
-          <div className="border-t border-border pt-8 space-y-6">
-            <h2 className="text-lg font-black text-foreground uppercase tracking-widest flex items-center gap-4">
-              <span className="w-4 h-4 bg-[var(--primary)]"></span>
+          <div className="border-t border-slate-200/80 pt-8 space-y-6">
+            <h2 className="text-lg font-bold text-slate-900 uppercase tracking-wide flex items-center gap-3">
+              <span className="w-3.5 h-3.5 bg-sky-600 rounded-xs"></span>
               Distribuição de SLA de Assinatura
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               
               {/* SLA Distribution */}
-              <div className="border border-border bg-background p-6 md:p-8 relative">
-                <h3 className="text-sm font-black text-[var(--primary)] uppercase tracking-widest mb-6 flex items-center gap-3">
-                  <span className="w-2.5 h-2.5 bg-indigo-500 rounded-none"></span>
+              <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-xs">
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide mb-6 flex items-center gap-3">
+                  <span className="w-2.5 h-2.5 bg-sky-600 rounded-full"></span>
                   SLA de Assinatura por Faixas
                 </h3>
                 <div className="space-y-4">
@@ -471,16 +484,16 @@ export default function HospitaisPage() {
                     const maxSla = Math.max(...slaRows.map((r: SlaItem) => Number(r.TOTAL)), 1);
                     const pct = (total / maxSla) * 100;
                     return (
-                      <div key={faixa} className="flex flex-col gap-1 text-[10px]">
+                      <div key={faixa} className="flex flex-col gap-1 text-xs">
                         <div className="flex justify-between items-center">
-                          <span className="font-bold tracking-wider uppercase">{faixa}</span>
-                          <span className="font-mono text-muted">{total} docs</span>
+                          <span className="font-semibold text-slate-700">{faixa}</span>
+                          <span className="font-mono text-slate-500 font-medium">{total} docs</span>
                         </div>
-                        <div className="h-2 w-full bg-card border border-border">
+                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                           <div 
                             className={cn(
-                              "h-full transition-all duration-500 ease-out", 
-                              faixa === 'Mais de 24h' ? 'bg-destructive' : 'bg-indigo-500'
+                              "h-full rounded-full transition-all duration-500 ease-out", 
+                              faixa === 'Mais de 24h' ? 'bg-rose-500' : 'bg-sky-600'
                             )}
                             style={{ width: `${pct}%` }}
                           />

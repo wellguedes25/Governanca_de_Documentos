@@ -99,19 +99,20 @@ export async function POST(request: Request) {
       sql = (body.version === 'V3' ? (data.docMetadataQueryV3 || data.docMetadataQuery) : data.docMetadataQuery);
     } else if (body.query === 'ACTIONS') {
       sql = (body.version === 'V3' ? (data.docActionsQueryV3 || data.docActionsQuery) : data.docActionsQuery);
+    } else if (body.query === 'RULES' || body.query === 'DOC_RULES') {
+      sql = data.docRulesQueryV3 || data.docActionsQueryV3 || data.docActionsQuery;
     } else if (body.query === 'AMBULATORY_PROFILES') {
       sql = data.ambulatoryProfilesQuery;
     } else if (body.query === 'AMBULATORY_PROFILE_DETAILS') {
       sql = data.ambulatoryProfileDetailsQuery;
-    } else if (body.query === 'V3') {
-      sql = data.activeQueryV3;
-    } else if (body.query === 'V2') {
-      sql = data.activeQuery;
+    } else if (body.query === 'DOCUMENTOS' || body.query === 'V3' || body.query === 'V2') {
+      const isV3 = body.version === 'V3' || body.query === 'V3';
+      sql = isV3 ? (data.activeQueryV3 || data.activeQuery) : data.activeQuery;
     } else if (body.query && typeof body.query === 'string') {
       sql = body.query;
       isPredefined = false;
     } else {
-      sql = data.activeQuery;
+      sql = (body.version === 'V3') ? (data.activeQueryV3 || data.activeQuery) : data.activeQuery;
     }
 
     if (!sql) {

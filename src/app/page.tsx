@@ -18,10 +18,10 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row overflow-hidden selection:bg-[var(--primary)] selection:text-black">
-      {/* 10% Asymmetric Left Bar (Gateway Sidebar) */}
-      <div className="hidden md:flex w-24 border-r border-border flex-col items-center justify-between py-8 z-10 bg-background">
-        <div className="w-12 h-12 bg-foreground text-background flex items-center justify-center font-black text-xl">
-          MP
+      {/* Left Bar (Gateway Sidebar) */}
+      <div className="hidden md:flex w-24 border-r border-slate-200 flex-col items-center justify-between py-8 z-10 bg-white">
+        <div className="w-11 h-11 bg-sky-600 rounded-xl text-white flex items-center justify-center font-bold text-base shadow-xs">
+          GP
         </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="-rotate-90 whitespace-nowrap text-[10px] font-black tracking-[0.3em] uppercase text-muted-foreground">

@@ -86,6 +86,7 @@ export interface StorageData {
   docMetadataQueryV3?: string;
   docActionsQuery: string;
   docActionsQueryV3?: string;
+  docRulesQueryV3?: string;
   ambulatoryProfilesQuery: string;
   ambulatoryProfileDetailsQuery: string;
   enabledQueries: Record<string, boolean>;
@@ -302,66 +303,127 @@ GROUP BY
    AND edo.cd_documento = :CD_DOCUMENTO
  ORDER BY evd.vl_versao DESC, etl.cd_tipo_layout ASC`,
   docActionsQuery: `SELECT DISTINCT
-       ed.cd_documento               AS Codigo_Origem,
-       ed.ds_documento               AS Descricao_Origem,
-       ec.cd_metadado                AS Codigo_Metadado,
-       ec.ds_campo                   AS Nome_Campo,
-       ec.ds_identificador           AS Identificador_Campo,
-
-       CASE 
-           WHEN REGEXP_LIKE(DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1), 'CD_DOCUMENTO[[:space:]]+IN[[:space:]]*\\(', 'i')
-           THEN REGEXP_SUBSTR(DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1), 'IN[[:space:]]*\\(([^)]+)\\)', 1, 1, 'i', 1)
-       END                           AS Grupo_Docs_Relacionados,
-
+       ed.cd_documento                       AS "CODIGO_ORIGEM",
+       ed.ds_documento                       AS "DESCRICAO_ORIGEM",
+       ec.cd_campo                           AS "CODIGO_CAMPO",
+       ec.cd_metadado                        AS "CODIGO_METADADO",
+       ec.ds_campo                           AS "NOME_CAMPO",
+       ec.ds_campo                           AS "DESCRICAO_REGRA",
+       ec.ds_identificador                   AS "IDENTIFICADOR_CAMPO",
+       ev.cd_propriedade                     AS "CODIGO_PROPRIEDADE",
+       REGEXP_SUBSTR(
+           DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1),
+           'CD_DOCUMENTO[[:space:]]+IN[[:space:]]*\(([0-9[:space:],]+)\)',
+           1, 1, 'i', 1
+       )                                     AS "GRUPO_DOCS_RELACIONADOS",
        REGEXP_SUBSTR(
            DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1),
            'CD_DOCUMENTO[[:space:]]*=[[:space:]]*([0-9]+)',
            1, 1, 'i', 1
-       )                             AS Documento_Relacionado,
-
-       DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1) AS Script_Acao_Completo
-
+       )                                     AS "DOCUMENTO_RELACIONADO",
+       DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1) AS "SCRIPT_ACAO_COMPLETO"
   FROM dbamv.editor_documento ed
  INNER JOIN dbamv.editor_versao_documento evd ON ed.cd_documento = evd.cd_documento
  INNER JOIN dbamv.editor_layout el            ON evd.cd_versao_documento = el.cd_versao_documento
  INNER JOIN dbamv.editor_layout_campo elc     ON el.cd_layout = elc.cd_layout
  INNER JOIN dbamv.editor_campo ec             ON elc.cd_campo = ec.cd_campo
- INNER JOIN dbamv.editor_campo_prop_val ev    ON ec.cd_metadado = ev.cd_campo
-
- WHERE evd.cd_tipo_versao = 3  -- Apenas versões publicadas
-   AND ev.cd_propriedade = 4   -- Focado na Propriedade de Ação
+ INNER JOIN dbamv.editor_campo_prop_val ev    ON ev.cd_campo = NVL(ec.cd_metadado, ec.cd_campo)
+ WHERE evd.cd_tipo_versao = 3
+   AND ev.cd_propriedade = 4
    AND ev.lo_valor IS NOT NULL
-   AND REGEXP_LIKE(DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1), 'CD_DOCUMENTO[[:space:]](=|IN[[:space:]]\\()', 'i')
    AND ed.cd_documento = :CD_DOCUMENTO
  ORDER BY ec.ds_identificador`,
   docActionsQueryV3: `SELECT DISTINCT
-       ed.cd_documento               AS "CODIGO_ORIGEM",
-       ed.ds_documento               AS "DESCRICAO_ORIGEM",
-       ec.cd_campo                   AS "CODIGO_METADADO",
-       ec.ds_campo                   AS "NOME_CAMPO",
-       ec.ds_identificador           AS "IDENTIFICADOR_CAMPO",
-       CASE 
-           WHEN REGEXP_LIKE(DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1), 'CD_DOCUMENTO[[:space:]]+IN[[:space:]]*\\(', 'i')
-           THEN REGEXP_SUBSTR(DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1), 'IN[[:space:]]*\\(([^)]+)\\)', 1, 1, 'i', 1)
-       END                           AS "GRUPO_DOCS_RELACIONADOS",
+       ed.cd_documento                       AS "CODIGO_ORIGEM",
+       ed.ds_documento                       AS "DESCRICAO_ORIGEM",
+       ec.cd_campo                           AS "CODIGO_CAMPO",
+       ec.cd_metadado                        AS "CODIGO_METADADO",
+       ec.ds_campo                           AS "NOME_CAMPO",
+       ec.ds_campo                           AS "DESCRICAO_REGRA",
+       ec.ds_identificador                   AS "IDENTIFICADOR_CAMPO",
+       ev.cd_propriedade                     AS "CODIGO_PROPRIEDADE",
+       REGEXP_SUBSTR(
+           DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1),
+           'CD_DOCUMENTO[[:space:]]+IN[[:space:]]*\(([0-9[:space:],]+)\)',
+           1, 1, 'i', 1
+       )                                     AS "GRUPO_DOCS_RELACIONADOS",
        REGEXP_SUBSTR(
            DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1),
            'CD_DOCUMENTO[[:space:]]*=[[:space:]]*([0-9]+)',
            1, 1, 'i', 1
-       )                             AS "DOCUMENTO_RELACIONADO",
+       )                                     AS "DOCUMENTO_RELACIONADO",
        DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1) AS "SCRIPT_ACAO_COMPLETO"
   FROM editor.editor_documento ed
- INNER JOIN editor.editor_versao_documento evd ON ed.cd_documento = evd.cd_documento
- INNER JOIN editor.editor_layout el            ON evd.cd_versao_documento = el.cd_versao_documento
- INNER JOIN editor.editor_layout_campo elc     ON el.cd_layout = elc.cd_layout
- INNER JOIN editor.editor_campo ec             ON elc.cd_campo = ec.cd_campo
- INNER JOIN editor.editor_campo_prop_val ev    ON ec.cd_campo = ev.cd_campo
- WHERE evd.sn_ativo = 1
+  JOIN editor.editor_versao_documento evd ON ed.cd_documento = evd.cd_documento
+  JOIN editor.editor_layout el            ON el.cd_versao_documento = evd.cd_versao_documento
+  JOIN editor.editor_layout_campo elc     ON elc.cd_layout = el.cd_layout
+  JOIN editor.editor_campo ec             ON ec.cd_campo = elc.cd_campo
+  JOIN editor.editor_campo_prop_val ev    ON ev.cd_campo = NVL(ec.cd_metadado, ec.cd_campo)
+ WHERE ed.cd_documento = :CD_DOCUMENTO
    AND ev.cd_propriedade = 4
    AND ev.lo_valor IS NOT NULL
-   AND REGEXP_LIKE(DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1), 'CD_DOCUMENTO[[:space:]](=|IN[[:space:]]\\()', 'i')
-   AND ed.cd_documento = :CD_DOCUMENTO
  ORDER BY ec.ds_identificador`,
+  docRulesQueryV3: `SELECT ed.cd_documento                         AS "CD_DOCUMENTO",
+       ed.ds_documento                         AS "DS_DOCUMENTO",
+       evd.cd_versao_documento                 AS "CD_VERSAO_DOCUMENTO",
+       evd.vl_versao                           AS "VL_VERSAO",
+       evd.tp_versao                           AS "TP_VERSAO",
+       evd.sn_publicado                        AS "SN_PUBLICADO",
+       er.cd_regra                             AS "CD_REGRA",
+       er.num_ordem                            AS "NUM_ORDEM",
+       er.ds_identificador                     AS "DS_REGRA",
+       er.ativa                                AS "ATIVA",
+       etr.ds_identificador                    AS "TIPO_REGRA",
+       er.ds_alerta                            AS "DS_ALERTA",
+       (
+         SELECT LISTAGG(
+                  NVL2(er_conn.ds_identificador, er_conn.ds_identificador || ' ', '') ||
+                  ec_cond.ds_identificador || ' ' ||
+                  CASE er_op.ds_identificador
+                    WHEN 'EQUAL' THEN '='
+                    WHEN 'DIFFERENT' THEN '<>'
+                    WHEN 'BIGGER' THEN '>'
+                    WHEN 'BIGGER_OR_EQUAL' THEN '>='
+                    WHEN 'LESSER' THEN '<'
+                    WHEN 'LESSER_OR_EQUAL' THEN '<='
+                    WHEN 'ISCLICK' THEN 'ao clicar'
+                    ELSE er_op.ds_identificador
+                  END ||
+                  NVL2(erc_sub.valor, ' "' || erc_sub.valor || '"', ''),
+                  ' '
+                ) WITHIN GROUP (ORDER BY erc_sub.cd_regra_condicao ASC)
+           FROM editor.editor_regra_condicao erc_sub
+           LEFT JOIN editor.editor_regra_conector er_conn ON erc_sub.cd_conector = er_conn.cd_regra_conector
+           LEFT JOIN editor.editor_regra_operador er_op ON erc_sub.cd_operador = er_op.cd_regra_operador
+           LEFT JOIN editor.editor_campo ec_cond ON erc_sub.cd_campo = ec_cond.cd_campo
+          WHERE erc_sub.cd_regra = er.cd_regra
+       ) AS "CONDICAO",
+       (
+         SELECT COUNT(DISTINCT erc_sub.cd_campo)
+           FROM editor.editor_regra_campo erc_sub
+          WHERE erc_sub.cd_regra = er.cd_regra
+       ) AS "QTD_CAMPOS",
+       (
+         SELECT LISTAGG(ec_sub.ds_identificador, ', ') WITHIN GROUP (ORDER BY ec_sub.ds_identificador)
+           FROM editor.editor_regra_campo erc_sub
+           JOIN editor.editor_campo ec_sub ON erc_sub.cd_campo = ec_sub.cd_campo
+          WHERE erc_sub.cd_regra = er.cd_regra
+       ) AS "CAMPOS_AFETADOS",
+       (
+         SELECT DBMS_LOB.SUBSTR(erpv_sub.lo_valor, 4000, 1)
+           FROM editor.editor_regra_prop_val erpv_sub
+          WHERE erpv_sub.cd_regra = er.cd_regra
+            AND erpv_sub.cd_propriedade IN (4, 36)
+            AND erpv_sub.lo_valor IS NOT NULL
+            AND ROWNUM = 1
+       ) AS "SCRIPT"
+  FROM editor.editor_documento ed
+  JOIN editor.editor_versao_documento evd ON ed.cd_documento = evd.cd_documento
+  JOIN editor.editor_layout el            ON el.cd_versao_documento = evd.cd_versao_documento
+  JOIN editor.editor_regra er             ON el.cd_layout = er.cd_layout
+  LEFT JOIN editor.editor_tipo_regra etr  ON er.cd_tipo_regra = etr.cd_tipo_regra
+ WHERE ed.cd_documento = :CD_DOCUMENTO
+ ORDER BY evd.vl_versao DESC, er.num_ordem ASC, er.cd_regra ASC`,
   enabledQueries: {
     total: true,
     prod24h: true,
@@ -428,6 +490,7 @@ export async function getData(): Promise<StorageData> {
       profileQueryV3: data.profileQueryV3 || INITIAL_DATA.profileQueryV3,
       docMetadataQueryV3: data.docMetadataQueryV3 || INITIAL_DATA.docMetadataQueryV3,
       docActionsQueryV3: data.docActionsQueryV3 || INITIAL_DATA.docActionsQueryV3,
+      docRulesQueryV3: data.docRulesQueryV3 || INITIAL_DATA.docRulesQueryV3,
       kpiQueriesV3: data.kpiQueriesV3 || INITIAL_DATA.kpiQueriesV3,
       analyticQueriesV3: data.analyticQueriesV3 || INITIAL_DATA.analyticQueriesV3,
       ambulatoryProfilesQuery: data.ambulatoryProfilesQuery || INITIAL_DATA.ambulatoryProfilesQuery,

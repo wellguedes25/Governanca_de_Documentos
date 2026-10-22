@@ -51,3 +51,6 @@ ENV/
 
 # local database / data
 data/storage.json.bak
+
+# scratch
+scratch/

@@ -16,7 +16,7 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Medlytics Pro - Clinical Analytics",
+  title: "Goverdoc Pro - Governança Clínica",
   description: "Monitoramento e Auditoria Inteligente de Documentos Clínicos",
 };
 

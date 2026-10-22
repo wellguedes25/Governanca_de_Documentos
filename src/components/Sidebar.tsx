@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { LayoutDashboard, FileText, Settings, Database, Building2, Activity, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, Database, Building2, Activity, ShieldCheck, GitFork } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useUI } from '@/context/UIContext';
 import { cn } from '@/lib/utils';
@@ -11,6 +11,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/hospitais', label: 'Hospitais', icon: Building2 },
   { href: '/documentos', label: 'Documentos', icon: FileText },
+  { href: '/linhagem', label: 'Linhagem', icon: GitFork },
 ];
 
 const configItems = [

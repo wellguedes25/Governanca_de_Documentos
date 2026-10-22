@@ -188,6 +188,19 @@ export default function DocumentCamposPage({ params }: { params: Promise<{ id: s
     return { total, active, withMetadata, withRules };
   }, [filteredFields]);
 
+  // Contagem de campos por layout para a versão selecionada
+  const layoutCountsForVersion = useMemo(() => {
+    const targetVer = selectedVersion !== 'ALL' 
+      ? selectedVersion 
+      : (versions.find(v => v.published === 1)?.version || versions[0]?.version);
+    const list = selectedVersion === 'ALL' 
+      ? fields 
+      : fields.filter(f => f.VL_VERSAO === targetVer);
+    const tela = list.filter(f => f.CD_TIPO_LAYOUT === 1).length;
+    const relatorio = list.filter(f => f.CD_TIPO_LAYOUT === 2).length;
+    return { all: list.length, tela, relatorio, targetVer };
+  }, [fields, selectedVersion, versions]);
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedTag(text);
@@ -378,35 +391,44 @@ export default function DocumentCamposPage({ params }: { params: Promise<{ id: s
               <button
                 onClick={() => setSelectedLayout('ALL')}
                 className={cn(
-                  "px-2.5 py-1 rounded-md font-medium transition-all",
+                  "px-2.5 py-1 rounded-md font-medium transition-all flex items-center gap-1",
                   selectedLayout === 'ALL'
                     ? "bg-white text-slate-900 font-bold shadow-2xs"
                     : "text-slate-600 hover:text-slate-900"
                 )}
               >
-                Todos Layouts
+                <span>Todos Layouts</span>
+                <span className="font-mono text-[10.5px] text-slate-500">({layoutCountsForVersion.all})</span>
               </button>
               <button
                 onClick={() => setSelectedLayout(1)}
                 className={cn(
-                  "px-2.5 py-1 rounded-md font-medium transition-all",
+                  "px-2.5 py-1 rounded-md font-medium transition-all flex items-center gap-1",
                   selectedLayout === 1
                     ? "bg-sky-600 text-white font-bold shadow-2xs"
                     : "text-slate-600 hover:text-slate-900"
                 )}
               >
-                Tela (Editor)
+                <span>Tela (Editor)</span>
+                <span className={cn(
+                  "font-mono text-[10.5px]",
+                  selectedLayout === 1 ? "text-sky-100" : "text-slate-500"
+                )}>({layoutCountsForVersion.tela})</span>
               </button>
               <button
                 onClick={() => setSelectedLayout(2)}
                 className={cn(
-                  "px-2.5 py-1 rounded-md font-medium transition-all",
+                  "px-2.5 py-1 rounded-md font-medium transition-all flex items-center gap-1",
                   selectedLayout === 2
                     ? "bg-teal-700 text-white font-bold shadow-2xs"
                     : "text-slate-600 hover:text-slate-900"
                 )}
               >
-                Relatório (Impressão)
+                <span>Relatório (Impressão)</span>
+                <span className={cn(
+                  "font-mono text-[10.5px]",
+                  selectedLayout === 2 ? "text-teal-100" : "text-slate-500"
+                )}>({layoutCountsForVersion.relatorio})</span>
               </button>
             </div>
 
@@ -638,3 +660,4 @@ export default function DocumentCamposPage({ params }: { params: Promise<{ id: s
     </div>
   );
 }
+

@@ -320,6 +320,19 @@ export function DocumentDetailsDrawer({
     return { total, active, withMetadata, withRules };
   }, [filteredFields]);
 
+  // Contagem de campos por layout para a versão selecionada
+  const layoutCountsForVersion = useMemo(() => {
+    const targetVer = selectedFieldVersion !== 'ALL' 
+      ? selectedFieldVersion 
+      : (activePublishedVersion || fieldVersions[0]?.version);
+    const list = selectedFieldVersion === 'ALL' 
+      ? fields 
+      : fields.filter(f => f.VL_VERSAO === targetVer);
+    const tela = list.filter(f => f.CD_TIPO_LAYOUT === 1).length;
+    const relatorio = list.filter(f => f.CD_TIPO_LAYOUT === 2).length;
+    return { all: list.length, tela, relatorio, targetVer };
+  }, [fields, selectedFieldVersion, activePublishedVersion, fieldVersions]);
+
   // Exportação CSV de Campos
   const handleExportFieldsCSV = () => {
     if (!filteredFields.length) {
@@ -539,7 +552,7 @@ export function DocumentDetailsDrawer({
               )}
             >
               <TableProperties size={14} />
-              <span>Campos ({fields.length})</span>
+              <span>Campos ({layoutCountsForVersion.all || fields.length})</span>
             </button>
           </div>
 
@@ -587,16 +600,31 @@ export function DocumentDetailsDrawer({
                       </div>
                       <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl flex flex-col justify-between">
                         <div>
-                          <span className="text-[11px] font-semibold text-slate-700 block">Quantidade de Campos</span>
-                          <span className="text-2xl font-bold text-slate-900 font-mono mt-1 block">
-                            {activeSpecs.QUANTIDADE_CAMPOS ?? 0}
-                          </span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-semibold text-slate-700 block">Quantidade de Campos</span>
+                            <span className="text-[10px] font-bold text-sky-800 bg-sky-50 px-1.5 py-0.2 rounded border border-sky-100">
+                              Layout Tela
+                            </span>
+                          </div>
+                          <div className="flex items-baseline gap-1.5 mt-1">
+                            <span className="text-2xl font-bold text-slate-900 font-mono">
+                              {activeSpecs.QUANTIDADE_CAMPOS ?? 0}
+                            </span>
+                            {relatorioSpecs?.QUANTIDADE_CAMPOS && (
+                              <span className="text-[10.5px] text-slate-500 font-medium">
+                                (+{relatorioSpecs.QUANTIDADE_CAMPOS} no Relatório = {(activeSpecs.QUANTIDADE_CAMPOS || 0) + (relatorioSpecs.QUANTIDADE_CAMPOS || 0)} total)
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <button 
-                          onClick={() => setActiveTab('fields')}
+                          onClick={() => {
+                            setSelectedFieldLayout(1);
+                            setActiveTab('fields');
+                          }}
                           className="mt-2 pt-2 border-t border-slate-200/60 text-[11px] font-bold text-sky-700 hover:text-sky-900 flex items-center justify-between transition-colors group"
                         >
-                          <span>Explorar metadados e campos</span>
+                          <span>Ver os {activeSpecs.QUANTIDADE_CAMPOS ?? 0} campos de Tela</span>
                           <span className="group-hover:translate-x-0.5 transition-transform">→</span>
                         </button>
                       </div>
@@ -1195,35 +1223,44 @@ export function DocumentDetailsDrawer({
                             <button
                               onClick={() => setSelectedFieldLayout('ALL')}
                               className={cn(
-                                "px-2 py-1 rounded-md font-medium transition-all",
+                                "px-2 py-1 rounded-md font-medium transition-all flex items-center gap-1",
                                 selectedFieldLayout === 'ALL'
                                   ? "bg-white text-slate-900 font-bold shadow-2xs"
                                   : "text-slate-600 hover:text-slate-900"
                               )}
                             >
-                              Todos Layouts
+                              <span>Todos Layouts</span>
+                              <span className="font-mono text-[10px] text-slate-500">({layoutCountsForVersion.all})</span>
                             </button>
                             <button
                               onClick={() => setSelectedFieldLayout(1)}
                               className={cn(
-                                "px-2 py-1 rounded-md font-medium transition-all",
+                                "px-2 py-1 rounded-md font-medium transition-all flex items-center gap-1",
                                 selectedFieldLayout === 1
                                   ? "bg-sky-600 text-white font-bold shadow-2xs"
                                   : "text-slate-600 hover:text-slate-900"
                               )}
                             >
-                              Tela
+                              <span>Tela</span>
+                              <span className={cn(
+                                "font-mono text-[10px]",
+                                selectedFieldLayout === 1 ? "text-sky-100" : "text-slate-500"
+                              )}>({layoutCountsForVersion.tela})</span>
                             </button>
                             <button
                               onClick={() => setSelectedFieldLayout(2)}
                               className={cn(
-                                "px-2 py-1 rounded-md font-medium transition-all",
+                                "px-2 py-1 rounded-md font-medium transition-all flex items-center gap-1",
                                 selectedFieldLayout === 2
                                   ? "bg-teal-700 text-white font-bold shadow-2xs"
                                   : "text-slate-600 hover:text-slate-900"
                               )}
                             >
-                              Relatório
+                              <span>Relatório</span>
+                              <span className={cn(
+                                "font-mono text-[10px]",
+                                selectedFieldLayout === 2 ? "text-teal-100" : "text-slate-500"
+                              )}>({layoutCountsForVersion.relatorio})</span>
                             </button>
                           </div>
 

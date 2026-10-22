@@ -56,22 +56,22 @@ export default function Home() {
 
           <div className="relative z-10 w-full px-8 md:px-16 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
             <div className="space-y-4 max-w-2xl">
-              <div className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 group-hover:bg-black group-hover:text-[var(--primary)] text-[10px] font-bold uppercase tracking-widest transition-colors duration-300">
+              <div className="inline-block px-3 py-1 bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 group-hover:bg-black group-hover:text-[var(--primary)] text-[10px] font-bold uppercase tracking-widest transition-colors duration-300">
                 Versão Atual // HTML5
               </div>
               <h2 className="text-6xl md:text-8xl font-black uppercase tracking-tighter text-foreground group-hover:text-black transition-colors duration-300">
-                Editor <span className="text-emerald-600 dark:text-emerald-400 group-hover:text-black/50 transition-colors duration-300">V3</span>
+                Editor <span className="text-sky-600 dark:text-sky-400 group-hover:text-black/50 transition-colors duration-300">V3</span>
               </h2>
               <p className="text-muted-foreground group-hover:text-black/70 text-sm md:text-base font-medium max-w-lg uppercase tracking-tight transition-colors duration-300">
                 NOVA ARQUITETURA HTML5. VOLUME GERAL E TELEMETRIA OPERACIONAL DOS DOCUMENTOS CLÍNICOS DO MVEDITOR 3.0 HTML5. FOCO EM PERFORMANCE.
               </p>
             </div>
 
-            <div className="hidden md:flex items-center gap-4 text-emerald-600 dark:text-emerald-400 group-hover:text-black transition-colors duration-300">
+            <div className="hidden md:flex items-center gap-4 text-sky-600 dark:text-sky-400 group-hover:text-black transition-colors duration-300">
               <span className="text-xs font-black uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 System_Init
               </span>
-              <div className="w-16 h-16 border border-emerald-500/30 group-hover:border-black flex items-center justify-center group-hover:bg-black group-hover:text-[var(--primary)] transition-all duration-300">
+              <div className="w-16 h-16 border border-sky-500/30 group-hover:border-black flex items-center justify-center group-hover:bg-black group-hover:text-[var(--primary)] transition-all duration-300">
                 <ChevronRight size={32} />
               </div>
             </div>

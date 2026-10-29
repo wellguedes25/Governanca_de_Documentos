@@ -1,29 +1,33 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { getData } from '@/lib/storage';
 import { executeQuery, testConnection } from '@/lib/oracle';
 
-// Validação rigorosa de segurança para queries personalizadas
+// Validacao rigorosa de seguranca para queries personalizadas (Cloudflare Security Pattern)
 function validateSafeSqlQuery(sql: string): { safe: boolean; reason?: string } {
-  const trimmed = sql.trim();
-  
-  // 1. Deve ser exclusivamente query de leitura (SELECT ou WITH)
-  if (!/^(SELECT|WITH)\b/i.test(trimmed)) {
-    return { 
-      safe: false, 
-      reason: 'Apenas consultas de leitura (SELECT ou WITH) são permitidas nesta API.' 
+  // 1. Remover comentarios SQL (-- e /* ... */) para evitar evasao de filtros
+  const cleanSql = sql
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/--.*$/gm, ' ')
+    .trim();
+
+  // 2. Deve ser exclusivamente query de leitura (SELECT ou WITH)
+  if (!/^(SELECT|WITH)\b/i.test(cleanSql)) {
+    return {
+      safe: false,
+      reason: 'Apenas consultas de leitura (SELECT ou WITH) sao permitidas nesta API.'
     };
   }
 
-  // 2. Não deve conter múltiplos statements encadeados
-  const withoutTrailingSemicolon = trimmed.replace(/;+\s*$/, '');
+  // 3. Nao deve conter multiplos statements encadeados
+  const withoutTrailingSemicolon = cleanSql.replace(/;+\s*$/, '');
   if (withoutTrailingSemicolon.includes(';')) {
-    return { 
-      safe: false, 
-      reason: 'Execução de múltiplos comandos SQL encadeados é bloqueada por segurança.' 
+    return {
+      safe: false,
+      reason: 'Execucao de multiplos comandos SQL encadeados e bloqueada por seguranca.'
     };
   }
 
-  // 3. Proibir comandos DDL, DML e transacionais
+  // 4. Proibir comandos DDL, DML, transacionais e procedural
   const forbiddenKeywords = [
     /\bDROP\b/i,
     /\bTRUNCATE\b/i,
@@ -41,31 +45,39 @@ function validateSafeSqlQuery(sql: string): { safe: boolean; reason?: string } {
     /\bDECLARE\b/i,
     /\bCALL\b/i,
     /\bLOCK\b/i,
+    /\bRENAME\b/i,
   ];
 
   for (const pattern of forbiddenKeywords) {
-    if (pattern.test(trimmed)) {
-      return { 
-        safe: false, 
-        reason: 'Operação destrutiva ou DDL/DML detectada: comando bloqueado por segurança.' 
+    if (pattern.test(cleanSql)) {
+      return {
+        safe: false,
+        reason: 'Operacao destrutiva, DDL/DML ou procedural bloqueada por seguranca.'
       };
     }
   }
 
-  // 4. Proibir acesso a esquemas administrativos críticos do Oracle
+  // 5. Proibir acesso a pacotes de rede/arquivo e esquemas administrativos do Oracle
   const forbiddenAdminObjects = [
     /\bSYS\./i,
     /\bSYSTEM\./i,
-    /\bDBA_USERS\b/i,
-    /\bV\$SESSION\b/i,
-    /\bV\$PROCESS\b/i,
+    /\bDBA_/i,
+    /\bV\$/i,
+    /\bGV\$/i,
+    /\bALL_USERS\b/i,
+    /\bUTL_FILE\b/i,
+    /\bUTL_HTTP\b/i,
+    /\bUTL_TCP\b/i,
+    /\bDBMS_SCHEDULER\b/i,
+    /\bDBMS_LOB\b/i,
+    /\bDBMS_SQL\b/i,
   ];
 
   for (const pattern of forbiddenAdminObjects) {
-    if (pattern.test(trimmed)) {
-      return { 
-        safe: false, 
-        reason: 'Acesso a objetos administrativos internos do Oracle é restrito.' 
+    if (pattern.test(cleanSql)) {
+      return {
+        safe: false,
+        reason: 'Acesso a objetos administrativos ou pacotes de sistema do Oracle e restrito.'
       };
     }
   }

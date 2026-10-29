@@ -6,7 +6,9 @@ import { useUI } from '@/context/UIContext';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DocumentosToolbar } from '@/components/documentos/DocumentosToolbar';
 import { DocumentosTable } from '@/components/documentos/DocumentosTable';
+import { DocumentosCardsGrid } from '@/components/documentos/DocumentosCardsGrid';
 import { DocumentDetailsDrawer } from '@/components/documentos/DocumentDetailsDrawer';
+import { DocumentProfilesDrawer } from '@/components/documentos/DocumentProfilesDrawer';
 import { AmbulatoryProfilesView } from '@/components/documentos/AmbulatoryProfilesView';
 
 export default function DocumentosPage() {
@@ -17,6 +19,7 @@ export default function DocumentosPage() {
   const [activeHospitals, setActiveHospitals] = useState<{ id: number; sigla: string }[]>([]);
   const [selectedHospitals, setSelectedHospitals] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [density, setDensity] = useState<'compact' | 'normal'>('normal');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({
@@ -28,10 +31,17 @@ export default function DocumentosPage() {
   // Estados de Abas
   const [activeMainTab, setActiveMainTab] = useState<'documentos' | 'perfis'>('documentos');
 
-  // Estados para Detalhamento de Perfil Inline (Drill-down)
-  const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
+  // Estados para Gaveta Inferior de Perfis Ambulatoriais
+  const [profilesDrawerOpen, setProfilesDrawerOpen] = useState(false);
+  const [profilesDocInfo, setProfilesDocInfo] = useState<{ id: string; name: string } | null>(null);
   const [profileData, setProfileData] = useState<any[]>([]);
   const [profileLoading, setProfileLoading] = useState(false);
+
+  const handleOpenProfiles = (code: string, name?: string) => {
+    setProfilesDocInfo({ id: code, name: name || `Documento #${code}` });
+    setProfilesDrawerOpen(true);
+    fetchProfile(code);
+  };
 
   // Estados para Drawer de Metadados Técnicos
   const [sidebarDoc, setSidebarDoc] = useState<string | null>(null);
@@ -138,14 +148,6 @@ export default function DocumentosPage() {
     }
   }
 
-  // Dispara busca de perfis inline ao selecionar documento
-  useEffect(() => {
-    if (selectedDoc) {
-      fetchProfile(selectedDoc);
-    } else {
-      setProfileData([]);
-    }
-  }, [selectedDoc]);
 
   async function fetchProfile(docId: string) {
     setProfileLoading(true);
@@ -550,6 +552,8 @@ export default function DocumentosPage() {
         setActiveTab={setActiveMainTab}
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
         density={density}
         setDensity={setDensity}
         loading={loading}
@@ -565,32 +569,46 @@ export default function DocumentosPage() {
         totalDocs={oracleData?.length || 0}
       />
 
-      {/* Main Content: Documentos Table or Ambulatory Profiles */}
+      {/* Main Content: Documentos Table / Cards Grid or Ambulatory Profiles */}
       {activeMainTab === 'documentos' ? (
-        <DocumentosTable
-          columns={columns}
-          data={paginatedData}
-          loading={loading}
-          density={density}
-          sortConfig={sortConfig}
-          onSort={handleSort}
-          selectedDoc={selectedDoc}
-          onToggleDoc={(code) => setSelectedDoc(prev => prev === code ? null : code)}
-          onOpenDrawer={(code) => {
-            setSidebarDoc(code);
-            setSidebarOpen(true);
-          }}
-          profileData={profileData}
-          profileLoading={profileLoading}
-          activeHospitals={activeHospitals}
-          selectedHospitals={selectedHospitals}
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={setCurrentPage}
-          totalFiltered={filteredData.length}
-          columnWidths={columnWidths}
-          onResizeStart={handleResizeStart}
-        />
+        viewMode === 'table' ? (
+          <DocumentosTable
+            columns={columns}
+            data={paginatedData}
+            loading={loading}
+            density={density}
+            sortConfig={sortConfig}
+            onSort={handleSort}
+            onOpenDrawer={(code) => {
+              setSidebarDoc(code);
+              setSidebarOpen(true);
+            }}
+            onOpenProfiles={handleOpenProfiles}
+            activeHospitals={activeHospitals}
+            selectedHospitals={selectedHospitals}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            totalFiltered={filteredData.length}
+            columnWidths={columnWidths}
+            onResizeStart={handleResizeStart}
+          />
+        ) : (
+          <DocumentosCardsGrid
+            data={paginatedData}
+            loading={loading}
+            onOpenDrawer={(code) => {
+              setSidebarDoc(code);
+              setSidebarOpen(true);
+            }}
+            onOpenProfiles={handleOpenProfiles}
+            activeHospitals={activeHospitals}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            totalFiltered={filteredData.length}
+          />
+        )
       ) : (
         <AmbulatoryProfilesView
           data={ambulatoryProfilesData}
@@ -620,6 +638,17 @@ export default function DocumentosPage() {
         fields={metadataFields}
         fieldsLoading={metadataFieldsLoading}
         fieldsError={metadataFieldsError}
+      />
+
+      {/* Bottom Sheet Drawer for Ambulatory Profiles */}
+      <DocumentProfilesDrawer
+        open={profilesDrawerOpen}
+        onClose={() => setProfilesDrawerOpen(false)}
+        docId={profilesDocInfo?.id || null}
+        docName={profilesDocInfo?.name}
+        profiles={profileData}
+        loading={profileLoading}
+        docVersion={docVersion || 'V3'}
       />
     </div>
   );

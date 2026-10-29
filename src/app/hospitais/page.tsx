@@ -1,24 +1,33 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Building2, 
   FileText, 
   Activity, 
   Clock, 
-  RefreshCcw, 
+  RotateCw, 
   ArrowLeft,
   TrendingUp,
   Database,
   AlertTriangle,
-  Loader2
+  Loader2,
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle,
+  ExternalLink,
+  Layers,
+  ChevronRight
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn, formatDateTime } from '@/lib/utils';
 import { useUI } from '@/context/UIContext';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { DbConnection, HospitalMapping } from '@/lib/storage';
+import { DocumentDetailsDrawer } from '@/components/documentos/DocumentDetailsDrawer';
 
 interface DetailItem {
   CD_DOCUMENTO: string;
@@ -38,12 +47,6 @@ interface SlaItem {
   TOTAL: number;
 }
 
-const COLORS = [
-  'bg-sky-600', 'bg-emerald-600', 'bg-amber-600', 'bg-teal-600', 
-  'bg-cyan-600', 'bg-rose-600', 'bg-slate-700', 'bg-blue-600', 
-  'bg-emerald-500', 'bg-lime-600', 'bg-sky-500', 'bg-orange-500'
-];
-
 interface HospitalStats {
   kpis: {
     TOTAL_DOCS?: number;
@@ -53,15 +56,17 @@ interface HospitalStats {
   details: DetailItem[];
   top5: Top5Item[];
   globalTotal: number;
+  versionApplied?: string;
   error?: string;
 }
 
 interface QualityStats {
   sla: SlaItem[];
+  versionApplied?: string;
 }
 
 interface HospitalItem extends HospitalMapping {
-  color: string;
+  color?: string;
 }
 
 export default function HospitaisPage() {
@@ -74,27 +79,105 @@ export default function HospitaisPage() {
   const [qualityData, setQualityData] = useState<QualityStats | null>(null);
   const [hospitals, setHospitals] = useState<HospitalItem[]>([]);
   const [activeConnName, setActiveConnName] = useState('');
+  const [activeConnId, setActiveConnId] = useState('');
+
+  // Drawer de Metadados Integrado
+  const [sidebarDoc, setSidebarDoc] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [metadata, setMetadata] = useState<any[]>([]);
+  const [metadataLoading, setMetadataLoading] = useState(false);
+  const [metadataActions, setMetadataActions] = useState<any[]>([]);
+  const [metadataActionsLoading, setMetadataActionsLoading] = useState(false);
+  const [metadataActionsError, setMetadataActionsError] = useState<string | null>(null);
+  const [metadataRules, setMetadataRules] = useState<any[]>([]);
+  const [metadataRulesLoading, setMetadataRulesLoading] = useState(false);
+  const [metadataRulesError, setMetadataRulesError] = useState<string | null>(null);
+  const [metadataFields, setMetadataFields] = useState<any[]>([]);
+  const [metadataFieldsLoading, setMetadataFieldsLoading] = useState(false);
+  const [metadataFieldsError, setMetadataFieldsError] = useState<string | null>(null);
+
+  // Versão ativa resolvida com fallback
+  const resolvedVersion = useMemo(() => {
+    if (docVersion) return docVersion;
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem('app_doc_version');
+      if (saved === 'V3' || saved === 'V2') return saved;
+    }
+    return 'V2';
+  }, [docVersion]);
 
   // Cálculos da métrica de SLA
   const slaRows = qualityData?.sla || [];
-  const totalSigned = slaRows.reduce((acc: number, r: SlaItem) => acc + Number(r.TOTAL), 0);
-  const within24h = slaRows
-    .filter((r: SlaItem) => r.FAIXA_SLA !== 'Mais de 24h')
-    .reduce((acc: number, r: SlaItem) => acc + Number(r.TOTAL), 0);
-  const slaPercentage = totalSigned > 0 ? ((within24h / totalSigned) * 100).toFixed(1) : '100.0';
+  const totalSigned = useMemo(() => {
+    return slaRows.reduce((acc: number, r: SlaItem) => acc + Number(r.TOTAL), 0);
+  }, [slaRows]);
 
-  // Proteção de rota
-  useEffect(() => {
-    const savedVersion = sessionStorage.getItem('app_doc_version');
-    if (!docVersion && !savedVersion) {
-      router.push('/');
-    }
-  }, [docVersion, router]);
+  const within24h = useMemo(() => {
+    return slaRows
+      .filter((r: SlaItem) => r.FAIXA_SLA !== 'Mais de 24h')
+      .reduce((acc: number, r: SlaItem) => acc + Number(r.TOTAL), 0);
+  }, [slaRows]);
+
+  const over24h = useMemo(() => {
+    const item = slaRows.find((r: SlaItem) => r.FAIXA_SLA === 'Mais de 24h');
+    return item ? Number(item.TOTAL) : 0;
+  }, [slaRows]);
+
+  const slaPercentage = totalSigned > 0 ? ((within24h / totalSigned) * 100).toFixed(1) : '100.0';
 
   const selectedHospital = hospitals[selectedIdx];
 
-  const fetchData = async (id: string, force = false) => {
-    const cacheKey = `hospital_data_${id}`;
+  // Busca de Metadados para o Drawer
+  const fetchDocDetails = async (docId: string) => {
+    setSidebarDoc(docId);
+    setSidebarOpen(true);
+    setMetadataLoading(true);
+    setMetadataActionsLoading(true);
+    setMetadataRulesLoading(true);
+    setMetadataFieldsLoading(true);
+
+    try {
+      const [resMeta, resActions, resRules, resFields] = await Promise.all([
+        fetch('/api/oracle/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: 'METADATA', version: resolvedVersion, params: { CD_DOCUMENTO: docId } })
+        }).then(r => r.json()),
+        fetch('/api/oracle/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: 'ACTIONS', version: resolvedVersion, params: { CD_DOCUMENTO: docId } })
+        }).then(r => r.json()),
+        fetch('/api/oracle/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: 'RULES', version: resolvedVersion, params: { CD_DOCUMENTO: docId } })
+        }).then(r => r.json()),
+        fetch('/api/oracle/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: 'FIELDS', params: { CD_DOCUMENTO: docId } })
+        }).then(r => r.json())
+      ]);
+
+      setMetadata(resMeta.rows || []);
+      setMetadataActions(resActions.rows || []);
+      setMetadataRules(resRules.rows || []);
+      setMetadataFields(resFields.rows || []);
+    } catch (e) {
+      console.error('Erro ao buscar detalhes do documento:', e);
+    } finally {
+      setMetadataLoading(false);
+      setMetadataActionsLoading(false);
+      setMetadataRulesLoading(false);
+      setMetadataFieldsLoading(false);
+    }
+  };
+
+  // Busca de Dados do Hospital (Respeitando a Versão V2 vs V3 e Conexão)
+  const fetchData = useCallback(async (id: string, force = false) => {
+    const cacheKey = `hospital_data_${id}_${resolvedVersion}_${activeConnId || 'default'}`;
+    
     if (!force) {
       const cachedStr = sessionStorage.getItem(cacheKey);
       if (cachedStr) {
@@ -112,8 +195,8 @@ export default function HospitaisPage() {
     setError(null);
     try {
       const [resStats, resQuality] = await Promise.all([
-        fetch(`/api/hospitals/stats?id=${id}${force ? '&force=true' : ''}`),
-        fetch(`/api/hospitals/quality?id=${id}${force ? '&force=true' : ''}`)
+        fetch(`/api/hospitals/stats?id=${id}&version=${resolvedVersion}${force ? '&force=true' : ''}`),
+        fetch(`/api/hospitals/quality?id=${id}&version=${resolvedVersion}${force ? '&force=true' : ''}`)
       ]);
       
       const jsonStats = await resStats.json();
@@ -131,15 +214,15 @@ export default function HospitaisPage() {
         stats: jsonStats,
         quality: jsonQuality
       }));
-    } catch (error) {
-      const err = error as Error;
+    } catch (err: any) {
       console.error('Erro ao buscar dados do hospital:', err);
       setError('Falha na comunicação com o servidor Oracle.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [resolvedVersion, activeConnId]);
 
+  // Carrega conexões e lista de hospitais ativos
   useEffect(() => {
     fetch('/api/connections')
       .then(res => res.json())
@@ -148,286 +231,370 @@ export default function HospitaisPage() {
           const activeConn = storage.connections.find((c: DbConnection) => c.id === storage.activeConnectionId);
           if (activeConn) {
             setActiveConnName(activeConn.name);
+            setActiveConnId(activeConn.id);
           }
         }
         if (storage.hospitalsMapping) {
           const active = storage.hospitalsMapping
             .filter((h: HospitalMapping) => h.ativo)
-            .map((h: HospitalMapping, i: number) => ({
+            .map((h: HospitalMapping) => ({
               ...h,
-              nome: h.nome || h.sigla, // Usamos a sigla como fallback para o nome
-              color: COLORS[i % COLORS.length]
+              nome: h.nome || h.sigla,
             }));
           setHospitals(active);
-          
-          if (active.length > 0) {
-            fetchData(String(active[0].id));
+
+          // Suporte a seleção via query param ?id=X
+          if (typeof window !== 'undefined') {
+            const urlParams = new URLSearchParams(window.location.search);
+            const targetId = urlParams.get('id');
+            if (targetId) {
+              const idx = active.findIndex((h: HospitalItem) => String(h.id) === String(targetId));
+              if (idx !== -1) {
+                setSelectedIdx(idx);
+              }
+            }
           }
         }
+      })
+      .catch(err => {
+        console.error('Erro ao carregar conexões:', err);
+        setError('Não foi possível obter a lista de hospitais configurados.');
       });
   }, []);
 
+  // Dispara busca quando hospital selecionado ou versão mudar
   useEffect(() => {
     if (selectedHospital) {
       fetchData(String(selectedHospital.id));
     }
-  }, [selectedIdx, selectedHospital]);
+  }, [selectedHospital, resolvedVersion, fetchData]);
 
-  if (hospitals.length === 0) {
+  if (hospitals.length === 0 && !error) {
     return (
-      <div className="flex flex-col items-center justify-center h-full bg-background text-muted space-y-4">
-        <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
-        <p className="text-xs uppercase tracking-widest font-black">Carregando unidades...</p>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <Loader2 className="w-9 h-9 animate-spin text-sky-600" />
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Carregando unidades hospitalares...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-card flex flex-col p-4 md:p-8 space-y-8 animate-in fade-in duration-700 text-foreground font-mono pb-20">
+    <div className="min-h-screen bg-slate-50/50 flex flex-col p-4 md:p-8 space-y-6 pb-24">
       
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
-        {/* --- PADRONIZAÇÃO DO HEADER --- */}
-        <PageHeader 
-          title="Unidades Hospitalares"
-          subtitle={selectedHospital ? `${selectedHospital.nome}` : "Gestão Operacional"}
-          icon={Building2}
-        />
+      {/* 1. Header Padronizado */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
+        <div className="flex items-center gap-3">
+          <PageHeader 
+            title="Unidades Hospitalares"
+            subtitle={selectedHospital ? `${selectedHospital.nome} — Monitoramento de Uso Clínico` : "Gestão Operacional de Prontuários"}
+            icon={Building2}
+          />
+          <Badge 
+            variant="outline" 
+            className="text-[10px] font-bold px-2 py-0.5 rounded-full border-sky-300 bg-sky-50 text-sky-800"
+          >
+            Motor {resolvedVersion}
+          </Badge>
+        </div>
         
-        <Link href="/dashboard" className="flex items-center justify-between p-4 bg-card border border-border -border -foreground transition-colors group w-full md:w-auto text-xs font-black uppercase tracking-widest text-muted">
-          <ArrowLeft className="w-4 h-4 mr-4 group-hover:-translate-x-1 transition-transform" />
-          Dashboard Geral
-        </Link>
+        <div className="flex items-center gap-2 flex-wrap">
+          {selectedHospital && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fetchData(String(selectedHospital.id), true)}
+              disabled={loading}
+              className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-2xs cursor-pointer h-9 px-4"
+            >
+              <RotateCw className={cn("w-3.5 h-3.5 text-sky-600", loading && "animate-spin")} />
+              <span>Sincronizar Agora</span>
+            </Button>
+          )}
+
+          <Link href="/documentos">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-2xs h-9 px-4 cursor-pointer"
+            >
+              <FileText className="w-3.5 h-3.5 text-slate-500" />
+              <span>Ver Todos os Documentos</span>
+            </Button>
+          </Link>
+
+          <Link href="/dashboard">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-2xs h-9 px-4 cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Dashboard Geral</span>
+            </Button>
+          </Link>
+        </div>
       </div>
 
-      {/* Hospital Selector (Brutalist Tabs) */}
-      <div className="flex flex-wrap gap-2">
-        {hospitals.map((h, idx) => (
-          <button
-            key={h.id}
-            onClick={() => setSelectedIdx(idx)}
-            className={cn(
-              "px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-all border",
-              selectedIdx === idx 
-                ? "bg-[var(--primary)] text-black border-[var(--primary)]" 
-                : "-background border-border text-muted -background -foreground -border"
-            )}
-          >
-            {h.sigla}
-          </button>
-        ))}
+      {/* 2. Seletor de Hospitais em Pílulas Modernas */}
+      <div className="bg-white p-2 rounded-2xl border border-slate-200/80 shadow-2xs overflow-x-auto scrollbar-thin">
+        <div className="flex items-center gap-1.5 min-w-max">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3 flex items-center gap-1.5">
+            <Building2 size={13} className="text-slate-400" />
+            Unidade:
+          </span>
+          {hospitals.map((h, idx) => {
+            const isSelected = selectedIdx === idx;
+            return (
+              <button
+                key={h.id}
+                type="button"
+                onClick={() => setSelectedIdx(idx)}
+                className={cn(
+                  "px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer",
+                  isSelected 
+                    ? "bg-[#004953] text-white shadow-2xs" 
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
+                )}
+              >
+                <span>{h.sigla}</span>
+                <span className={cn(
+                  "text-[10px] font-mono px-1.5 py-0.2 rounded-full",
+                  isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+                )}>
+                  #{h.id}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
+      {/* 3. Mensagem de Erro de Conectividade */}
       {error && (
-        <div className="border border-red-500 bg-red-500/10 p-6 flex items-start md:items-center gap-6">
-          <div className="w-12 h-12 bg-red-500 text-black flex items-center justify-center font-black shrink-0">
-            <AlertTriangle size={24} />
+        <div className="bg-rose-50 border border-rose-200 p-4 rounded-2xl flex items-center justify-between gap-4 text-rose-800 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+            <div>
+              <p className="text-xs font-bold">Falha ao obter métricas da unidade hospitalar</p>
+              <p className="text-[11px] text-rose-600 font-mono mt-0.5">{error}</p>
+            </div>
           </div>
-          <div className="flex-1">
-            <h3 className="text-sm font-black text-red-500 uppercase tracking-widest mb-1">Erro de Conectividade</h3>
-            <p className="text-red-400 text-xs uppercase tracking-widest">
-              {error}
-            </p>
-          </div>
-          <button 
-            onClick={() => fetchData(String(selectedHospital.id), true)}
-            className="px-6 py-4 bg-card border border-red-500/50 hover:border-red-500 text-red-500 text-[10px] font-black uppercase tracking-widest transition-all flex items-center"
-          >
-            <RefreshCcw size={14} className="mr-2" /> Tentar Novamente
-          </button>
+          {selectedHospital && (
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => fetchData(String(selectedHospital.id), true)}
+              className="text-xs border-rose-300 text-rose-700 bg-white hover:bg-rose-100/60 rounded-full cursor-pointer shrink-0"
+            >
+              Tentar Novamente
+            </Button>
+          )}
         </div>
       )}
 
+      {/* 4. Estado de Carregamento Suave */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center h-96 space-y-6 border border-border -background">
-          <Loader2 className="w-12 h-12 text-[var(--primary)] animate-spin" />
-          <div className="text-center">
-            <span className="text-[var(--primary)] text-sm font-black uppercase tracking-[0.2em] block mb-2">Sincronizando</span>
-            <span className="text-muted text-[10px] font-bold uppercase tracking-widest">Estabelecendo handshake com Oracle...</span>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-2xs space-y-3 animate-pulse">
+                <div className="skeleton h-4 w-28 rounded-md" />
+                <div className="skeleton h-8 w-24 rounded-md" />
+                <div className="skeleton h-3 w-36 rounded-md" />
+              </div>
+            ))}
           </div>
-        </div>
-      ) : data?.error ? (
-        <div className="flex flex-col items-center justify-center h-96 space-y-6 border border-red-500/50 -background p-8">
-          <AlertTriangle className="w-16 h-16 text-red-500" />
-          <div className="text-center">
-            <h3 className="text-xl font-black text-foreground uppercase tracking-widest mb-2">Dados Indisponíveis</h3>
-            <p className="text-muted text-xs font-bold uppercase tracking-widest mb-4">
-              Falha ao resolver query para {selectedHospital.sigla}.
-            </p>
-            <div className="text-[10px] text-red-400 bg-red-500/10 px-4 py-2 border border-red-500/20 font-mono">
-              SYS_ERR: {data.error}
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs h-72 animate-pulse" />
+            <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs h-72 animate-pulse" />
           </div>
-          <button 
-            onClick={() => fetchData(String(selectedHospital.id))}
-            className="px-8 py-4 bg-card border -border hover:border-white text-foreground text-[10px] font-black uppercase tracking-widest transition-all"
-          >
-            Tentar Novamente
-          </button>
         </div>
       ) : data?.kpis ? (
-        <div className="space-y-8">
+        <div className="space-y-6">
           
-          {/* KPI Grid - Linha 1: Métricas Operacionais */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* 5. Linha Harmônica de 4 KPIs Principais (Sem Buracos Vazios) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
-            <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs flex flex-col justify-between hover:border-sky-300 transition-all">
-              <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-2">
-                <div>
-                  <span className="block text-slate-700 font-bold">Total Preenchido</span>
-                  <span className="text-[10px] text-slate-400 font-normal">{selectedHospital.nome}</span>
-                </div>
-                <div className="p-1.5 rounded-lg bg-sky-50 text-sky-600 border border-sky-100">
-                  <FileText size={16} />
-                </div>
+            {/* Card 1: Total Preenchido */}
+            <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-2xs flex flex-col justify-between hover:border-sky-300 transition-all">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Preenchido</span>
+                <Badge variant="outline" className="text-[10px] font-semibold bg-sky-50 text-sky-700 border-sky-200 rounded-full px-2 py-0.5">
+                  Volume 90d
+                </Badge>
               </div>
-              <div className="text-3xl font-bold font-mono tabular-nums text-slate-900 my-1">
+              <div className="text-3xl font-bold font-mono text-slate-900 tracking-tight">
                 {Number(data?.kpis?.TOTAL_DOCS || 0).toLocaleString('pt-BR')}
               </div>
-              <div className="mt-3 pt-2.5 border-t border-slate-100">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-sky-800 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200">
-                  Volume 90d
-                </span>
-              </div>
+              <p className="text-[11px] text-slate-400 mt-2 truncate">
+                Prontuários eletrônicos preenchidos na unidade
+              </p>
             </div>
 
-            <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs flex flex-col justify-between hover:border-emerald-300 transition-all">
-              <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-2">
-                <div>
-                  <span className="block text-slate-700 font-bold">Documentos Ativos</span>
-                  <span className="text-[10px] text-slate-400 font-normal">Modelos únicos em uso</span>
-                </div>
-                <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100">
-                  <Activity size={16} />
-                </div>
-              </div>
-              <div className="text-3xl font-bold font-mono tabular-nums text-slate-900 my-1">
-                {data?.kpis?.DOCS_ATIVOS || 0}
-              </div>
-              <div className="mt-3 pt-2.5 border-t border-slate-100">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+            {/* Card 2: Documentos Únicos em Uso */}
+            <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-2xs flex flex-col justify-between hover:border-emerald-300 transition-all">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Modelos Ativos</span>
+                <Badge variant="outline" className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border-emerald-200 rounded-full px-2 py-0.5 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                   Aderência Local
-                </span>
+                </Badge>
               </div>
+              <div className="text-3xl font-bold font-mono text-emerald-800 tracking-tight">
+                {Number(data?.kpis?.DOCS_ATIVOS || 0).toLocaleString('pt-BR')}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2 truncate">
+                Modelos clínicos com registros homologados
+              </p>
             </div>
 
-            <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs flex flex-col justify-between hover:border-amber-300 transition-all">
-              <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-2">
-                <div>
-                  <span className="block text-slate-700 font-bold">Recência de Uso</span>
-                  <span className="text-[10px] text-slate-400 font-normal">Última Atividade</span>
-                </div>
-                <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600 border border-amber-100">
-                  <Clock size={16} />
-                </div>
+            {/* Card 3: SLA de Assinatura (24h) */}
+            <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-2xs flex flex-col justify-between hover:border-teal-300 transition-all">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">SLA Assinatura (24h)</span>
+                <Badge 
+                  variant="outline" 
+                  className={cn(
+                    "text-[10px] font-semibold rounded-full px-2 py-0.5",
+                    Number(slaPercentage) >= 90 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"
+                  )}
+                >
+                  Regra CFM
+                </Badge>
               </div>
-              <div className="text-xl font-bold font-mono tabular-nums text-slate-900 my-1 truncate">
-                {data.kpis.ULTIMO_REGISTRO 
-                  ? new Date(data.kpis.ULTIMO_REGISTRO).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                  : 'N/A'}
-              </div>
-              <div className="mt-3 pt-2.5 border-t border-slate-100">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                  Tempo Real
-                </span>
-              </div>
-            </div>
-
-          </div>
-
-          {/* KPI Grid - Linha 2: Eficiência & Segurança (SLA) */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs flex flex-col justify-between hover:border-emerald-300 transition-all">
-              <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-2">
-                <div>
-                  <span className="block text-slate-700 font-bold">SLA de Assinatura (24h)</span>
-                  <span className="text-[10px] text-slate-400 font-normal">Fechamento do Registro (CFM)</span>
-                </div>
-                <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100">
-                  <Clock size={16} />
-                </div>
-              </div>
-              <div className="text-3xl font-bold font-mono tabular-nums text-emerald-600 my-1">
+              <div className={cn(
+                "text-3xl font-bold font-mono tracking-tight",
+                Number(slaPercentage) >= 90 ? "text-emerald-700" : "text-amber-700"
+              )}>
                 {slaPercentage}%
               </div>
-              <div className="mt-3 pt-2.5 border-t border-slate-100">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                  Tempo Limite de Faturamento
-                </span>
+              <p className="text-[11px] text-slate-400 mt-2 truncate">
+                Fechamento tempestivo de prontuários
+              </p>
+            </div>
+
+            {/* Card 4: Recência de Uso */}
+            <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-2xs flex flex-col justify-between hover:border-sky-300 transition-all">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Última Atividade</span>
+                <Badge variant="outline" className="text-[10px] font-semibold bg-slate-50 text-slate-700 border-slate-200 rounded-full px-2 py-0.5">
+                  Tempo Real
+                </Badge>
               </div>
+              <div className="text-xl font-bold font-mono text-slate-900 tracking-tight truncate py-1">
+                {data.kpis.ULTIMO_REGISTRO 
+                  ? new Date(data.kpis.ULTIMO_REGISTRO).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                  : 'N/A'}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2 truncate">
+                Último atendimento registrado na base
+              </p>
             </div>
           </div>
 
-          {/* Main Content: Table & Ranking */}
+          {/* 6. Conteúdo Central: Tabela Interativa de Registros + Top 5 */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
-            {/* Table block */}
-            <div className="lg:col-span-2 bg-white border border-slate-200/80 rounded-xl p-6 shadow-xs">
-              <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
-                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
-                  <FileText size={16} className="text-sky-600" />
-                  Últimos Registros
-                </h3>
-                <span className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-sky-50 text-sky-800 border border-sky-100">
-                  {selectedHospital.sigla}
-                </span>
-              </div>
-              
-              <div className="overflow-x-auto scrollbar-thin">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-slate-500 font-semibold">
-                      <th className="py-2.5">Documento</th>
-                      <th className="py-2.5 text-center">Versão</th>
-                      <th className="py-2.5 text-right">Volume</th>
-                      <th className="py-2.5 text-right">Último Uso</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {data?.details?.slice(0, 5).map((item: DetailItem) => (
-                      <tr key={item.CD_DOCUMENTO} className="group hover:bg-slate-50/80 transition-colors">
-                        <td className="py-3">
-                          <div>
-                            <p className="font-semibold text-slate-800 text-xs">{item.NOME}</p>
-                            <p className="text-[10px] text-slate-400 font-mono mt-0.5">ID: {item.CD_DOCUMENTO}</p>
-                          </div>
-                        </td>
-                        <td className="py-3 text-center font-mono">
-                          <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-bold">
-                            v{item.VERSAO || '1.0'}
-                          </span>
-                        </td>
-                        <td className="py-3 text-right font-mono font-bold text-sky-800 tabular-nums">
-                          {Number(item.USO_UNIDADE).toLocaleString('pt-BR')}
-                        </td>
-                        <td className="py-3 text-right font-mono text-slate-500 text-[11px]">
-                          {item.ULTIMO_USO ? formatDateTime(item.ULTIMO_USO) : '-'}
-                        </td>
+            {/* Tabela de Documentos Recentes da Unidade */}
+            <div className="lg:col-span-2 bg-white border border-slate-200/80 rounded-3xl p-6 shadow-2xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <FileText size={16} className="text-sky-600" />
+                      Documentos Mais Movimentados na Unidade
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Prontuários com maior volume recente em <b>{selectedHospital?.nome}</b>
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold font-mono px-2.5 py-1 rounded-full bg-sky-50 text-sky-800 border border-sky-200">
+                    {selectedHospital?.sigla}
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto scrollbar-thin">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200/80 text-slate-500 font-semibold uppercase text-[10px] tracking-wider">
+                        <th className="py-2.5">Documento Clínico</th>
+                        <th className="py-2.5 text-center">Versão</th>
+                        <th className="py-2.5 text-right">Volume</th>
+                        <th className="py-2.5 text-right">Último Uso</th>
+                        <th className="py-2.5 text-center w-20">Ações</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {data?.details?.slice(0, 8).map((item: DetailItem) => (
+                        <tr key={item.CD_DOCUMENTO} className="group hover:bg-sky-50/40 transition-colors">
+                          <td className="py-3">
+                            <div className="cursor-pointer" onClick={() => fetchDocDetails(item.CD_DOCUMENTO)}>
+                              <p className="font-semibold text-slate-900 group-hover:text-sky-700 transition-colors">{item.NOME}</p>
+                              <p className="text-[10px] text-slate-400 font-mono mt-0.5">CÓDIGO: #{item.CD_DOCUMENTO}</p>
+                            </div>
+                          </td>
+                          <td className="py-3 text-center font-mono">
+                            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold">
+                              v{item.VERSAO || '1.0'}
+                            </span>
+                          </td>
+                          <td className="py-3 text-right font-mono font-bold text-sky-800 tabular-nums">
+                            {Number(item.USO_UNIDADE).toLocaleString('pt-BR')}
+                          </td>
+                          <td className="py-3 text-right font-mono text-slate-500 text-[11px]">
+                            {item.ULTIMO_USO ? formatDateTime(item.ULTIMO_USO) : '-'}
+                          </td>
+                          <td className="py-3 text-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => fetchDocDetails(item.CD_DOCUMENTO)}
+                              className="h-7 px-2 text-[10px] rounded-lg text-sky-700 hover:bg-sky-100/70 cursor-pointer"
+                              title="Visualizar Metadados & Regras"
+                            >
+                              <Layers size={13} className="mr-1" />
+                              Ver
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                <span>Exibindo os modelos com maior volume na unidade</span>
+                <Link 
+                  href={`/documentos?search=${selectedHospital?.sigla}`}
+                  className="font-semibold text-sky-700 hover:underline flex items-center gap-1"
+                >
+                  Abrir na Matriz Geral de Documentos <ChevronRight size={13} />
+                </Link>
               </div>
             </div>
 
-            {/* Ranking Section */}
+            {/* Coluna Direita: Top 5 + Card de Insight */}
             <div className="space-y-6">
               
-              <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-xs">
-                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide mb-5 flex items-center gap-2">
-                  <TrendingUp size={16} className="text-sky-600" />
-                  Top 5 Documentos
-                </h3>
+              {/* Ranking Top 5 */}
+              <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-2xs">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <TrendingUp size={16} className="text-sky-600" />
+                    Top 5 Documentos Mais Usados
+                  </h3>
+                </div>
                 
-                <div className="space-y-4">
+                <div className="space-y-3.5">
                   {data?.top5?.map((doc: Top5Item, i: number) => {
                     const max = data?.top5?.[0]?.USO || 1;
-                    const percent = (doc.USO / max) * 100;
+                    const percent = Math.round((doc.USO / max) * 100);
                     return (
                       <div key={i} className="group space-y-1.5">
                         <div className="flex justify-between items-center text-xs">
-                          <span className="font-medium text-slate-700 truncate max-w-[70%]">
-                            <span className="font-mono text-slate-400 font-bold mr-1.5">#{i + 1}</span>
+                          <span className="font-semibold text-slate-800 truncate max-w-[70%]" title={doc.NOME}>
+                            <span className="font-mono text-sky-600 font-bold mr-1.5">#{i + 1}</span>
                             {doc.NOME}
                           </span>
                           <span className="font-mono font-bold text-slate-900 tabular-nums">
@@ -449,51 +616,67 @@ export default function HospitaisPage() {
                 </div>
               </div>
 
-              {/* Info Card */}
-              <div className="bg-sky-50/60 border border-sky-100 rounded-xl p-5 shadow-xs">
-                <h4 className="text-xs font-bold text-sky-900 flex items-center gap-2 mb-2 uppercase tracking-wide">
+              {/* Insight Operacional da Unidade na Rede */}
+              <div className="bg-sky-50/70 border border-sky-100 rounded-3xl p-5 shadow-2xs">
+                <h4 className="text-xs font-bold text-sky-950 flex items-center gap-2 mb-2 uppercase tracking-wide">
                   <Activity size={14} className="text-sky-600" />
-                  Insight Operacional
+                  Representatividade na Rede
                 </h4>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Esta unidade representa <span className="font-bold text-sky-900">{(data.globalTotal > 0 ? ((Number(data.kpis.TOTAL_DOCS) / Number(data.globalTotal)) * 100) : 0).toFixed(1)}%</span> do volume total transacionado do ambiente <span className="font-semibold text-slate-800">{activeConnName || 'selecionado'}</span> nos últimos 90 dias.
+                  A unidade <b>{selectedHospital?.sigla}</b> é responsável por <span className="font-bold text-sky-900">{(data.globalTotal > 0 ? ((Number(data.kpis.TOTAL_DOCS) / Number(data.globalTotal)) * 100) : 0).toFixed(1)}%</span> de todo o volume de prontuários eletrônicos preenchidos na base <span className="font-semibold text-slate-800">{activeConnName || 'ativa'}</span> (filtro motor {resolvedVersion}).
                 </p>
               </div>
 
             </div>
           </div>
 
-          {/* Section: SLA de Assinatura */}
-          <div className="border-t border-slate-200/80 pt-8 space-y-6">
-            <h2 className="text-lg font-bold text-slate-900 uppercase tracking-wide flex items-center gap-3">
-              <span className="w-3.5 h-3.5 bg-sky-600 rounded-xs"></span>
-              Distribuição de SLA de Assinatura
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              
-              {/* SLA Distribution */}
-              <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-xs">
-                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide mb-6 flex items-center gap-3">
-                  <span className="w-2.5 h-2.5 bg-sky-600 rounded-full"></span>
-                  SLA de Assinatura por Faixas
+          {/* 7. Seção de Qualidade e SLA de Assinatura (Completa, Sem Coluna Vazia) */}
+          <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-2xs space-y-6">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <Clock size={16} className="text-emerald-600" />
+                  Governança Clínica: SLA de Fechamento e Assinatura Digital
                 </h3>
-                <div className="space-y-4">
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Conformidade com resolução CFM nº 1.821 e diretrizes de integridade documental
+                </p>
+              </div>
+              <Badge variant="outline" className="text-xs font-mono font-bold text-emerald-800 bg-emerald-50 border-emerald-200 px-2.5 py-0.5 rounded-full">
+                {slaPercentage}% em dia
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              
+              {/* Coluna 1: Distribuição de SLA por Faixas */}
+              <div className="space-y-4">
+                <span className="text-xs font-bold text-slate-700 block uppercase tracking-wider">
+                  Distribuição por Faixa de Tempo
+                </span>
+                <div className="space-y-3.5">
                   {['0-2h', '2-6h', '6-12h', '12-24h', 'Mais de 24h'].map(faixa => {
                     const match = slaRows.find((r: SlaItem) => r.FAIXA_SLA === faixa);
                     const total = match ? Number(match.TOTAL) : 0;
                     const maxSla = Math.max(...slaRows.map((r: SlaItem) => Number(r.TOTAL)), 1);
-                    const pct = (total / maxSla) * 100;
+                    const pct = Math.round((total / maxSla) * 100);
+                    const isLate = faixa === 'Mais de 24h';
+
                     return (
                       <div key={faixa} className="flex flex-col gap-1 text-xs">
                         <div className="flex justify-between items-center">
-                          <span className="font-semibold text-slate-700">{faixa}</span>
-                          <span className="font-mono text-slate-500 font-medium">{total} docs</span>
+                          <span className={cn("font-semibold", isLate ? "text-rose-700 font-bold" : "text-slate-700")}>
+                            {faixa}
+                          </span>
+                          <span className="font-mono text-slate-500 font-medium">
+                            {total.toLocaleString('pt-BR')} prontuários
+                          </span>
                         </div>
-                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
                           <div 
                             className={cn(
                               "h-full rounded-full transition-all duration-500 ease-out", 
-                              faixa === 'Mais de 24h' ? 'bg-rose-500' : 'bg-sky-600'
+                              isLate ? 'bg-rose-500' : 'bg-emerald-600'
                             )}
                             style={{ width: `${pct}%` }}
                           />
@@ -504,21 +687,72 @@ export default function HospitaisPage() {
                 </div>
               </div>
 
+              {/* Coluna 2: Card de Avaliação Regulatória e Faturamento (Elimina o Espaço Vazio!) */}
+              <div className="bg-slate-50/80 rounded-2xl p-5 border border-slate-200/70 flex flex-col justify-between space-y-4">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 flex items-center gap-2 mb-2 uppercase tracking-wide">
+                    <ShieldCheck size={16} className="text-emerald-700" />
+                    Diagnóstico Regulatório & Faturamento
+                  </h4>
+                  <p className="text-xs text-slate-600 leading-relaxed mb-4">
+                    Prontuários médicos que excedem 24 horas para fechamento ou assinatura digital geram passivos em auditorias hospitalares (ONA/JCI) e bloqueios no faturamento de contas de convênios.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-3 text-center">
+                    <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Dentro do Prazo (&le; 24h)</span>
+                      <span className="text-xl font-bold font-mono text-emerald-700">{within24h.toLocaleString('pt-BR')}</span>
+                      <span className="text-[10px] text-emerald-600 block font-medium">Conforme regulamentação</span>
+                    </div>
+
+                    <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Acima de 24h (Risco)</span>
+                      <span className="text-xl font-bold font-mono text-rose-700">{over24h.toLocaleString('pt-BR')}</span>
+                      <span className="text-[10px] text-rose-600 block font-medium">Requer intervenção</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200/60 flex items-center gap-2.5 text-xs text-emerald-900 font-medium">
+                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                  <span>
+                    Índice de conformidade geral da unidade: <b>{slaPercentage}%</b>.
+                  </span>
+                </div>
+              </div>
+
             </div>
           </div>
 
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center h-96 p-20 text-center border border-border -background">
-          <div className="w-16 h-16 bg-card border border-border flex items-center justify-center mb-6">
-            <Building2 size={32} className="-muted" />
-          </div>
-          <h2 className="text-xl font-black text-zinc-700 uppercase tracking-widest mb-2">Dados Indisponíveis</h2>
-          <p className="-muted text-[10px] font-bold uppercase max-w-xs">
-            Aguardando sincronização ou ausência de registros para este hospital no período.
+        <div className="bg-white rounded-3xl p-16 text-center border border-slate-200/80 shadow-2xs space-y-3">
+          <Building2 size={42} className="mx-auto text-slate-300" />
+          <h3 className="text-sm font-bold text-slate-800">Nenhum dado encontrado para esta unidade</h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+            Não há registros de prontuários clínicos para o hospital selecionado nos últimos 90 dias na conexão ativa.
           </p>
         </div>
       )}
+
+      {/* Drawer de Detalhes de Metadados Integrado */}
+      <DocumentDetailsDrawer
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        docId={sidebarDoc}
+        metadata={metadata}
+        loading={metadataLoading}
+        actions={metadataActions}
+        actionsLoading={metadataActionsLoading}
+        actionsError={metadataActionsError}
+        rules={metadataRules}
+        rulesLoading={metadataRulesLoading}
+        rulesError={metadataRulesError}
+        fields={metadataFields}
+        fieldsLoading={metadataFieldsLoading}
+        fieldsError={metadataFieldsError}
+      />
+
     </div>
   );
 }

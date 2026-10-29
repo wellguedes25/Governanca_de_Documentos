@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { getData } from '@/lib/storage';
 import { executeQuery } from '@/lib/oracle';
 
@@ -33,6 +33,8 @@ GROUP BY
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const hospitalId = searchParams.get('id');
+  const version = (searchParams.get('version') || 'V2').toUpperCase();
+  const isV3 = version === 'V3';
 
   if (!hospitalId) {
     return NextResponse.json({ error: 'Hospital ID is required' }, { status: 400 });
@@ -42,21 +44,22 @@ export async function GET(request: Request) {
   const activeConn = data.connections.find(c => String(c.id) === String(data.activeConnectionId));
 
   if (!activeConn) {
-    return NextResponse.json({ error: 'Nenhuma conexão ativa encontrada.' }, { status: 400 });
+    return NextResponse.json({ error: 'Nenhuma conexao ativa encontrada.' }, { status: 400 });
   }
 
-  // Utiliza node-cache do oracle.ts
   const force = searchParams.get('force') === 'true';
 
   try {
-    const slaSql = data.analyticQueries?.slaAssinatura || DEFAULT_SLA_QUERY;
+    const slaSql = (isV3 && (data as any).analyticQueriesV3?.slaAssinatura)
+      ? (data as any).analyticQueriesV3.slaAssinatura
+      : (data.analyticQueries?.slaAssinatura || DEFAULT_SLA_QUERY);
+
     const slaRes = await executeQuery(activeConn, slaSql, { ID: hospitalId }, { ttlSeconds: 600, forceRefresh: force });
 
-    const result = {
-      sla: slaRes || []
-    };
-
-    return NextResponse.json(result);
+    return NextResponse.json({
+      sla: slaRes || [],
+      versionApplied: isV3 ? 'V3' : 'V2'
+    });
   } catch (error) {
     const err = error as Error;
     console.error('Error fetching quality indicators:', err);

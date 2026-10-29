@@ -13,8 +13,10 @@ interface DocumentosToolbarProps {
   setActiveTab: (tab: 'documentos' | 'perfis') => void;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
-  density: 'compact' | 'normal';
-  setDensity: (d: 'compact' | 'normal') => void;
+  viewMode?: 'table' | 'cards';
+  setViewMode?: (mode: 'table' | 'cards') => void;
+  density?: 'compact' | 'normal';
+  setDensity?: (d: 'compact' | 'normal') => void;
   loading: boolean;
   onRefresh: () => void;
   onExport: () => void;
@@ -33,7 +35,9 @@ export function DocumentosToolbar({
   setActiveTab,
   searchTerm,
   setSearchTerm,
-  density,
+  viewMode = 'table',
+  setViewMode,
+  density = 'normal',
   setDensity,
   loading,
   onRefresh,
@@ -89,31 +93,69 @@ export function DocumentosToolbar({
 
         {/* Action Controls */}
         <div className="flex items-center flex-wrap gap-2 self-end md:self-auto">
-          {/* Density Toggle */}
-          <div className="flex items-center bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/60 text-xs text-slate-600">
+          {/* Alternador de Modo: Tabela vs Cards */}
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/60 text-xs">
             <button
-              onClick={() => setDensity('normal')}
-              title="Densidade Normal (Confortável)"
+              type="button"
+              onClick={() => setViewMode && setViewMode('table')}
+              title="Visualização em Tabela Completa"
               className={cn(
-                "p-1.5 rounded-md transition-all flex items-center gap-1.5 text-xs font-medium",
-                density === 'normal' ? "bg-white text-slate-900 shadow-2xs font-semibold" : "hover:text-slate-900"
+                "p-1.5 px-2.5 rounded-md transition-all flex items-center gap-1.5 text-xs cursor-pointer",
+                viewMode === 'table'
+                  ? "bg-white text-slate-900 shadow-2xs font-bold"
+                  : "hover:text-slate-900 text-slate-600 font-medium"
               )}
             >
-              <LayoutGrid size={13} />
-              <span className="hidden sm:inline">Normal</span>
+              <Rows size={13} className={cn(viewMode === 'table' ? "text-[#004953]" : "text-slate-400")} />
+              <span className="hidden sm:inline">Tabela</span>
             </button>
             <button
-              onClick={() => setDensity('compact')}
-              title="Alta Densidade (Compacto para Análise Rápida)"
+              type="button"
+              onClick={() => setViewMode && setViewMode('cards')}
+              title="Visualização em Cards Clínicos"
               className={cn(
-                "p-1.5 rounded-md transition-all flex items-center gap-1.5 text-xs font-medium",
-                density === 'compact' ? "bg-white text-slate-900 shadow-2xs font-semibold" : "hover:text-slate-900"
+                "p-1.5 px-2.5 rounded-md transition-all flex items-center gap-1.5 text-xs cursor-pointer",
+                viewMode === 'cards'
+                  ? "bg-white text-slate-900 shadow-2xs font-bold"
+                  : "hover:text-slate-900 text-slate-600 font-medium"
               )}
             >
-              <Rows size={13} />
-              <span className="hidden sm:inline">Compacto</span>
+              <LayoutGrid size={13} className={cn(viewMode === 'cards' ? "text-[#004953]" : "text-slate-400")} />
+              <span className="hidden sm:inline">Cards</span>
             </button>
           </div>
+
+          {/* Alternador de Densidade para Tabela: Normal vs Compacto */}
+          {viewMode === 'table' && setDensity && (
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/60 text-xs">
+              <button
+                type="button"
+                onClick={() => setDensity('normal')}
+                title="Espaçamento Padrão"
+                className={cn(
+                  "px-2 py-1 rounded-md text-[11px] transition-all cursor-pointer",
+                  density === 'normal'
+                    ? "bg-white text-slate-900 shadow-2xs font-bold"
+                    : "text-slate-500 hover:text-slate-800 font-medium"
+                )}
+              >
+                Normal
+              </button>
+              <button
+                type="button"
+                onClick={() => setDensity('compact')}
+                title="Espaçamento Compacto / Alta Densidade"
+                className={cn(
+                  "px-2 py-1 rounded-md text-[11px] transition-all cursor-pointer",
+                  density === 'compact'
+                    ? "bg-white text-slate-900 shadow-2xs font-bold"
+                    : "text-slate-500 hover:text-slate-800 font-medium"
+                )}
+              >
+                Compacto
+              </button>
+            </div>
+          )}
 
           {/* Hospital Filter Pill Toggle */}
           {activeHospitals.length > 0 && activeTab === 'documentos' && (

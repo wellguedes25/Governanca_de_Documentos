@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { LayoutDashboard, FileText, Settings, Database, Building2, Activity, GitFork } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, Database, Building2, Activity, GitFork, ArrowLeftRight } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useUI } from '@/context/UIContext';
 import { cn } from '@/lib/utils';
@@ -12,6 +12,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/hospitais', label: 'Hospitais', icon: Building2 },
   { href: '/documentos', label: 'Documentos', icon: FileText },
+  { href: '/migracao', label: 'Migração', icon: ArrowLeftRight },
   { href: '/linhagem', label: 'Linhagem', icon: GitFork },
 ];
 

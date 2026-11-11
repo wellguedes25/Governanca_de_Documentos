@@ -291,6 +291,7 @@ export default function HospitaisPage() {
           />
           <Badge 
             variant="outline" 
+            suppressHydrationWarning
             className="text-[10px] font-bold px-2 py-0.5 rounded-full border-sky-300 bg-sky-50 text-sky-800"
           >
             Motor {resolvedVersion}

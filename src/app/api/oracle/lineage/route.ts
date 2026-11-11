@@ -39,6 +39,115 @@ interface LineageEdge {
   script?: string;
 }
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function tokenize(tag: string): string[] {
+  return (tag || '')
+    .replace(/^(TXT|CB|CXT|RB|DS|VL|DT|CK)_/i, '')
+    .split('_')
+    .map(t => t.toUpperCase())
+    .filter(t => t.length > 1 || t === 'N');
+}
+
+function computeSimilarity(sourceTag: string, targetTag: string): number {
+  const sTokens = tokenize(sourceTag);
+  const tTokens = tokenize(targetTag);
+  let matches = 0;
+  for (const st of sTokens) {
+    if (tTokens.includes(st)) {
+      matches += 2;
+    } else if (st === 'NR' && tTokens.includes('N')) {
+      matches += 1.5;
+    } else if (st === 'N' && tTokens.includes('NR')) {
+      matches += 1.5;
+    }
+  }
+  return matches;
+}
+
+function getMainSelectProjection(sql: string): string {
+  const m = sql.match(/^\s*SELECT\s+(?:DISTINCT\s+)?([\s\S]+?)\s+FROM\b/i);
+  return m ? m[1].replace(/\s+/g, ' ').trim() : '';
+}
+
+function findBestSourceField(
+  sourceFields: LineageField[],
+  targetTag: string,
+  script: string
+): { field: LineageField | null; isDocLevelOnly: boolean } {
+  const projection = getMainSelectProjection(script);
+
+  // Se o SELECT projeta exclusivamente metadados/auditoria do documento de origem (ex: dh_criacao, dh_fechamento)
+  // e não o conteúdo de campos (lo_conteudo), o vínculo é a nível de Documento clínico, não de campo individual.
+  const isDocLevelOnly = /\b(dh_criacao|dh_fechamento|cd_documento_clinico|cd_atendimento)\b/i.test(projection)
+    && !/lo_conteudo|lo_valor|ds_conteudo/i.test(projection);
+
+  if (isDocLevelOnly) {
+    return { field: null, isDocLevelOnly: true };
+  }
+
+  const candidates: Array<{ field: LineageField; score: number }> = [];
+
+  for (const field of sourceFields) {
+    const sTag = field.tag;
+    if (!sTag) continue;
+
+    // A tag deve aparecer entre aspas ou delimitada por limites de palavra/sublinhado
+    const tagPattern = new RegExp(`['"]${escapeRegex(sTag)}['"]|(?:\\b|_)` + escapeRegex(sTag) + `(?:\\b|_)`, 'i');
+    if (!tagPattern.test(script)) continue;
+
+    let score = 10;
+
+    // 1. O script possui subquery com alias projetado no SELECT externo?
+    // Ex: SELECT solicitacao as tipo FROM ... LEFT JOIN (... as solicitacao WHERE ds_identificador = 'TXT_NR_SOLICITACAO')
+    const subqueryMatch = new RegExp(
+      `SELECT[\\s\\S]*?lo_conteudo[\\s\\S]*?\\bAS\\s+([a-zA-Z0-9_]+)[\\s\\S]*?ds_identificador\\s*=\\s*['"]${escapeRegex(sTag)}['"]`,
+      'i'
+    ).exec(script);
+
+    if (subqueryMatch) {
+      const alias = subqueryMatch[1];
+      const aliasInProjection = new RegExp(`(?:\\b|_)${escapeRegex(alias)}(?:\\b|_)`, 'i').test(projection);
+      if (aliasInProjection) {
+        score += 100; // Coluna cujo valor alimenta diretamente a saída
+      } else {
+        score += 15;
+      }
+    } else {
+      // 2. Consulta direta de lo_conteudo/lo_valor associado a este ds_identificador
+      const directSelect = new RegExp(
+        `SELECT[\\s\\S]*?(?:lo_conteudo|lo_valor)[\\s\\S]*?FROM[\\s\\S]*?ds_identificador[\\s\\S]*?['"]${escapeRegex(sTag)}['"]`,
+        'i'
+      ).test(script);
+      if (directSelect) {
+        score += 80;
+      }
+    }
+
+    // 3. Similaridade semântica entre tags (ex: TXT_NR_SOLICITACAO <-> TXT_N_SOLICITACAO_RECEB)
+    const sim = computeSimilarity(sTag, targetTag);
+    score += sim * 15;
+
+    // 4. Correspondência de tipo/prefixo de widget (ex: TXT_ com TXT_, CXT_ com CXT_)
+    const sPrefix = (sTag.match(/^[A-Z]+/i) || [''])[0].toUpperCase();
+    const tPrefix = (targetTag.match(/^[A-Z]+/i) || [''])[0].toUpperCase();
+    if (sPrefix && sPrefix === tPrefix) {
+      score += 5;
+    }
+
+    candidates.push({ field, score });
+  }
+
+  if (candidates.length === 0) {
+    return { field: null, isDocLevelOnly: false };
+  }
+
+  candidates.sort((a, b) => b.score - a.score);
+  return { field: candidates[0].field, isDocLevelOnly: false };
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const rootDocId = searchParams.get('rootDocId');
@@ -240,31 +349,35 @@ export async function GET(request: Request) {
       const sourceDoc = docMap.get(sDocNum)!;
       const targetDoc = docMap.get(tDocNum)!;
 
-      // Procura se o script cita expressamente algum campo do documento de origem
-      let matchedSourceFieldTag: string | undefined = undefined;
-      for (const [sTag, sField] of sourceDoc.fields.entries()) {
-        const tagRegex = new RegExp(`['"]?${sTag}['"]?`, 'i');
-        if (tagRegex.test(re.script)) {
-          matchedSourceFieldTag = sTag;
-          sField.hasLink = true;
-          sField.isSource = true;
-          break;
-        }
-      }
+      // Detecta com heurística avançada qual campo do documento de origem é o verdadeiro provedor do dado
+      const sourceFieldsList = Array.from(sourceDoc.fields.values());
+      const { field: bestSourceField, isDocLevelOnly } = findBestSourceField(
+        sourceFieldsList,
+        re.targetFieldTag,
+        re.script
+      );
 
-      // Se não encontrou campo correspondente no documento de origem, não cria vínculo espúrio
-      if (!matchedSourceFieldTag) {
+      // Se não encontrou campo correspondente e não é um vínculo a nível de documento, ignora
+      if (!bestSourceField && !isDocLevelOnly) {
         return;
       }
 
-      // Marca o campo alvo como tendo vínculo legítimo
+      // Marca campo alvo
       const targetField = targetDoc.fields.get(re.targetFieldTag);
       if (targetField) {
         targetField.hasLink = true;
         targetField.isTarget = true;
       }
 
-      const edgeKey = `${sDocNum}_${matchedSourceFieldTag}->${tDocNum}_${re.targetFieldTag}`;
+      // Marca campo origem (se for a nível de campo)
+      let matchedSourceFieldTag: string | undefined = undefined;
+      if (bestSourceField) {
+        matchedSourceFieldTag = bestSourceField.tag;
+        bestSourceField.hasLink = true;
+        bestSourceField.isSource = true;
+      }
+
+      const edgeKey = `${sDocNum}_${matchedSourceFieldTag || 'DOC'}->${tDocNum}_${re.targetFieldTag}`;
       if (!edgeKeySet.has(edgeKey)) {
         edgeKeySet.add(edgeKey);
         edges.push({
@@ -274,8 +387,8 @@ export async function GET(request: Request) {
           targetDocId: String(tDocNum),
           targetFieldTag: re.targetFieldTag,
           type: 'SQL_QUERY',
-          label: 'Consulta SQL',
-          script: re.script.slice(0, 500)
+          label: isDocLevelOnly ? 'Auditoria (Doc)' : 'Consulta SQL',
+          script: re.script
         });
       }
     });

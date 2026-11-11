@@ -9,6 +9,18 @@ const DEMANDS_FILE = path.join(process.cwd(), 'data', 'migration-demands.json');
 const V2_CACHE_FILE = path.join(process.cwd(), 'data', 'v2-catalog-cache.json');
 const V3_CACHE_FILE = path.join(process.cwd(), 'data', 'v3-catalog-cache.json');
 
+const CACHE_MAX_AGE_MS = 15 * 60 * 1000; // 15 minutos de TTL para catálogo Oracle
+
+function isCacheStale(filePath: string): boolean {
+  try {
+    if (!fs.existsSync(filePath)) return true;
+    const stats = fs.statSync(filePath);
+    return (Date.now() - stats.mtimeMs) > CACHE_MAX_AGE_MS;
+  } catch {
+    return true;
+  }
+}
+
 function getStoredDemands(): DocumentoMigracao[] {
   try {
     if (!fs.existsSync(DEMANDS_FILE)) {
@@ -64,28 +76,33 @@ export async function GET(request: Request) {
     let docsFlexTotal = readCachedDocs(V2_CACHE_FILE, 'FLEX');
     let docsHtml5Total = readCachedDocs(V3_CACHE_FILE, 'HTML5');
 
-    // Se o cache estiver vazio ou for solicitado sync=true, consulta Oracle diretamente
-    if (forceSync || docsFlexTotal.length === 0 || docsHtml5Total.length === 0) {
+    // Se o cache estiver vazio, expirado ou for solicitado sync=true, consulta Oracle diretamente
+    const shouldSyncV2 = forceSync || docsFlexTotal.length === 0 || isCacheStale(V2_CACHE_FILE);
+    const shouldSyncV3 = forceSync || docsHtml5Total.length === 0 || isCacheStale(V3_CACHE_FILE);
+
+    if (shouldSyncV2 || shouldSyncV3) {
       const connection = storageData.connections.find(c => c.id === storageData.activeConnectionId);
       if (connection) {
         try {
-          if (forceSync || docsFlexTotal.length === 0) {
+          if (shouldSyncV2) {
             const sqlV2 = storageData.activeQuery;
             if (sqlV2) {
               const resV2 = await executeQuery(connection, sqlV2, {}, { ttlSeconds: 300, forceRefresh: forceSync });
-              if (resV2.rows && resV2.rows.length > 0) {
-                fs.writeFileSync(V2_CACHE_FILE, JSON.stringify(resV2.rows, null, 2), 'utf8');
+              const rowsV2 = Array.isArray(resV2) ? resV2 : ((resV2 as any)?.rows || []);
+              if (rowsV2.length > 0) {
+                fs.writeFileSync(V2_CACHE_FILE, JSON.stringify(rowsV2, null, 2), 'utf8');
                 docsFlexTotal = readCachedDocs(V2_CACHE_FILE, 'FLEX');
               }
             }
           }
 
-          if (forceSync || docsHtml5Total.length === 0) {
+          if (shouldSyncV3) {
             const sqlV3 = storageData.activeQueryV3 || storageData.activeQuery;
             if (sqlV3) {
               const resV3 = await executeQuery(connection, sqlV3, {}, { ttlSeconds: 300, forceRefresh: forceSync });
-              if (resV3.rows && resV3.rows.length > 0) {
-                fs.writeFileSync(V3_CACHE_FILE, JSON.stringify(resV3.rows, null, 2), 'utf8');
+              const rowsV3 = Array.isArray(resV3) ? resV3 : ((resV3 as any)?.rows || []);
+              if (rowsV3.length > 0) {
+                fs.writeFileSync(V3_CACHE_FILE, JSON.stringify(rowsV3, null, 2), 'utf8');
                 docsHtml5Total = readCachedDocs(V3_CACHE_FILE, 'HTML5');
               }
             }
@@ -95,6 +112,10 @@ export async function GET(request: Request) {
         }
       }
     }
+
+    // Ordenar listas numericamente por código para facilitar localização
+    docsFlexTotal.sort((a, b) => Number(a.cd_documento_mv) - Number(b.cd_documento_mv));
+    docsHtml5Total.sort((a, b) => Number(a.cd_documento_mv) - Number(b.cd_documento_mv));
 
     // Mapas para enriquecimento ágil de demandas
     const flexDocMap = new Map<string, DocumentoFlexItem>();

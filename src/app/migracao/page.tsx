@@ -71,7 +71,8 @@ export default function MigracaoPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/migracao');
+      const syncParam = force ? '?sync=true' : '';
+      const res = await fetch(`/api/migracao${syncParam}`);
       const data = await res.json();
       if (data.error) throw new Error(data.error);
 

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, Save, Trash2, CheckSquare, Square, Plus, 
-  Calendar, User, ShieldCheck, Tag, GitBranch, Layers, Clock
+  Calendar, User, ShieldCheck, Tag, GitBranch, Layers, Clock, Search
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -66,6 +66,21 @@ export function MigracaoDrawer({
 
   // Seção 3: Dados Documento
   const [codigoObjeto, setCodigoObjeto] = useState<string>('');
+  const [html5Search, setHtml5Search] = useState<string>('');
+
+  // Ordenação numérica crescente por código com filtro de pesquisa instantâneo
+  const sortedAndFilteredHtml5 = useMemo(() => {
+    return [...docsHtml5Total]
+      .sort((a, b) => Number(a.cd_documento_mv) - Number(b.cd_documento_mv))
+      .filter(d => {
+        if (!html5Search.trim()) return true;
+        const term = html5Search.toLowerCase().trim();
+        return (
+          String(d.cd_documento_mv).includes(term) ||
+          d.nome.toLowerCase().includes(term)
+        );
+      });
+  }, [docsHtml5Total, html5Search]);
 
   // Seção 4: Regras e Relacionamentos Flex
   const [regrasNegocio, setRegrasNegocio] = useState<string>('');
@@ -99,10 +114,12 @@ export function MigracaoDrawer({
       setDataEfetiva(migracao.data_conclusao_efetiva ? migracao.data_conclusao_efetiva.slice(0, 10) : '');
       setObservacoes(migracao.observacoes || '');
       setChecklist(migracao.checklist && migracao.checklist.length > 0 ? migracao.checklist : DEFAULT_CHECKLIST);
+      setHtml5Search('');
     } else {
       // Nova Demanda
       setFlexId(initialFlexDoc ? String(initialFlexDoc.cd_documento_mv) : (docsFlexTotal[0] ? String(docsFlexTotal[0].cd_documento_mv) : ''));
       setHtml5Id('');
+      setHtml5Search('');
       setStatus(initialStatus || 'PENDENTES');
       setComplexidade('MEDIA');
       setTipoDocumento(initialFlexDoc?.nome || '');
@@ -340,16 +357,38 @@ export function MigracaoDrawer({
                 <span>Dados Documento (Destino V3)</span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <Label className="mb-1 block">Documento HTML5 / Editor 3 Pareado</Label>
+              <div className="flex flex-col sm:flex-row items-start gap-4">
+                {/* Código Documento HTML com busca e ordenação */}
+                <div className="flex-1 w-full space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="block">Código Documento HTML</Label>
+                    {docsHtml5Total.length > 0 && (
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {sortedAndFilteredHtml5.length} de {docsHtml5Total.length} docs
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Campo de Pesquisa Rápida */}
+                  <div className="relative">
+                    <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Pesquisar por código (ex: 622) ou nome..."
+                      value={html5Search}
+                      onChange={(e) => setHtml5Search(e.target.value)}
+                      className="w-full h-8 pl-8 pr-2.5 rounded-lg border border-slate-200 bg-slate-50/70 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#004953] focus:bg-white transition-all shadow-2xs"
+                    />
+                  </div>
+
+                  {/* Select Ordenado por Código */}
                   <select
                     value={html5Id}
                     onChange={(e) => setHtml5Id(e.target.value)}
-                    className="w-full h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-[#004953] shadow-2xs"
+                    className="w-full h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-[#004953] shadow-2xs font-mono"
                   >
-                    <option value="">Ainda não pareado / Em desenvolvimento</option>
-                    {docsHtml5Total.map(d => (
+                    <option value="" className="font-sans">Ainda não pareado / Em desenvolvimento</option>
+                    {sortedAndFilteredHtml5.map(d => (
                       <option key={d.id || d.cd_documento_mv} value={d.cd_documento_mv}>
                         [{d.cd_documento_mv}] {d.nome}
                       </option>
@@ -357,14 +396,17 @@ export function MigracaoDrawer({
                   </select>
                 </div>
 
-                <div>
-                  <Label className="mb-1 block">Código Objeto Documento (MV)</Label>
+                {/* Cód. Objeto Perfil (Reduzido para 4 caracteres) */}
+                <div className="w-full sm:w-36 space-y-1.5 shrink-0">
+                  <Label className="block whitespace-nowrap">Cód. Objeto Perfil</Label>
                   <Input
                     value={codigoObjeto}
-                    onChange={(e) => setCodigoObjeto(e.target.value)}
-                    placeholder="Ex: 772, 733"
-                    className="font-mono"
+                    onChange={(e) => setCodigoObjeto(e.target.value.slice(0, 4))}
+                    maxLength={4}
+                    placeholder="Ex: 646"
+                    className="font-mono text-center tracking-wider text-xs h-9 uppercase"
                   />
+                  <span className="text-[10px] text-slate-400 block text-center">Máx. 4 dígitos</span>
                 </div>
               </div>
             </div>

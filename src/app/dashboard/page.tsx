@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   FileText, Activity, ShieldCheck, Archive, RotateCw,
-  Building2, BarChart3, Clock, ChevronRight, AlertTriangle,
+  Building2, BarChart3, Clock, ChevronRight, ChevronDown, AlertTriangle,
   Sun, Moon, CheckCircle2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatDatabaseError } from '@/lib/error-formatter';
 
 interface Top10Item {
   CD_DOCUMENTO: number;
@@ -55,6 +56,7 @@ export default function Dashboard() {
   const [quality, setQuality] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showTechDetails, setShowTechDetails] = useState(false);
   const [activeConnId, setActiveConnId] = useState('');
 
   // Busca dados de conexões ativas
@@ -200,16 +202,64 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Alerta de Erro */}
-      {error && (
-        <div className="border border-rose-200 bg-rose-50 p-4 rounded-xl flex items-center gap-3 text-xs text-rose-700 shadow-2xs">
-          <AlertTriangle size={18} className="text-rose-600 shrink-0" />
-          <div>
-            <p className="font-bold text-rose-900">Falha ao obter telemetria do banco de dados</p>
-            <p className="text-rose-600">{error}</p>
+      {/* Alerta Amigável de Erro */}
+      {error && (() => {
+        const friendlyError = formatDatabaseError(error);
+        return (
+          <div className="border border-rose-200 bg-rose-50/90 rounded-2xl p-4 sm:p-5 shadow-xs transition-all">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="p-2.5 rounded-xl bg-rose-100 text-rose-700 shrink-0 mt-0.5 sm:mt-0">
+                  <AlertTriangle size={20} className="stroke-[2.2]" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="font-semibold text-rose-950 text-sm">{friendlyError.title}</h4>
+                    <Badge variant="outline" className="text-[10px] bg-rose-100/60 text-rose-700 border-rose-200">
+                      Banco Oracle
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-rose-800 leading-relaxed">{friendlyError.message}</p>
+                  <p className="text-xs text-rose-600 font-medium">{friendlyError.actionSuggestion}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fetchDashboardData(true)}
+                  disabled={loading}
+                  className="gap-1.5 text-xs font-semibold rounded-xl bg-white hover:bg-rose-50 border-rose-200 text-rose-800 shadow-2xs h-8.5 px-3.5 cursor-pointer"
+                >
+                  <RotateCw className={cn("w-3.5 h-3.5 text-rose-700", loading && "animate-spin")} />
+                  <span>{loading ? "Reconectando..." : "Tentar Novamente"}</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Seletor de Detalhes Técnicos */}
+            {friendlyError.technicalDetails && (
+              <div className="mt-3 pt-3 border-t border-rose-200/70">
+                <button
+                  type="button"
+                  onClick={() => setShowTechDetails(prev => !prev)}
+                  className="flex items-center gap-1.5 text-[11px] font-medium text-rose-700 hover:text-rose-950 transition-colors cursor-pointer"
+                >
+                  <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200", showTechDetails && "rotate-180")} />
+                  <span>{showTechDetails ? "Ocultar detalhes técnicos" : "Ver código do erro (para DBA / Suporte Técnico)"}</span>
+                </button>
+
+                {showTechDetails && (
+                  <div className="mt-2 p-2.5 bg-white/70 border border-rose-200/80 rounded-xl font-mono text-[11px] text-rose-900 break-all select-all">
+                    {friendlyError.technicalDetails}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 2. Top Executive KPI Bar (4 Cards de Alto Impacto) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

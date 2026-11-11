@@ -173,6 +173,7 @@ export async function getPool(connection: DbConnection): Promise<CustomPool> {
     poolMax: 15,
     poolIncrement: 2,
     poolTimeout: 60,
+    poolPingInterval: 1, // Valida conexões ociosas há > 1s antes de usar, descartando sessões mortas
     stmtCacheSize: 60,
   }) as CustomPool;
 
@@ -333,6 +334,26 @@ export async function executeQuery(
     return result.rows;
   } catch (err) {
     console.error('[Oracle] Database error:', err);
+    // Se a sessão foi morta ou a conexão caiu, limpa o pool para que a próxima tentativa abra conexões limpas
+    const errMsg = String((err as any)?.message || '');
+    if (
+      errMsg.includes('ORA-00028') ||
+      errMsg.includes('ORA-28') ||
+      errMsg.includes('DPI-1080') ||
+      errMsg.includes('ORA-03113') ||
+      errMsg.includes('ORA-03114') ||
+      errMsg.includes('NJS-003')
+    ) {
+      console.warn('[Oracle] Sessão ou conexão morta identificada. Resetando o pool de conexões...');
+      if (globalThis.oraclePool) {
+        try {
+          await globalThis.oraclePool.close(2);
+        } catch {
+          // ignore
+        }
+        globalThis.oraclePool = undefined;
+      }
+    }
     throw err;
   } finally {
     if (conn) {

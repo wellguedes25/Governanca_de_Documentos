@@ -54,10 +54,25 @@ export function MigracaoDrawer({
 }: MigracaoDrawerProps) {
   // Seção 1: Dados da Demanda
   const [flexId, setFlexId] = useState<string>('');
+  const [flexSearch, setFlexSearch] = useState<string>('');
   const [html5Id, setHtml5Id] = useState<string>('');
   const [status, setStatus] = useState<StatusMigracao>('PENDENTES');
   const [complexidade, setComplexidade] = useState<ComplexidadeMigracao>('MEDIA');
   const [tipoDocumento, setTipoDocumento] = useState<string>('');
+
+  // Ordenação numérica crescente por código com filtro de pesquisa instantâneo para Flex
+  const sortedAndFilteredFlex = useMemo(() => {
+    return [...docsFlexTotal]
+      .sort((a, b) => Number(a.cd_documento_mv) - Number(b.cd_documento_mv))
+      .filter(d => {
+        if (!flexSearch.trim()) return true;
+        const term = flexSearch.toLowerCase().trim();
+        return (
+          String(d.cd_documento_mv).includes(term) ||
+          d.nome.toLowerCase().includes(term)
+        );
+      });
+  }, [docsFlexTotal, flexSearch]);
 
   // Seção 2: Responsáveis
   const [lecom, setLecom] = useState<string>('');
@@ -115,11 +130,13 @@ export function MigracaoDrawer({
       setObservacoes(migracao.observacoes || '');
       setChecklist(migracao.checklist && migracao.checklist.length > 0 ? migracao.checklist : DEFAULT_CHECKLIST);
       setHtml5Search('');
+      setFlexSearch('');
     } else {
       // Nova Demanda
       setFlexId(initialFlexDoc ? String(initialFlexDoc.cd_documento_mv) : (docsFlexTotal[0] ? String(docsFlexTotal[0].cd_documento_mv) : ''));
       setHtml5Id('');
       setHtml5Search('');
+      setFlexSearch('');
       setStatus(initialStatus || 'PENDENTES');
       setComplexidade('MEDIA');
       setTipoDocumento(initialFlexDoc?.nome || '');
@@ -250,8 +267,28 @@ export function MigracaoDrawer({
                 <span>Dados da Demanda</span>
               </div>
 
-              <div>
-                <Label className="mb-1 block">Documento Flex Origem (V2) *</Label>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="block">Documento Flex Origem (V2) *</Label>
+                  {docsFlexTotal.length > 0 && (
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {sortedAndFilteredFlex.length} de {docsFlexTotal.length} docs
+                    </span>
+                  )}
+                </div>
+
+                {/* Campo de Pesquisa Rápida Flex */}
+                <div className="relative">
+                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Pesquisar por código (ex: 1914) ou nome..."
+                    value={flexSearch}
+                    onChange={(e) => setFlexSearch(e.target.value)}
+                    className="w-full h-8 pl-8 pr-2.5 rounded-lg border border-slate-200 bg-slate-50/70 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#004953] focus:bg-white transition-all shadow-2xs"
+                  />
+                </div>
+
                 <select
                   value={flexId}
                   onChange={(e) => {
@@ -260,10 +297,10 @@ export function MigracaoDrawer({
                     if (selected && !tipoDocumento) setTipoDocumento(selected.nome);
                   }}
                   required
-                  className="w-full h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-[#004953] shadow-2xs"
+                  className="w-full h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-[#004953] shadow-2xs font-mono"
                 >
-                  <option value="">Selecione o modelo Flex...</option>
-                  {docsFlexTotal.map(d => (
+                  <option value="" className="font-sans">Selecione o modelo Flex...</option>
+                  {sortedAndFilteredFlex.map(d => (
                     <option key={d.id || d.cd_documento_mv} value={d.cd_documento_mv}>
                       [{d.cd_documento_mv}] {d.nome}
                     </option>

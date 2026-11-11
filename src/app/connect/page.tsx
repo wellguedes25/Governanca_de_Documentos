@@ -13,7 +13,9 @@ import {
   RotateCw, 
   Sparkles,
   Layers,
-  ChevronDown
+  ChevronDown,
+  Search,
+  Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +38,7 @@ function ConnectPageContent() {
 
   const [connections, setConnections] = useState<ConnectionItem[]>([]);
   const [selectedConnId, setSelectedConnId] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedVersion, setSelectedVersion] = useState<'V3' | 'V2'>('V3');
   const [loadingList, setLoadingList] = useState(true);
   const [connecting, setConnecting] = useState(false);
@@ -137,35 +140,61 @@ function ConnectPageContent() {
           </div>
 
           <div className="flex items-center gap-2 mb-1">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-1.5">
-              Goverdoc <span className="text-sky-400 font-extrabold">Pro</span>
+            <h1 
+              className="text-2xl sm:text-3xl font-extrabold tracking-tight !text-white flex items-center gap-2 drop-shadow-md"
+              style={{ color: '#ffffff' }}
+            >
+              Goverdoc <span className="text-sky-400 font-black">Pro</span>
             </h1>
-            <Badge variant="outline" className="text-[10px] font-semibold bg-sky-950/70 text-sky-300 border-sky-800/60 px-2 py-0.5">
+            <Badge variant="outline" className="text-[10px] font-bold bg-sky-950/80 text-sky-300 border-sky-800/80 px-2 py-0.5 uppercase tracking-wide">
               Gateway Clínico
             </Badge>
           </div>
-          <p className="text-xs sm:text-sm text-slate-400 max-w-md">
+          <p className="text-xs sm:text-sm text-slate-300 max-w-md">
             Selecione o ambiente de banco de dados e o motor de documentos para validar a sessão segura.
           </p>
         </div>
 
         {/* Card Principal */}
-        <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl transition-all">
+        <div className="w-full bg-slate-900/95 border border-slate-800 rounded-3xl p-5 sm:p-7 shadow-2xl backdrop-blur-xl transition-all">
           
           {/* Sessão 1: Seleção de Conexão Oracle */}
           <div className="space-y-3 mb-6">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
                 <Database size={15} className="text-sky-400" />
                 1. Ambiente de Dados (Oracle)
               </label>
-              <span className="text-[11px] text-slate-400">
-                {connections.length} {connections.length === 1 ? 'base disponível' : 'bases disponíveis'}
+              <span className="text-[11px] font-medium text-slate-400">
+                {connections.length} {connections.length === 1 ? 'base configurada' : 'bases configuradas'}
               </span>
             </div>
 
+            {/* Barra de Pesquisa Rápida para Múltiplas Conexões */}
+            {!loadingList && connections.length > 2 && (
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Pesquisar por nome, SCAN host ou usuário..."
+                  className="w-full bg-slate-950/70 border border-slate-800 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/30 transition-all"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 hover:text-white px-1 py-0.5 rounded transition-colors"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            )}
+
             {loadingList ? (
-              <div className="p-4 bg-slate-950/50 border border-slate-800 rounded-2xl flex items-center justify-center gap-2.5 text-xs text-slate-400">
+              <div className="p-5 bg-slate-950/50 border border-slate-800 rounded-2xl flex items-center justify-center gap-2.5 text-xs text-slate-400">
                 <RotateCw size={14} className="animate-spin text-sky-400" />
                 <span>Carregando conexões cadastradas...</span>
               </div>
@@ -175,51 +204,85 @@ function ConnectPageContent() {
                 <span>Nenhuma conexão cadastrada no sistema. Configure em Conexões.</span>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {connections.map((conn) => {
-                  const isSelected = selectedConnId === conn.id;
-                  return (
-                    <button
-                      key={conn.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedConnId(conn.id);
-                        setErrorInfo(null);
-                      }}
-                      className={cn(
-                        "p-3.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between cursor-pointer",
-                        isSelected
-                          ? "bg-sky-950/40 border-sky-500/80 shadow-sm shadow-sky-950/40"
-                          : "bg-slate-950/40 border-slate-800 hover:border-slate-700 hover:bg-slate-800/40"
-                      )}
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-2">
-                          <Server size={14} className={isSelected ? "text-sky-400" : "text-slate-400"} />
-                          <span className={cn("text-xs font-bold", isSelected ? "text-white" : "text-slate-200")}>
-                            {conn.name}
-                          </span>
-                        </div>
-                        {isSelected && (
-                          <CheckCircle2 size={15} className="text-sky-400 shrink-0" />
+              <div className="max-h-56 overflow-y-auto space-y-2 pr-1 select-none">
+                {connections
+                  .filter((conn) => {
+                    if (!searchTerm.trim()) return true;
+                    const q = searchTerm.toLowerCase();
+                    return (
+                      conn.name.toLowerCase().includes(q) ||
+                      conn.user.toLowerCase().includes(q) ||
+                      conn.host.toLowerCase().includes(q)
+                    );
+                  })
+                  .map((conn) => {
+                    const isSelected = selectedConnId === conn.id;
+                    return (
+                      <button
+                        key={conn.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedConnId(conn.id);
+                          setErrorInfo(null);
+                        }}
+                        className={cn(
+                          "w-full p-3 rounded-2xl border text-left transition-all flex items-center justify-between cursor-pointer group",
+                          isSelected
+                            ? "bg-sky-950/50 border-sky-500 text-white shadow-sm shadow-sky-950/40"
+                            : "bg-slate-950/40 border-slate-800/90 hover:border-slate-700 hover:bg-slate-800/40 text-slate-300"
                         )}
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-mono truncate">
-                        Usuário: {conn.user}
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-mono truncate">
-                        {conn.host}
-                      </div>
-                    </button>
-                  );
-                })}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={cn(
+                            "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                            isSelected ? "bg-sky-500/20 text-sky-400" : "bg-slate-800/70 text-slate-400 group-hover:text-slate-200"
+                          )}>
+                            <Server size={16} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className={cn("text-xs font-bold truncate", isSelected ? "text-white" : "text-slate-200")}>
+                                {conn.name}
+                              </span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded font-mono text-slate-300 bg-slate-800/70">
+                                {conn.user}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 font-mono truncate mt-0.5" title={conn.host}>
+                              {conn.host}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 ml-3">
+                          {isSelected ? (
+                            <div className="w-5 h-5 rounded-full bg-sky-500 flex items-center justify-center text-slate-950 shadow-xs">
+                              <Check size={12} strokeWidth={3} />
+                            </div>
+                          ) : (
+                            <div className="w-4 h-4 rounded-full border border-slate-700 group-hover:border-slate-500" />
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+
+                {searchTerm && connections.filter(c => 
+                  c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  c.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  c.host.toLowerCase().includes(searchTerm.toLowerCase())
+                ).length === 0 && (
+                  <div className="p-4 text-center text-xs text-slate-400 bg-slate-950/30 rounded-2xl border border-dashed border-slate-800">
+                    Nenhuma conexão encontrada para &quot;{searchTerm}&quot;.
+                  </div>
+                )}
               </div>
             )}
           </div>
 
           {/* Sessão 2: Seleção de Motor de Documentos */}
           <div className="space-y-3 mb-6">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
               <Layers size={15} className="text-sky-400" />
               2. Motor de Documentos Clínicos
             </label>
@@ -230,10 +293,10 @@ function ConnectPageContent() {
                 type="button"
                 onClick={() => setSelectedVersion('V3')}
                 className={cn(
-                  "p-3.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between cursor-pointer",
+                  "p-3.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between cursor-pointer group",
                   selectedVersion === 'V3'
-                    ? "bg-sky-950/40 border-sky-500/80 shadow-sm shadow-sky-950/40"
-                    : "bg-slate-950/40 border-slate-800 hover:border-slate-700 hover:bg-slate-800/40"
+                    ? "bg-sky-950/50 border-sky-500 shadow-sm shadow-sky-950/40"
+                    : "bg-slate-950/40 border-slate-800/90 hover:border-slate-700 hover:bg-slate-800/40"
                 )}
               >
                 <div className="flex items-center justify-between mb-1">
@@ -255,10 +318,10 @@ function ConnectPageContent() {
                 type="button"
                 onClick={() => setSelectedVersion('V2')}
                 className={cn(
-                  "p-3.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between cursor-pointer",
+                  "p-3.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between cursor-pointer group",
                   selectedVersion === 'V2'
-                    ? "bg-sky-950/40 border-sky-500/80 shadow-sm shadow-sky-950/40"
-                    : "bg-slate-950/40 border-slate-800 hover:border-slate-700 hover:bg-slate-800/40"
+                    ? "bg-sky-950/50 border-sky-500 shadow-sm shadow-sky-950/40"
+                    : "bg-slate-950/40 border-slate-800/90 hover:border-slate-700 hover:bg-slate-800/40"
                 )}
               >
                 <div className="flex items-center justify-between mb-1">

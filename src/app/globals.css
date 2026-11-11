@@ -57,30 +57,26 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Headings: Clear, professional clinical hierarchy without forced all-caps */
-h1, h2, h3 {
-  font-family: var(--font-manrope), sans-serif;
-  letter-spacing: -0.02em;
-  font-weight: 700;
-  color: var(--foreground);
-}
-
-h4, .kicker {
-  font-family: var(--font-inter), sans-serif;
-  font-weight: 700;
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.tabular-nums {
-  font-variant-numeric: tabular-nums;
-}
-
 @layer base {
   * {
     border-color: var(--border);
+  }
+
+  /* Headings: Clear, professional clinical hierarchy without forced all-caps */
+  h1, h2, h3 {
+    font-family: var(--font-manrope), sans-serif;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+    color: var(--foreground);
+  }
+
+  h4, .kicker {
+    font-family: var(--font-inter), sans-serif;
+    font-weight: 700;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
   }
 
   button, a, input, select, textarea {

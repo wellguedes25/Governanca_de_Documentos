@@ -40,16 +40,7 @@ interface TurnoItem {
 export default function Dashboard() {
   const { docVersion } = useUI();
   const router = useRouter();
-
-  // Versão resolvida com fallback seguro
-  const resolvedVersion = useMemo(() => {
-    if (docVersion) return docVersion;
-    if (typeof window !== 'undefined') {
-      const saved = sessionStorage.getItem('app_doc_version');
-      if (saved === 'V3' || saved === 'V2') return saved;
-    }
-    return 'V2';
-  }, [docVersion]);
+  const resolvedVersion = docVersion || 'V3';
 
   const [stats, setStats] = useState<any>(null);
   const [analytics, setAnalytics] = useState<any>(null);

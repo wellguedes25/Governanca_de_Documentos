@@ -97,14 +97,7 @@ export default function HospitaisPage() {
   const [metadataFieldsError, setMetadataFieldsError] = useState<string | null>(null);
 
   // Versão ativa resolvida com fallback
-  const resolvedVersion = useMemo(() => {
-    if (docVersion) return docVersion;
-    if (typeof window !== 'undefined') {
-      const saved = sessionStorage.getItem('app_doc_version');
-      if (saved === 'V3' || saved === 'V2') return saved;
-    }
-    return 'V2';
-  }, [docVersion]);
+  const resolvedVersion = docVersion || 'V3';
 
   // Cálculos da métrica de SLA
   const slaRows = qualityData?.sla || [];

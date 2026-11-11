@@ -72,7 +72,7 @@ export default function DocumentosPage() {
 
   // Carregamento inicial de conexões e hospitais
   useEffect(() => {
-    const currentVersion = docVersion || (typeof window !== 'undefined' ? (sessionStorage.getItem('app_doc_version') as 'V2' | 'V3') : null) || 'V2';
+    const currentVersion = docVersion || 'V3';
     const cacheKey = `oracle_documentos_data_${currentVersion}`;
     const cached = typeof window !== 'undefined' ? sessionStorage.getItem(cacheKey) : null;
     
@@ -104,7 +104,7 @@ export default function DocumentosPage() {
   // Carrega documentos do Oracle
   async function fetchInitialData(isManual = false, versionOverride?: 'V2' | 'V3') {
     if (loading) return;
-    const targetVersion = versionOverride || docVersion || (typeof window !== 'undefined' ? (sessionStorage.getItem('app_doc_version') as 'V2' | 'V3') : null) || 'V2';
+    const targetVersion = versionOverride || docVersion || 'V3';
     setLoading(true);
     setError('');
     

@@ -11,6 +11,7 @@ interface UIContextType {
   setColumnWidth: (column: string, width: number) => void;
   docVersion: 'V2' | 'V3' | null;
   setDocVersion: (version: 'V2' | 'V3' | null) => void;
+  isMounted: boolean;
 }
 
 const UIContext = createContext<UIContextType | undefined>(undefined);
@@ -20,39 +21,51 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const [oracleData, setOracleData] = useState<Record<string, unknown>[] | null>(null);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const [docVersion, setDocVersionState] = useState<'V2' | 'V3' | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
 
-  // Carregar estado do sessionStorage no client
+  // Carregar preferências salvas no navegador após a montagem inicial
   useEffect(() => {
-    const savedSidebar = localStorage.getItem('sidebarOpen');
-    if (savedSidebar !== null) {
-      setTimeout(() => {
-        setSidebarOpen(savedSidebar === 'true');
-      }, 0);
-    }
+    setIsMounted(true);
 
-    const savedVersion = sessionStorage.getItem('app_doc_version') as 'V2' | 'V3' | null;
-    if (savedVersion) {
-      setDocVersionState(savedVersion);
+    try {
+      const savedSidebar = localStorage.getItem('sidebarOpen');
+      if (savedSidebar !== null) {
+        setSidebarOpen(savedSidebar === 'true');
+      }
+
+      const savedVersion = sessionStorage.getItem('app_doc_version') as 'V2' | 'V3' | null;
+      if (savedVersion === 'V2' || savedVersion === 'V3') {
+        setDocVersionState(savedVersion);
+      }
+    } catch {
+      // Ambientes restritos ou SSR
     }
   }, []);
 
   const setDocVersion = (version: 'V2' | 'V3' | null) => {
     setDocVersionState(version);
     setOracleData(null); // Limpar dados do contexto React para que a nova versão recarregue
-    if (version) {
-      sessionStorage.setItem('app_doc_version', version);
-      // Limpar caches legados e versionados
-      sessionStorage.removeItem('oracle_documentos_data');
-      sessionStorage.removeItem('oracle_documentos_data_V2');
-      sessionStorage.removeItem('oracle_documentos_data_V3');
-    } else {
-      sessionStorage.removeItem('app_doc_version');
+    try {
+      if (version) {
+        sessionStorage.setItem('app_doc_version', version);
+        sessionStorage.removeItem('oracle_documentos_data');
+        sessionStorage.removeItem('oracle_documentos_data_V2');
+        sessionStorage.removeItem('oracle_documentos_data_V3');
+      } else {
+        sessionStorage.removeItem('app_doc_version');
+      }
+    } catch {
+      // Ignore
     }
   };
 
   const handleSetSidebarOpen = (open: boolean) => {
     setSidebarOpen(open);
-    localStorage.setItem('sidebarOpen', String(open));
+    try {
+      localStorage.setItem('sidebarOpen', String(open));
+    } catch {
+      // Ignore
+    }
   };
 
   const setColumnWidth = (column: string, width: number) => {
@@ -68,7 +81,8 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
       columnWidths,
       setColumnWidth,
       docVersion,
-      setDocVersion
+      setDocVersion,
+      isMounted
     }}>
       {children}
     </UIContext.Provider>

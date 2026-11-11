@@ -26,15 +26,7 @@ import toast from 'react-hot-toast';
 
 export default function MigracaoPage() {
   const { docVersion } = useUI();
-
-  const resolvedVersion = useMemo(() => {
-    if (docVersion) return docVersion;
-    if (typeof window !== 'undefined') {
-      const saved = sessionStorage.getItem('app_doc_version');
-      if (saved === 'V3' || saved === 'V2') return saved;
-    }
-    return 'V2';
-  }, [docVersion]);
+  const resolvedVersion = docVersion || 'V3';
 
   const [migracoes, setMigracoes] = useState<DocumentoMigracao[]>([]);
   const [docsFlexSemMigracao, setDocsFlexSemMigracao] = useState<DocumentoFlexItem[]>([]);

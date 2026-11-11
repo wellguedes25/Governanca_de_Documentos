@@ -8,8 +8,9 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
   const { docVersion } = useUI();
   const pathname = usePathname();
   
-  // Ocultar nav na home ou se não houver versão selecionada
-  const showNav = pathname !== '/' && docVersion !== null;
+  // Ocultar nav na home, tela de conexão ou se não houver versão selecionada
+  const isPublicPage = pathname === '/' || pathname === '/connect';
+  const showNav = !isPublicPage && docVersion !== null;
 
   // Determinar se aplicamos padding global (Dashboard tem layout assimétrico próprio)
   const isDashboard = pathname === '/dashboard';

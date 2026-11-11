@@ -122,12 +122,22 @@ export function DocumentProfilesDrawer({
       return;
     }
 
+    const escapeHtml = (str: unknown): string => {
+      if (str === undefined || str === null) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    };
+
     const htmlContent = `
       <!DOCTYPE html>
       <html lang="pt-BR">
       <head>
         <meta charset="utf-8">
-        <title>Perfis Ambulatoriais - Documento #${docId}</title>
+        <title>Perfis Ambulatoriais - Documento #${escapeHtml(docId)}</title>
         <style>
           @page { size: A4; margin: 15mm; }
           body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #0f172a; margin: 0; padding: 10px; font-size: 11px; }
@@ -148,7 +158,7 @@ export function DocumentProfilesDrawer({
           <div>
             <h1 class="title">ACSC · Governança de Documentos Clínicos</h1>
             <div class="subtitle">
-              Documento: <strong>#${docId} - ${docName || 'Sem descrição'}</strong> · Motor ${docVersion}
+              Documento: <strong>#${escapeHtml(docId)} - ${escapeHtml(docName || 'Sem descrição')}</strong> · Motor ${escapeHtml(docVersion)}
             </div>
           </div>
           <div style="text-align: right;">
@@ -169,10 +179,10 @@ export function DocumentProfilesDrawer({
           <tbody>
             ${filteredProfiles.map(p => `
               <tr>
-                <td style="font-family: monospace; font-weight: bold; color: #0369a1;">#${docId}</td>
-                <td style="font-weight: 600;">${p.DS_PERFIL_AMBULATORIAL || '—'}</td>
-                <td style="color: #64748b;">${p.NM_TITULO || '—'}</td>
-                <td><span class="hospital-badge">${p.EMPRESA || 'REDE'}</span></td>
+                <td style="font-family: monospace; font-weight: bold; color: #0369a1;">#${escapeHtml(docId)}</td>
+                <td style="font-weight: 600;">${escapeHtml(p.DS_PERFIL_AMBULATORIAL || '—')}</td>
+                <td style="color: #64748b;">${escapeHtml(p.NM_TITULO || '—')}</td>
+                <td><span class="hospital-badge">${escapeHtml(p.EMPRESA || 'REDE')}</span></td>
               </tr>
             `).join('')}
           </tbody>

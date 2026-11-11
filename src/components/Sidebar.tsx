@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { LayoutDashboard, FileText, Settings, Database, Building2, Activity, GitFork, ArrowLeftRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { LayoutDashboard, FileText, Settings, Database, Building2, Activity, GitFork, ArrowLeftRight, LogOut } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useUI } from '@/context/UIContext';
 import { cn } from '@/lib/utils';
@@ -25,8 +26,35 @@ type OracleStatus = 'unknown' | 'active' | 'inactive' | 'error';
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { docVersion } = useUI();
+  const router = useRouter();
+  const { docVersion, setDocVersion } = useUI();
   const [oracleStatus, setOracleStatus] = useState<OracleStatus>('unknown');
+  const [sessionConnName, setSessionConnName] = useState<string>('');
+
+  useEffect(() => {
+    let mounted = true;
+    fetch('/api/auth/session')
+      .then(r => r.json())
+      .then(d => {
+        if (mounted && d.session?.connectionName) {
+          setSessionConnName(d.session.connectionName);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      mounted = false;
+    };
+  }, [pathname]);
+
+  const handleDisconnect = async () => {
+    try {
+      await fetch('/api/auth/disconnect', { method: 'POST' });
+    } catch {}
+    setDocVersion(null);
+    router.push('/connect');
+    router.refresh();
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -142,14 +170,29 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Oracle Health Status */}
-      <div className="flex items-center h-full pr-4 md:pr-6 shrink-0">
+      {/* Oracle Health Status & Session Actions */}
+      <div className="flex items-center h-full pr-4 md:pr-6 gap-2.5 shrink-0">
+        {sessionConnName && (
+          <span className="hidden xl:inline-flex text-[11px] font-mono font-semibold text-slate-300 bg-slate-800/90 px-2.5 py-1 rounded-md border border-slate-700/60 shadow-xs">
+            {sessionConnName}
+          </span>
+        )}
+
         <div className={cn("flex items-center gap-2 px-2.5 py-1 rounded-full border text-[11px] font-medium transition-all shadow-xs", status.bg)}>
           <span className={cn("w-2 h-2 rounded-full shrink-0", status.dot)}></span>
           <span className={cn("hidden sm:inline font-semibold", status.color)}>
             {status.label}
           </span>
         </div>
+
+        <button
+          type="button"
+          onClick={handleDisconnect}
+          title="Desconectar ou Trocar Base de Dados"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800/80 transition-colors cursor-pointer"
+        >
+          <LogOut size={15} />
+        </button>
       </div>
       
     </header>

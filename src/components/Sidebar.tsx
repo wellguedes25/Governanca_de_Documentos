@@ -141,7 +141,7 @@ export default function Sidebar() {
       </div>
 
       {/* Main Navigation Tabs */}
-      <nav className="flex items-center h-full px-4 gap-1 overflow-x-auto scrollbar-none">
+      <nav className="flex items-center h-full px-4 gap-1 overflow-visible">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
@@ -165,7 +165,7 @@ export default function Sidebar() {
         <div className="w-px h-5 bg-slate-800 mx-2 shrink-0 hidden md:block"></div>
         
         {/* Menu Dropdown Configurações */}
-        <div className="relative" ref={configRef}>
+        <div className="relative inline-block" ref={configRef}>
           <button
             type="button"
             onClick={() => setConfigOpen(prev => !prev)}
@@ -183,8 +183,8 @@ export default function Sidebar() {
           </button>
 
           {configOpen && (
-            <div className="absolute left-0 mt-2 w-56 bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in-50 zoom-in-95 duration-150">
-              <div className="px-3.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800/80 mb-1">
+            <div className="absolute top-[calc(100%+6px)] left-0 w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-1.5 z-50">
+              <div className="px-3.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800 mb-1">
                 Painel do Sistema
               </div>
 
@@ -192,17 +192,17 @@ export default function Sidebar() {
                 href="/configuracoes/conexoes"
                 onClick={() => setConfigOpen(false)}
                 className={cn(
-                  "flex items-center gap-2.5 px-3.5 py-2.5 text-xs transition-colors hover:bg-slate-800/80",
+                  "flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-slate-800/90 rounded-lg mx-1",
                   pathname === '/configuracoes/conexoes' 
-                    ? "text-sky-400 bg-sky-950/40 font-semibold" 
+                    ? "text-sky-400 bg-sky-950/60 font-semibold" 
                     : "text-slate-300 hover:text-white"
                 )}
               >
-                <div className="p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sky-400 shrink-0">
+                <div className="p-1.5 rounded-md bg-slate-800 border border-slate-700 text-sky-400 shrink-0">
                   <Settings size={14} />
                 </div>
                 <div className="flex flex-col">
-                  <span className="font-semibold">Conexões</span>
+                  <span className="font-semibold text-xs">Conexões</span>
                   <span className="text-[10px] text-slate-400 font-normal">Instâncias Oracle e credenciais</span>
                 </div>
               </Link>
@@ -211,17 +211,17 @@ export default function Sidebar() {
                 href="/configuracoes/consultas"
                 onClick={() => setConfigOpen(false)}
                 className={cn(
-                  "flex items-center gap-2.5 px-3.5 py-2.5 text-xs transition-colors hover:bg-slate-800/80",
+                  "flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-slate-800/90 rounded-lg mx-1 mt-0.5",
                   pathname === '/configuracoes/consultas' 
-                    ? "text-sky-400 bg-sky-950/40 font-semibold" 
+                    ? "text-sky-400 bg-sky-950/60 font-semibold" 
                     : "text-slate-300 hover:text-white"
                 )}
               >
-                <div className="p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sky-400 shrink-0">
+                <div className="p-1.5 rounded-md bg-slate-800 border border-slate-700 text-sky-400 shrink-0">
                   <Database size={14} />
                 </div>
                 <div className="flex flex-col">
-                  <span className="font-semibold">Motores SQL</span>
+                  <span className="font-semibold text-xs">Motores SQL</span>
                   <span className="text-[10px] text-slate-400 font-normal">Consultas V2/V3 e KPIs</span>
                 </div>
               </Link>

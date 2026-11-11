@@ -3,11 +3,11 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { LayoutDashboard, FileText, Settings, Database, Building2, Activity, GitFork, ArrowLeftRight, LogOut } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, Database, Building2, Activity, GitFork, ArrowLeftRight, LogOut, ChevronDown } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useUI } from '@/context/UIContext';
 import { cn } from '@/lib/utils';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -15,11 +15,6 @@ const navItems = [
   { href: '/documentos', label: 'Documentos', icon: FileText },
   { href: '/migracao', label: 'Migração', icon: ArrowLeftRight },
   { href: '/linhagem', label: 'Linhagem', icon: GitFork },
-];
-
-const configItems = [
-  { href: '/configuracoes/conexoes', label: 'Conexões', icon: Settings },
-  { href: '/configuracoes/consultas', label: 'Motor SQL', icon: Database },
 ];
 
 type OracleStatus = 'unknown' | 'active' | 'inactive' | 'error';
@@ -30,6 +25,26 @@ export default function Sidebar() {
   const { docVersion, setDocVersion } = useUI();
   const [oracleStatus, setOracleStatus] = useState<OracleStatus>('unknown');
   const [sessionConnName, setSessionConnName] = useState<string>('');
+  const [configOpen, setConfigOpen] = useState(false);
+  const configRef = useRef<HTMLDivElement>(null);
+
+  // Fecha o dropdown ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (configRef.current && !configRef.current.contains(event.target as Node)) {
+        setConfigOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Fecha o dropdown quando a rota mudar
+  useEffect(() => {
+    setConfigOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     let mounted = true;
@@ -149,25 +164,70 @@ export default function Sidebar() {
         
         <div className="w-px h-5 bg-slate-800 mx-2 shrink-0 hidden md:block"></div>
         
-        {configItems.map((item) => {
-          const isActive = pathname.startsWith(item.href);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-semibold tracking-normal transition-all whitespace-nowrap",
-                isActive
-                  ? "bg-sky-600/15 text-sky-400 shadow-xs border border-sky-500/20"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-              )}
-            >
-              <Icon size={15} strokeWidth={isActive ? 2.2 : 1.8} />
-              {item.label}
-            </Link>
-          );
-        })}
+        {/* Menu Dropdown Configurações */}
+        <div className="relative" ref={configRef}>
+          <button
+            type="button"
+            onClick={() => setConfigOpen(prev => !prev)}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold tracking-normal transition-all whitespace-nowrap cursor-pointer",
+              pathname.startsWith('/configuracoes')
+                ? "bg-sky-600/15 text-sky-400 shadow-xs border border-sky-500/20"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+            )}
+            aria-expanded={configOpen}
+          >
+            <Settings size={15} strokeWidth={pathname.startsWith('/configuracoes') ? 2.2 : 1.8} />
+            <span>Configurações</span>
+            <ChevronDown size={13} className={cn("transition-transform duration-200", configOpen && "rotate-180")} />
+          </button>
+
+          {configOpen && (
+            <div className="absolute left-0 mt-2 w-56 bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in-50 zoom-in-95 duration-150">
+              <div className="px-3.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800/80 mb-1">
+                Painel do Sistema
+              </div>
+
+              <Link
+                href="/configuracoes/conexoes"
+                onClick={() => setConfigOpen(false)}
+                className={cn(
+                  "flex items-center gap-2.5 px-3.5 py-2.5 text-xs transition-colors hover:bg-slate-800/80",
+                  pathname === '/configuracoes/conexoes' 
+                    ? "text-sky-400 bg-sky-950/40 font-semibold" 
+                    : "text-slate-300 hover:text-white"
+                )}
+              >
+                <div className="p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sky-400 shrink-0">
+                  <Settings size={14} />
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-semibold">Conexões</span>
+                  <span className="text-[10px] text-slate-400 font-normal">Instâncias Oracle e credenciais</span>
+                </div>
+              </Link>
+
+              <Link
+                href="/configuracoes/consultas"
+                onClick={() => setConfigOpen(false)}
+                className={cn(
+                  "flex items-center gap-2.5 px-3.5 py-2.5 text-xs transition-colors hover:bg-slate-800/80",
+                  pathname === '/configuracoes/consultas' 
+                    ? "text-sky-400 bg-sky-950/40 font-semibold" 
+                    : "text-slate-300 hover:text-white"
+                )}
+              >
+                <div className="p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sky-400 shrink-0">
+                  <Database size={14} />
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-semibold">Motores SQL</span>
+                  <span className="text-[10px] text-slate-400 font-normal">Consultas V2/V3 e KPIs</span>
+                </div>
+              </Link>
+            </div>
+          )}
+        </div>
       </nav>
 
       {/* Oracle Health Status & Session Actions */}

@@ -82,6 +82,7 @@ export interface StorageData {
     volumeTurno: string;
     slaAssinatura: string;
   };
+  similarityQuery?: string;
   docMetadataQuery: string;
   docMetadataQueryV3?: string;
   docActionsQuery: string;
@@ -245,6 +246,26 @@ GROUP BY
     volumeTurno: '',
     slaAssinatura: '',
   },
+  similarityQuery: `SELECT 
+    T.CD_ATENDIMENTO as ATENDIMENTO,
+    T.CD_DOCUMENTO as DOCUMENTO,
+    T.DS_DOCUMENTO as NOME_DOCUMENTO,
+    T.IDENTIFICADOR_FILTRO as IDENTIFICADOR,
+    T.DH_FECHAMENTO as DATA_HORA,
+    T.CD_PRESTADOR || ' - ' || P.NM_PRESTADOR as PRESTADOR,
+    T.LEITO,
+    T.UNIDADE,
+    T.GRAU_SIMILARIDADE as SCORE
+FROM 
+    DBAMV.TB_AUDITORIA_SIMILARIDADE T
+LEFT JOIN 
+    DBAMV.PRESTADOR P ON P.CD_PRESTADOR = T.CD_PRESTADOR
+WHERE 
+    T.CD_DOCUMENTO = :CD_DOCUMENTO
+    AND T.IDENTIFICADOR_FILTRO = :IDENTIFICADOR
+    AND T.DH_FECHAMENTO BETWEEN TO_DATE(:DATA_INI, 'YYYY-MM-DD') AND TO_DATE(:DATA_FIM, 'YYYY-MM-DD') + 1
+ORDER BY 
+    T.CD_ATENDIMENTO DESC, T.DH_FECHAMENTO DESC`,
   docMetadataQuery: `SELECT DISTINCT
        edo.cd_documento             AS Codigo_Documento,
        edo.ds_documento             AS Descricao_Documento,
@@ -505,6 +526,7 @@ export async function getData(): Promise<StorageData> {
         fields: m.fields.map((f: FieldMapping | string) => typeof f === 'string' ? { id: f, name: f } : f)
       })),
       reportBaseUrl: data.reportBaseUrl || INITIAL_DATA.reportBaseUrl,
+      similarityQuery: data.similarityQuery || INITIAL_DATA.similarityQuery,
       auditDays: data.auditDays !== undefined ? Number(data.auditDays) : INITIAL_DATA.auditDays,
       auditDocId: data.auditDocId !== undefined ? data.auditDocId : INITIAL_DATA.auditDocId
     };

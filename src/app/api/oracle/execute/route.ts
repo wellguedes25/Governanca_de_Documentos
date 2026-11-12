@@ -147,6 +147,8 @@ export async function POST(request: Request) {
       sql = data.ambulatoryProfilesQuery;
     } else if (body.query === 'AMBULATORY_PROFILE_DETAILS') {
       sql = data.ambulatoryProfileDetailsQuery;
+    } else if (body.query === 'SIMILARIDADE') {
+      sql = data.similarityQuery || '';
     } else if (body.query === 'DOCUMENTOS' || body.query === 'V3' || body.query === 'V2') {
       const isV3 = body.version === 'V3' || body.query === 'V3';
       sql = isV3 ? (data.activeQueryV3 || data.activeQuery) : data.activeQuery;

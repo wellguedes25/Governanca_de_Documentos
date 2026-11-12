@@ -13,6 +13,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/hospitais', label: 'Hospitais', icon: Building2 },
   { href: '/documentos', label: 'Documentos', icon: FileText },
+  { href: '/similaridade', label: 'Similaridade', icon: Activity },
   { href: '/migracao', label: 'Migração', icon: ArrowLeftRight },
   { href: '/linhagem', label: 'Linhagem', icon: GitFork },
 ];

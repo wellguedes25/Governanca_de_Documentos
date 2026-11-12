@@ -13,8 +13,8 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
   const showNav = !isPublicPage && docVersion !== null;
 
   // Determinar se aplicamos padding global (Dashboard tem layout assimétrico próprio)
-  const isDashboard = pathname === '/dashboard';
-  const mainPadding = isDashboard ? '' : 'px-4 md:px-6 lg:px-8 pb-4 md:pb-6 lg:pb-8';
+  // Todas as páginas autenticadas controlam seu próprio padding e espaçamento interno de forma limpa e consistente
+  const mainPadding = '';
 
   return (
     <div className="flex flex-col min-h-screen bg-background">

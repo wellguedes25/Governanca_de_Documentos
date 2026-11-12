@@ -200,43 +200,44 @@ export default function MigracaoPage() {
     <div className="min-h-screen bg-slate-50/50 flex flex-col p-4 md:p-8 space-y-6 pb-24">
       
       {/* 1. Header Padronizado */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
-        <div className="flex items-center gap-3">
-          <PageHeader 
-            title="Governança de Migração"
-            subtitle="Painel executivo e técnico para controle de paridade funcional, esteira ágil de etapas V2 Flex ➔ V3 Editor"
-            icon={ArrowLeftRight}
-          />
-          <Badge 
-            variant="outline" 
-            suppressHydrationWarning
-            className="text-[10px] font-bold px-2 py-0.5 rounded-full border-sky-300 bg-sky-50 text-sky-800"
-          >
-            Motor {resolvedVersion}
-          </Badge>
-        </div>
-        
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fetchData(true)}
-            disabled={loading}
-            className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-2xs cursor-pointer h-9 px-4"
-          >
-            <RotateCw className={`w-3.5 h-3.5 text-sky-600 ${loading ? 'animate-spin' : ''}`} />
-            <span>Sincronizar</span>
-          </Button>
+      <div className="pb-4 border-b border-slate-200/80">
+        <PageHeader 
+          title="Governança de Migração"
+          subtitle="Painel executivo e técnico para controle de paridade funcional, esteira ágil de etapas V2 Flex ➔ V3 Editor"
+          icon={ArrowLeftRight}
+          badge={
+            <Badge 
+              variant="outline" 
+              suppressHydrationWarning
+              className="text-[10px] font-bold px-2 py-0.5 rounded-full border-sky-300 bg-sky-50 text-sky-800"
+            >
+              Motor {resolvedVersion}
+            </Badge>
+          }
+          action={
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchData(true)}
+                disabled={loading}
+                className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-2xs cursor-pointer h-9 px-4"
+              >
+                <RotateCw className={`w-3.5 h-3.5 text-sky-600 ${loading ? 'animate-spin' : ''}`} />
+                <span>Sincronizar</span>
+              </Button>
 
-          <Button
-            size="sm"
-            onClick={handleNovaDemanda}
-            className="gap-2 text-xs font-semibold rounded-full bg-[#004953] hover:bg-[#003b44] text-white shadow-2xs cursor-pointer h-9 px-4"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Nova Demanda</span>
-          </Button>
-        </div>
+              <Button
+                size="sm"
+                onClick={handleNovaDemanda}
+                className="gap-2 text-xs font-semibold rounded-full bg-[#004953] hover:bg-[#003b44] text-white shadow-2xs cursor-pointer h-9 px-4"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Nova Demanda</span>
+              </Button>
+            </>
+          }
+        />
       </div>
 
       {/* Alerta de Erro */}

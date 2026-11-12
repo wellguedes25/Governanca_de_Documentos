@@ -647,66 +647,67 @@ export default function SimilaridadePage() {
       <Toaster position="top-right" reverseOrder={false} />
       
       {/* 1. Header Padronizado */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
-        <div className="flex items-center gap-3">
-          <PageHeader 
-            title="Auditoria de Similaridade NLP"
-            subtitle="Detecção de cópia e cola textual, plágio e redundância clínica em prontuários eletrônicos (DBAMV)"
-            icon={ScanEye}
-          />
-          <Badge 
-            variant="outline" 
-            suppressHydrationWarning
-            className="text-[10px] font-bold px-2 py-0.5 rounded-full border-sky-300 bg-sky-50 text-sky-800"
-          >
-            Motor {docVersion || 'V3'}
-          </Badge>
-        </div>
-        
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Filtro instantâneo..."
-              className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 w-52 shadow-2xs transition-all disabled:opacity-50"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              disabled={!hasSearched || loading}
-            />
-          </div>
+      <div className="pb-4 border-b border-slate-200/80">
+        <PageHeader 
+          title="Auditoria de Similaridade NLP"
+          subtitle="Detecção de cópia e cola textual, plágio e redundância clínica em prontuários eletrônicos (DBAMV)"
+          icon={ScanEye}
+          badge={
+            <Badge 
+              variant="outline" 
+              suppressHydrationWarning
+              className="text-[10px] font-bold px-2 py-0.5 rounded-full border-sky-300 bg-sky-50 text-sky-800"
+            >
+              Motor {docVersion || 'V3'}
+            </Badge>
+          }
+          action={
+            <>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Filtro instantâneo..."
+                  className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 w-52 shadow-2xs transition-all disabled:opacity-50"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  disabled={!hasSearched || loading}
+                />
+              </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportExcel}
-            disabled={!hasSearched || loading || filteredData.length === 0}
-            className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-emerald-700 shadow-2xs cursor-pointer h-9 px-4 disabled:opacity-40"
-          >
-            <Download className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Exportar Excel</span>
-          </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportExcel}
+                disabled={!hasSearched || loading || filteredData.length === 0}
+                className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-emerald-700 shadow-2xs cursor-pointer h-9 px-4 disabled:opacity-40"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Exportar Excel</span>
+              </Button>
 
-          <Button
-            size="sm"
-            onClick={handleRunAuditScript}
-            disabled={isRunningScript}
-            className="gap-2 text-xs font-semibold rounded-full bg-sky-600 hover:bg-sky-500 text-white shadow-2xs cursor-pointer h-9 px-4 disabled:opacity-40"
-          >
-            <Play className={`w-3.5 h-3.5 ${isRunningScript ? 'animate-spin' : ''}`} />
-            <span>{isRunningScript ? 'Auditando...' : 'Rodar Auditoria NLP'}</span>
-          </Button>
+              <Button
+                size="sm"
+                onClick={handleRunAuditScript}
+                disabled={isRunningScript}
+                className="gap-2 text-xs font-semibold rounded-full bg-sky-600 hover:bg-sky-500 text-white shadow-2xs cursor-pointer h-9 px-4 disabled:opacity-40"
+              >
+                <Play className={`w-3.5 h-3.5 ${isRunningScript ? 'animate-spin' : ''}`} />
+                <span>{isRunningScript ? 'Auditando...' : 'Rodar Auditoria NLP'}</span>
+              </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.print()}
-            className="p-0 w-9 h-9 flex items-center justify-center rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-2xs cursor-pointer"
-            title="Imprimir Relatório"
-          >
-            <Printer className="w-3.5 h-3.5" />
-          </Button>
-        </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.print()}
+                className="p-0 w-9 h-9 flex items-center justify-center rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-2xs cursor-pointer"
+                title="Imprimir Relatório"
+              >
+                <Printer className="w-3.5 h-3.5" />
+              </Button>
+            </>
+          }
+        />
       </div>
 
       {/* Navigation Tabs Pill Style */}

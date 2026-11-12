@@ -129,47 +129,48 @@ export default function ConfigConexoesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-card flex flex-col p-4 md:p-8 space-y-8 animate-in slide-in-from-bottom-5 duration-700 pb-20">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-end border-b border-border pb-8 gap-4">
-        <div className="max-w-3xl">
-          <PageHeader 
-            title="Infraestrutura Oracle"
-            subtitle="Gerenciamento de instâncias e conectividade thick-mode para ambientes DBAMV."
-            icon={Settings}
+    <div className="min-h-screen bg-slate-50/50 flex flex-col p-4 md:p-8 space-y-6 pb-24">
+      {/* 1. Header Padronizado */}
+      <div className="pb-4 border-b border-slate-200/80">
+        <PageHeader 
+          title="Infraestrutura Oracle"
+          subtitle="Gerenciamento de instâncias e conectividade thick-mode para ambientes DBAMV"
+          icon={Settings}
+          action={
+            message ? (
+              <div className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-4 py-1.5 rounded-full text-xs font-semibold shadow-2xs">
+                {message}
+              </div>
+            ) : undefined
+          }
+        />
+      </div>
+
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs max-w-3xl">
+        <h4 className="text-[11px] font-bold text-slate-700 mb-3 uppercase tracking-wider flex items-center gap-2">
+          <Database size={14} className="text-sky-600" />
+          Oracle Client Path (Thick Mode)
+        </h4>
+        <div className="flex gap-2">
+          <input 
+            type="text" 
+            placeholder="Ex: C:\instantclient_23_0"
+            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs text-slate-800 outline-none focus:border-sky-500 focus:bg-white transition-all font-mono"
+            value={clientPath}
+            onChange={e => setClientPath(e.target.value)}
           />
-          
-          <div className="mt-8 p-6 bg-card border border-border rounded-none">
-            <h4 className="text-[10px] font-black text-muted mb-4 uppercase tracking-[0.2em] flex items-center gap-2">
-              <Database size={14} className="text-[var(--primary)]" />
-              Oracle Client Path (Required)
-            </h4>
-            <div className="flex gap-2">
-              <input 
-                type="text" 
-                placeholder="Ex: C:\instantclient_23_0"
-                className="flex-1 bg-background border border-border rounded-none px-4 py-2 text-xs text-foreground outline-none focus:border-[var(--primary)] shadow-none font-mono"
-                value={clientPath}
-                onChange={e => setClientPath(e.target.value)}
-              />
-              <button 
-                onClick={handleSaveClientPath}
-                className="bg-card hover:bg-muted text-foreground text-[10px] font-black uppercase tracking-widest px-6 py-2 rounded-none transition-all"
-              >
-                Configurar
-              </button>
-            </div>
-            <p className="text-[9px] text-muted mt-3 flex items-center gap-2 font-bold uppercase tracking-tight">
-              <AlertTriangle size={12} className="text-amber-500" />
-              A alteração do binário exige reinicialização do serviço Node.js / Next.js
-            </p>
-          </div>
+          <button 
+            onClick={handleSaveClientPath}
+            className="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-5 py-2 rounded-xl transition-all cursor-pointer shadow-2xs"
+          >
+            Configurar
+          </button>
         </div>
-        {message && (
-          <div className="bg-emerald-600 text-foreground px-6 py-3 rounded-none shadow-none animate-in zoom-in duration-300 text-[10px] font-black uppercase tracking-widest">
-             {message}
-          </div>
-        )}
-      </header>
+        <p className="text-[11px] text-slate-500 mt-2.5 flex items-center gap-2 font-medium">
+          <AlertTriangle size={13} className="text-amber-500 shrink-0" />
+          A alteração do binário exige reinicialização do serviço Node.js / Next.js
+        </p>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Form para Nova Conexão */}

@@ -368,29 +368,27 @@ export default function ConfigConsultasPage() {
   }
 
   return (
-    <div className="min-h-screen bg-card flex flex-col p-4 md:p-8 space-y-3 animate-in slide-in-from-bottom-5 duration-700 pb-12 text-foreground">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-end border-b border-border pb-2 gap-4">
-        <div className="max-w-4xl">
-          <PageHeader 
-            title="Motor de Inteligência SQL"
-            subtitle={`Gestão de algoritmos de extração e telemetria. Ambiente ativo: ${activeConnName}`}
-            icon={Database}
-          />
-        </div>
-
-        {message && (
-          <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-6 py-3 rounded-none shadow-none border animate-in slide-in-from-top-4 duration-300 ${
-            message.includes('Erro') 
-              ? 'bg-rose-600 border-rose-500 text-foreground' 
-              : 'bg-emerald-600 border-emerald-500 text-foreground'
-          }`}>
-            {message.includes('Erro') ? <CircleX size={18} /> : <CircleCheck size={18} className="animate-bounce" />}
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] whitespace-nowrap">
-              {message}
-            </span>
-          </div>
-        )}
-      </header>
+    <div className="min-h-screen bg-slate-50/50 flex flex-col p-4 md:p-8 space-y-6 pb-24">
+      {/* 1. Header Padronizado */}
+      <div className="pb-4 border-b border-slate-200/80">
+        <PageHeader 
+          title="Motor de Inteligência SQL"
+          subtitle={`Gestão de algoritmos de extração e telemetria. Ambiente ativo: ${activeConnName || 'Padrão'}`}
+          icon={Database}
+          action={
+            message ? (
+              <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold shadow-2xs border ${
+                message.includes('Erro') 
+                  ? 'bg-rose-50 border-rose-200 text-rose-700' 
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+              }`}>
+                {message.includes('Erro') ? <CircleX size={15} /> : <CircleCheck size={15} className="text-emerald-600" />}
+                <span>{message}</span>
+              </div>
+            ) : undefined
+          }
+        />
+      </div>
 
       {/* Menu de Abas Principal */}
       <div className="flex flex-wrap gap-2 border-b border-border mb-6">

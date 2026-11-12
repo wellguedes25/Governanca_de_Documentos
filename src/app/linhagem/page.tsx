@@ -18,8 +18,11 @@ import '@xyflow/react/dist/style.css';
 import { DocumentNode } from '@/components/linhagem/DocumentNode';
 import { LineageToolbar } from '@/components/linhagem/LineageToolbar';
 import { EdgeDetailsModal } from '@/components/linhagem/EdgeDetailsModal';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Badge } from '@/components/ui/badge';
+import { useUI } from '@/context/UIContext';
 import { getLayoutedElements } from '@/lib/dagre-layout';
-import { Loader2 } from 'lucide-react';
+import { Loader2, GitFork } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const nodeTypes = {
@@ -27,6 +30,7 @@ const nodeTypes = {
 };
 
 export default function LineagePage() {
+  const { docVersion } = useUI();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [loading, setLoading] = useState(true);
@@ -126,26 +130,55 @@ export default function LineagePage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] mt-16 bg-slate-50 relative overflow-hidden">
-      {/* Top Floating Toolbar */}
-      <div className="absolute top-4 left-6 right-6 z-20 pointer-events-none">
-        <div className="pointer-events-auto">
-          <LineageToolbar
-            totalDocs={summary.totalDocs}
-            totalEdges={summary.totalEdges}
-            onlyLinked={onlyLinked}
-            onToggleOnlyLinked={(val) => setOnlyLinked(val)}
-            rootDocId={rootDocId}
-            onSelectRootDoc={(id) => setRootDocId(id)}
-            availableDocs={availableDocs}
-            onResetLayout={handleResetLayout}
-            loading={loading}
-          />
-        </div>
+    <div className="min-h-screen bg-slate-50/50 flex flex-col p-4 md:p-8 space-y-4 pb-12">
+      {/* 1. Header Padronizado */}
+      <div className="pb-4 border-b border-slate-200/80">
+        <PageHeader 
+          title="Grafo Global de Linhagem & Dependências"
+          subtitle="Mapeamento em tempo real do fluxo de dados e dependências entre metadados (React Flow)"
+          icon={GitFork}
+          badge={
+            <Badge 
+              variant="outline" 
+              suppressHydrationWarning
+              className="text-[10px] font-bold px-2 py-0.5 rounded-full border-sky-300 bg-sky-50 text-sky-800"
+            >
+              Motor {docVersion || 'V3'}
+            </Badge>
+          }
+          action={
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3 bg-white px-3.5 py-1.5 rounded-full border border-slate-200 text-xs shadow-2xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-2xs" />
+                  <span className="font-semibold text-slate-700 text-[11px]">Herança Direta</span>
+                </div>
+                <div className="w-px h-3 bg-slate-200" />
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-sky-600 shadow-2xs" />
+                  <span className="font-semibold text-slate-700 text-[11px]">Consulta SQL</span>
+                </div>
+              </div>
+            </div>
+          }
+        />
       </div>
 
-      {/* Main Flow Canvas */}
-      <div className="flex-1 w-full h-full">
+      {/* 2. Toolbar de Filtros e Controles */}
+      <LineageToolbar
+        totalDocs={summary.totalDocs}
+        totalEdges={summary.totalEdges}
+        onlyLinked={onlyLinked}
+        onToggleOnlyLinked={(val) => setOnlyLinked(val)}
+        rootDocId={rootDocId}
+        onSelectRootDoc={(id) => setRootDocId(id)}
+        availableDocs={availableDocs}
+        onResetLayout={handleResetLayout}
+        loading={loading}
+      />
+
+      {/* 3. Main Flow Canvas */}
+      <div className="flex-1 w-full h-[calc(100vh-270px)] min-h-[520px] bg-white rounded-2xl border border-slate-200/90 shadow-xs relative overflow-hidden">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-500">
             <Loader2 className="animate-spin text-sky-600" size={36} />
@@ -156,7 +189,7 @@ export default function LineagePage() {
             <p className="text-sm font-semibold">Nenhum documento ou vínculo encontrado com os filtros atuais.</p>
             <button
               onClick={() => { setOnlyLinked(false); setRootDocId(null); }}
-              className="text-xs text-sky-700 hover:underline font-semibold"
+              className="text-xs text-sky-700 hover:underline font-semibold cursor-pointer"
             >
               Exibir todos os documentos
             </button>

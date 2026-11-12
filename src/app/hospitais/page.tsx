@@ -275,58 +275,59 @@ export default function HospitaisPage() {
     <div className="min-h-screen bg-slate-50/50 flex flex-col p-4 md:p-8 space-y-6 pb-24">
       
       {/* 1. Header Padronizado */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
-        <div className="flex items-center gap-3">
-          <PageHeader 
-            title="Unidades Hospitalares"
-            subtitle={selectedHospital ? `${selectedHospital.nome} — Monitoramento de Uso Clínico` : "Gestão Operacional de Prontuários"}
-            icon={Building2}
-          />
-          <Badge 
-            variant="outline" 
-            suppressHydrationWarning
-            className="text-[10px] font-bold px-2 py-0.5 rounded-full border-sky-300 bg-sky-50 text-sky-800"
-          >
-            Motor {resolvedVersion}
-          </Badge>
-        </div>
-        
-        <div className="flex items-center gap-2 flex-wrap">
-          {selectedHospital && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fetchData(String(selectedHospital.id), true)}
-              disabled={loading}
-              className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-2xs cursor-pointer h-9 px-4"
+      <div className="pb-4 border-b border-slate-200/80">
+        <PageHeader 
+          title="Unidades Hospitalares"
+          subtitle={selectedHospital ? `${selectedHospital.nome} — Monitoramento de Uso Clínico` : "Gestão Operacional de Prontuários"}
+          icon={Building2}
+          badge={
+            <Badge 
+              variant="outline" 
+              suppressHydrationWarning
+              className="text-[10px] font-bold px-2 py-0.5 rounded-full border-sky-300 bg-sky-50 text-sky-800"
             >
-              <RotateCw className={cn("w-3.5 h-3.5 text-sky-600", loading && "animate-spin")} />
-              <span>Sincronizar Agora</span>
-            </Button>
-          )}
+              Motor {resolvedVersion}
+            </Badge>
+          }
+          action={
+            <>
+              {selectedHospital && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fetchData(String(selectedHospital.id), true)}
+                  disabled={loading}
+                  className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-2xs cursor-pointer h-9 px-4"
+                >
+                  <RotateCw className={cn("w-3.5 h-3.5 text-sky-600", loading && "animate-spin")} />
+                  <span>Sincronizar Agora</span>
+                </Button>
+              )}
 
-          <Link href="/documentos">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-2xs h-9 px-4 cursor-pointer"
-            >
-              <FileText className="w-3.5 h-3.5 text-slate-500" />
-              <span>Ver Todos os Documentos</span>
-            </Button>
-          </Link>
+              <Link href="/documentos">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-2xs h-9 px-4 cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Ver Todos os Documentos</span>
+                </Button>
+              </Link>
 
-          <Link href="/dashboard">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-2xs h-9 px-4 cursor-pointer"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Dashboard Geral</span>
-            </Button>
-          </Link>
-        </div>
+              <Link href="/dashboard">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-2xs h-9 px-4 cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Dashboard Geral</span>
+                </Button>
+              </Link>
+            </>
+          }
+        />
       </div>
 
       {/* 2. Seletor de Hospitais em Pílulas Modernas */}

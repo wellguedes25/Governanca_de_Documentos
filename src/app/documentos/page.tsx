@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { FileText, AlertTriangle } from 'lucide-react';
 import { useUI } from '@/context/UIContext';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { Badge } from '@/components/ui/badge';
 import { DocumentosToolbar } from '@/components/documentos/DocumentosToolbar';
 import { DocumentosTable } from '@/components/documentos/DocumentosTable';
 import { DocumentosCardsGrid } from '@/components/documentos/DocumentosCardsGrid';
@@ -529,14 +530,24 @@ export default function DocumentosPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen pb-16">
-      {/* Page Header */}
-      <PageHeader 
-        title="Repositório de Documentos Clínicos"
-        subtitle="Matriz de Adesão e Utilização em Todas as Unidades ACSC (Oracle DBAMV)"
-        icon={FileText}
-        badge={activeConnName ? `Oracle: ${activeConnName}` : 'Conectando...'}
-      />
+    <div className="min-h-screen bg-slate-50/50 flex flex-col p-4 md:p-8 space-y-6 pb-24">
+      {/* 1. Header Padronizado */}
+      <div className="pb-4 border-b border-slate-200/80">
+        <PageHeader 
+          title="Repositório de Documentos Clínicos"
+          subtitle="Matriz de Adesão e Utilização em Todas as Unidades ACSC (Oracle DBAMV)"
+          icon={FileText}
+          badge={
+            <Badge 
+              variant="outline" 
+              suppressHydrationWarning
+              className="text-[10px] font-bold px-2 py-0.5 rounded-full border-sky-300 bg-sky-50 text-sky-800"
+            >
+              Motor {docVersion || 'V3'}
+            </Badge>
+          }
+        />
+      </div>
 
       {/* Error Alert */}
       {error && activeMainTab === 'documentos' && (

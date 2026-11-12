@@ -4,18 +4,26 @@ import { executeQuery } from '@/lib/oracle';
 
 export const dynamic = 'force-dynamic';
 
-interface LineageField {
-  id: string;
-  code: number;
-  tag: string;
-  name: string;
-  metadataId?: number;
-  hasLink: boolean;
-  isSource?: boolean;
-  isTarget?: boolean;
+export interface LineageFieldItem {
+  sourceTag?: string;
+  sourceName?: string;
+  targetTag: string;
+  targetName: string;
+  script: string;
+  isDocLevel: boolean;
 }
 
-interface LineageDocNode {
+export interface ExecutiveEdgeData {
+  id: string;
+  sourceDocId: string;
+  targetDocId: string;
+  totalFields: number;
+  fieldsMap: LineageFieldItem[];
+  label: string;
+  type: 'SQL_QUERY';
+}
+
+export interface LineageDocNodeData {
   id: string;
   docId: number;
   title: string;
@@ -23,129 +31,38 @@ interface LineageDocNode {
   versionType: string;
   tech: string;
   totalFields: number;
-  linkedFieldsCount: number;
-  fields: LineageField[];
-  unlinkedFields: LineageField[];
-}
-
-interface LineageEdge {
-  id: string;
-  sourceDocId: string;
-  sourceFieldTag?: string;
-  targetDocId: string;
-  targetFieldTag?: string;
-  type: 'SQL_QUERY' | 'INHERITANCE';
-  label?: string;
-  script?: string;
+  upstreamCount: number;
+  downstreamCount: number;
+  isFocus?: boolean;
+  fields: Array<{
+    code: number;
+    tag: string;
+    name: string;
+    metadataId?: number;
+    hasLink: boolean;
+  }>;
 }
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function tokenize(tag: string): string[] {
-  return (tag || '')
-    .replace(/^(TXT|CB|CXT|RB|DS|VL|DT|CK)_/i, '')
-    .split('_')
-    .map(t => t.toUpperCase())
-    .filter(t => t.length > 1 || t === 'N');
-}
-
-function computeSimilarity(sourceTag: string, targetTag: string): number {
-  const sTokens = tokenize(sourceTag);
-  const tTokens = tokenize(targetTag);
-  let matches = 0;
-  for (const st of sTokens) {
-    if (tTokens.includes(st)) {
-      matches += 2;
-    } else if (st === 'NR' && tTokens.includes('N')) {
-      matches += 1.5;
-    } else if (st === 'N' && tTokens.includes('NR')) {
-      matches += 1.5;
-    }
-  }
-  return matches;
-}
-
-function getMainSelectProjection(sql: string): string {
-  const m = sql.match(/^\s*SELECT\s+(?:DISTINCT\s+)?([\s\S]+?)\s+FROM\b/i);
-  return m ? m[1].replace(/\s+/g, ' ').trim() : '';
-}
-
-function findBestSourceField(
-  sourceFields: LineageField[],
-  targetTag: string,
+/**
+ * Encontra com rigor estrito se algum campo do documento de origem é explicitamente citado no script.
+ * Não utiliza aproximações de similaridade ou chutes: a tag deve constar delimitada no código SQL.
+ */
+function findStrictSourceField(
+  sourceFields: Map<string, { tag: string; name: string }>,
   script: string
-): { field: LineageField | null; isDocLevelOnly: boolean } {
-  const projection = getMainSelectProjection(script);
-
-  // Se o SELECT projeta exclusivamente metadados/auditoria do documento de origem (ex: dh_criacao, dh_fechamento)
-  // e não o conteúdo de campos (lo_conteudo), o vínculo é a nível de Documento clínico, não de campo individual.
-  const isDocLevelOnly = /\b(dh_criacao|dh_fechamento|cd_documento_clinico|cd_atendimento)\b/i.test(projection)
-    && !/lo_conteudo|lo_valor|ds_conteudo/i.test(projection);
-
-  if (isDocLevelOnly) {
-    return { field: null, isDocLevelOnly: true };
-  }
-
-  const candidates: Array<{ field: LineageField; score: number }> = [];
-
-  for (const field of sourceFields) {
-    const sTag = field.tag;
-    if (!sTag) continue;
-
-    // A tag deve aparecer entre aspas ou delimitada por limites de palavra/sublinhado
-    const tagPattern = new RegExp(`['"]${escapeRegex(sTag)}['"]|(?:\\b|_)` + escapeRegex(sTag) + `(?:\\b|_)`, 'i');
-    if (!tagPattern.test(script)) continue;
-
-    let score = 10;
-
-    // 1. O script possui subquery com alias projetado no SELECT externo?
-    // Ex: SELECT solicitacao as tipo FROM ... LEFT JOIN (... as solicitacao WHERE ds_identificador = 'TXT_NR_SOLICITACAO')
-    const subqueryMatch = new RegExp(
-      `SELECT[\\s\\S]*?lo_conteudo[\\s\\S]*?\\bAS\\s+([a-zA-Z0-9_]+)[\\s\\S]*?ds_identificador\\s*=\\s*['"]${escapeRegex(sTag)}['"]`,
-      'i'
-    ).exec(script);
-
-    if (subqueryMatch) {
-      const alias = subqueryMatch[1];
-      const aliasInProjection = new RegExp(`(?:\\b|_)${escapeRegex(alias)}(?:\\b|_)`, 'i').test(projection);
-      if (aliasInProjection) {
-        score += 100; // Coluna cujo valor alimenta diretamente a saída
-      } else {
-        score += 15;
-      }
-    } else {
-      // 2. Consulta direta de lo_conteudo/lo_valor associado a este ds_identificador
-      const directSelect = new RegExp(
-        `SELECT[\\s\\S]*?(?:lo_conteudo|lo_valor)[\\s\\S]*?FROM[\\s\\S]*?ds_identificador[\\s\\S]*?['"]${escapeRegex(sTag)}['"]`,
-        'i'
-      ).test(script);
-      if (directSelect) {
-        score += 80;
-      }
+): { tag: string; name: string } | null {
+  for (const [tag, field] of sourceFields.entries()) {
+    // Procura por 'TAG_NAME' ou "TAG_NAME" ou ds_identificador = 'TAG_NAME'
+    const pattern = new RegExp(`['"]${escapeRegex(tag)}['"]`, 'i');
+    if (pattern.test(script)) {
+      return field;
     }
-
-    // 3. Similaridade semântica entre tags (ex: TXT_NR_SOLICITACAO <-> TXT_N_SOLICITACAO_RECEB)
-    const sim = computeSimilarity(sTag, targetTag);
-    score += sim * 15;
-
-    // 4. Correspondência de tipo/prefixo de widget (ex: TXT_ com TXT_, CXT_ com CXT_)
-    const sPrefix = (sTag.match(/^[A-Z]+/i) || [''])[0].toUpperCase();
-    const tPrefix = (targetTag.match(/^[A-Z]+/i) || [''])[0].toUpperCase();
-    if (sPrefix && sPrefix === tPrefix) {
-      score += 5;
-    }
-
-    candidates.push({ field, score });
   }
-
-  if (candidates.length === 0) {
-    return { field: null, isDocLevelOnly: false };
-  }
-
-  candidates.sort((a, b) => b.score - a.score);
-  return { field: candidates[0].field, isDocLevelOnly: false };
+  return null;
 }
 
 export async function GET(request: Request) {
@@ -171,7 +88,7 @@ export async function GET(request: Request) {
              ec.cd_campo                           AS "TARGET_FIELD_ID",
              ec.cd_metadado                        AS "TARGET_METADATA_ID",
              ec.ds_identificador                   AS "TARGET_FIELD_TAG",
-             ec.ds_campo                           AS "TARGET_FIELD_NAME",
+             NVL(ec.ds_campo, ec.ds_identificador) AS "TARGET_FIELD_NAME",
              REGEXP_SUBSTR(
                  DBMS_LOB.SUBSTR(ev.lo_valor, 4000, 1),
                  'CD_DOCUMENTO[[:space:]]+IN[[:space:]]*\\(([0-9[:space:],]+)\\)',
@@ -201,12 +118,12 @@ export async function GET(request: Request) {
 
     const actionRows = await executeQuery(connection, actionsSql, {});
 
-    // Parse de arestas preliminares
-    const rawEdges: Array<{
-      sourceDocId: string;
-      targetDocId: string;
+    // Coleta todos os documentos participantes preliminares
+    const rawPairs: Array<{
+      sourceDocId: number;
+      targetDocId: number;
       targetFieldTag: string;
-      targetFieldId: number;
+      targetFieldName: string;
       script: string;
     }> = [];
 
@@ -215,28 +132,27 @@ export async function GET(request: Request) {
     actionRows.forEach((row: any) => {
       const targetDoc = Number(row.TARGET_DOC_ID);
       const targetTag = String(row.TARGET_FIELD_TAG || '').trim();
+      const targetName = String(row.TARGET_FIELD_NAME || targetTag).trim();
       const script = String(row.SCRIPT || '');
 
-      // Extrai documentos fontes referenciados
-      const sources: string[] = [];
-      if (row.REF_DOC_EQ) {
-        sources.push(String(row.REF_DOC_EQ).trim());
+      const sources: number[] = [];
+      if (row.REF_DOC_EQ && /^\d+$/.test(String(row.REF_DOC_EQ).trim())) {
+        sources.push(Number(String(row.REF_DOC_EQ).trim()));
       }
       if (row.REF_DOC_IN) {
         String(row.REF_DOC_IN).split(',').forEach((s: string) => {
-          const trimmed = s.trim();
-          if (trimmed && /^\d+$/.test(trimmed)) sources.push(trimmed);
+          const t = s.trim();
+          if (t && /^\d+$/.test(t)) sources.push(Number(t));
         });
       }
 
-      sources.forEach(src => {
-        const srcNum = Number(src);
+      sources.forEach(srcNum => {
         if (srcNum && srcNum !== targetDoc) {
-          rawEdges.push({
-            sourceDocId: String(srcNum),
-            targetDocId: String(targetDoc),
+          rawPairs.push({
+            sourceDocId: srcNum,
+            targetDocId: targetDoc,
             targetFieldTag: targetTag,
-            targetFieldId: Number(row.TARGET_FIELD_ID),
+            targetFieldName: targetName,
             script
           });
           involvedDocIds.add(srcNum);
@@ -245,42 +161,17 @@ export async function GET(request: Request) {
       });
     });
 
-    // Se usuário especificou um documento raiz, filtramos os documentos conectados
-    let filteredDocIds = Array.from(involvedDocIds);
-    if (rootDocId && /^\d+$/.test(rootDocId)) {
-      const rootNum = Number(rootDocId);
-      const connected = new Set<number>([rootNum]);
-      rawEdges.forEach(e => {
-        const s = Number(e.sourceDocId);
-        const t = Number(e.targetDocId);
-        if (s === rootNum || t === rootNum) {
-          connected.add(s);
-          connected.add(t);
-        }
-      });
-      filteredDocIds = Array.from(connected);
-    } else if (!onlyLinked) {
-      // Se não filtrar apenas conectados, adicionamos alguns documentos adicionais
-      const extraDocsSql = `
-        SELECT cd_documento
-          FROM (SELECT cd_documento FROM editor.editor_documento ORDER BY cd_documento DESC)
-         WHERE ROWNUM <= 8
-      `;
-      const extraRows = await executeQuery(connection, extraDocsSql, {});
-      extraRows.forEach((r: any) => filteredDocIds.push(Number(r.CD_DOCUMENTO)));
-      filteredDocIds = Array.from(new Set(filteredDocIds));
-    }
-
-    if (filteredDocIds.length === 0) {
+    if (involvedDocIds.size === 0) {
       return NextResponse.json({
         nodes: [],
         edges: [],
+        availableDocs: [],
         summary: { totalDocs: 0, totalEdges: 0, linkedDocs: 0 }
       });
     }
 
-    // 2. Busca informações completas dos documentos e seus campos
-    const inDocsList = filteredDocIds.join(', ');
+    // 2. Busca todos os campos e nomes dos documentos participantes
+    const inDocsList = Array.from(involvedDocIds).join(', ');
     const docsDetailsSql = `
       SELECT ed.cd_documento                         AS "CD_DOCUMENTO",
              UPPER(ed.ds_documento)                  AS "DS_DOCUMENTO",
@@ -302,12 +193,12 @@ export async function GET(request: Request) {
 
     const docDetailRows = await executeQuery(connection, docsDetailsSql, {});
 
-    // Agrupa campos por documento
+    // Mapeamento em memória de cada documento e seus campos
     const docMap = new Map<number, {
       title: string;
       version: number;
       versionType: string;
-      fields: Map<string, LineageField>;
+      fields: Map<string, { code: number; tag: string; name: string; metadataId?: number; hasLink: boolean }>;
     }>();
 
     docDetailRows.forEach((r: any) => {
@@ -325,7 +216,6 @@ export async function GET(request: Request) {
       const tag = String(r.DS_IDENTIFICADOR || '').trim();
       if (tag && !docObj.fields.has(tag)) {
         docObj.fields.set(tag, {
-          id: `field_${docId}_${r.CD_CAMPO}`,
           code: Number(r.CD_CAMPO),
           tag,
           name: String(r.DS_CAMPO || tag),
@@ -335,77 +225,122 @@ export async function GET(request: Request) {
       }
     });
 
-    // 3. Monta as arestas e detecta o campo exato de origem
-    const edges: LineageEdge[] = [];
-    const edgeKeySet = new Set<string>();
+    // 3. Validação Estrita de Vínculos & Consolidação por Par (Source ➔ Target)
+    const pairMap = new Map<string, {
+      sourceDocId: number;
+      targetDocId: number;
+      fieldsMap: LineageFieldItem[];
+    }>();
 
-    rawEdges.forEach((re, idx) => {
-      const sDocNum = Number(re.sourceDocId);
-      const tDocNum = Number(re.targetDocId);
+    rawPairs.forEach(pair => {
+      const sourceDoc = docMap.get(pair.sourceDocId);
+      const targetDoc = docMap.get(pair.targetDocId);
+      if (!sourceDoc || !targetDoc) return;
 
-      // Apenas processa se ambos os documentos estiverem no escopo
-      if (!docMap.has(sDocNum) || !docMap.has(tDocNum)) return;
+      // Validação Estrita do Campo de Origem
+      const matchedSource = findStrictSourceField(sourceDoc.fields, pair.script);
+      const isDocLevel = !matchedSource;
 
-      const sourceDoc = docMap.get(sDocNum)!;
-      const targetDoc = docMap.get(tDocNum)!;
+      // Marca que o campo tem vínculo ativo
+      if (matchedSource) {
+        const sField = sourceDoc.fields.get(matchedSource.tag);
+        if (sField) sField.hasLink = true;
+      }
+      const tField = targetDoc.fields.get(pair.targetFieldTag);
+      if (tField) tField.hasLink = true;
 
-      // Detecta com heurística avançada qual campo do documento de origem é o verdadeiro provedor do dado
-      const sourceFieldsList = Array.from(sourceDoc.fields.values());
-      const { field: bestSourceField, isDocLevelOnly } = findBestSourceField(
-        sourceFieldsList,
-        re.targetFieldTag,
-        re.script
+      const pairKey = `${pair.sourceDocId}_${pair.targetDocId}`;
+      if (!pairMap.has(pairKey)) {
+        pairMap.set(pairKey, {
+          sourceDocId: pair.sourceDocId,
+          targetDocId: pair.targetDocId,
+          fieldsMap: []
+        });
+      }
+
+      // Evita duplicatas exatas dentro do mesmo par
+      const existingFields = pairMap.get(pairKey)!.fieldsMap;
+      const alreadyAdded = existingFields.some(
+        f => f.targetTag === pair.targetFieldTag && f.sourceTag === (matchedSource?.tag || undefined)
       );
 
-      // Se não encontrou campo correspondente e não é um vínculo a nível de documento, ignora
-      if (!bestSourceField && !isDocLevelOnly) {
-        return;
-      }
-
-      // Marca campo alvo
-      const targetField = targetDoc.fields.get(re.targetFieldTag);
-      if (targetField) {
-        targetField.hasLink = true;
-        targetField.isTarget = true;
-      }
-
-      // Marca campo origem (se for a nível de campo)
-      let matchedSourceFieldTag: string | undefined = undefined;
-      if (bestSourceField) {
-        matchedSourceFieldTag = bestSourceField.tag;
-        bestSourceField.hasLink = true;
-        bestSourceField.isSource = true;
-      }
-
-      const edgeKey = `${sDocNum}_${matchedSourceFieldTag || 'DOC'}->${tDocNum}_${re.targetFieldTag}`;
-      if (!edgeKeySet.has(edgeKey)) {
-        edgeKeySet.add(edgeKey);
-        edges.push({
-          id: `edge_sql_${idx}_${sDocNum}_${tDocNum}`,
-          sourceDocId: String(sDocNum),
-          sourceFieldTag: matchedSourceFieldTag,
-          targetDocId: String(tDocNum),
-          targetFieldTag: re.targetFieldTag,
-          type: 'SQL_QUERY',
-          label: isDocLevelOnly ? 'Auditoria (Doc)' : 'Consulta SQL',
-          script: re.script
+      if (!alreadyAdded) {
+        existingFields.push({
+          sourceTag: matchedSource?.tag,
+          sourceName: matchedSource?.name,
+          targetTag: pair.targetFieldTag,
+          targetName: pair.targetFieldName,
+          script: pair.script,
+          isDocLevel
         });
       }
     });
 
-    // 4. Monta os nós no formato React Flow Custom Node
-    let nodes: LineageDocNode[] = [];
-    docMap.forEach((docData, docId) => {
+    // 4. Modo Foco (Single-Doc Explorer) vs Visão Global
+    let activeDocIds = new Set<number>();
+    const rootNum = rootDocId && /^\d+$/.test(rootDocId) ? Number(rootDocId) : null;
+
+    if (rootNum && docMap.has(rootNum)) {
+      activeDocIds.add(rootNum);
+      // Upstream: quem alimenta o root
+      // Downstream: quem o root alimenta
+      pairMap.forEach(p => {
+        if (p.targetDocId === rootNum) {
+          activeDocIds.add(p.sourceDocId);
+        }
+        if (p.sourceDocId === rootNum) {
+          activeDocIds.add(p.targetDocId);
+        }
+      });
+    } else {
+      // Visão Global: inclui todos os documentos que possuem ao menos 1 aresta válida
+      pairMap.forEach(p => {
+        if (p.fieldsMap.length > 0) {
+          activeDocIds.add(p.sourceDocId);
+          activeDocIds.add(p.targetDocId);
+        }
+      });
+    }
+
+    // 5. Montagem das Arestas Executivas Finais
+    const executiveEdges: ExecutiveEdgeData[] = [];
+    pairMap.forEach((p, key) => {
+      // Apenas inclui arestas cujos dois documentos estejam no escopo ativo
+      if (!activeDocIds.has(p.sourceDocId) || !activeDocIds.has(p.targetDocId)) return;
+      if (p.fieldsMap.length === 0) return;
+
+      const totalFields = p.fieldsMap.length;
+      const label = totalFields === 1 ? '1 campo vinculado' : `${totalFields} campos vinculados`;
+
+      executiveEdges.push({
+        id: `edge_${key}`,
+        sourceDocId: String(p.sourceDocId),
+        targetDocId: String(p.targetDocId),
+        totalFields,
+        fieldsMap: p.fieldsMap,
+        label,
+        type: 'SQL_QUERY'
+      });
+    });
+
+    // 6. Montagem dos Nós Executivos Finais
+    const upstreamCounters = new Map<number, number>();
+    const downstreamCounters = new Map<number, number>();
+
+    executiveEdges.forEach(e => {
+      const s = Number(e.sourceDocId);
+      const t = Number(e.targetDocId);
+      downstreamCounters.set(s, (downstreamCounters.get(s) || 0) + 1);
+      upstreamCounters.set(t, (upstreamCounters.get(t) || 0) + 1);
+    });
+
+    const executiveNodes: LineageDocNodeData[] = [];
+    activeDocIds.forEach(docId => {
+      const docData = docMap.get(docId);
+      if (!docData) return;
+
       const allFields = Array.from(docData.fields.values());
-      const linked = allFields.filter(f => f.hasLink);
-      const unlinked = allFields.filter(f => !f.hasLink);
-
-      // Se estiver em modo "apenas vinculados" e o doc não tiver campos vinculados, pula
-      if (onlyLinked && linked.length === 0) {
-        return;
-      }
-
-      nodes.push({
+      executiveNodes.push({
         id: `doc_${docId}`,
         docId,
         title: docData.title,
@@ -413,42 +348,43 @@ export async function GET(request: Request) {
         versionType: docData.versionType,
         tech: 'HTML5',
         totalFields: allFields.length,
-        linkedFieldsCount: linked.length,
-        fields: linked,
-        unlinkedFields: unlinked
+        upstreamCount: upstreamCounters.get(docId) || 0,
+        downstreamCount: downstreamCounters.get(docId) || 0,
+        isFocus: rootNum === docId,
+        fields: allFields.filter(f => f.hasLink)
       });
     });
 
-    // 5. Integridade Referencial Estrita:
-    // Apenas arestas cujos nós de origem E destino existem no grafo são mantidas
-    const nodeIds = new Set(nodes.map(n => n.id));
-    const validEdges = edges.filter(e => 
-      nodeIds.has(`doc_${e.sourceDocId}`) && nodeIds.has(`doc_${e.targetDocId}`)
-    );
+    // 7. Lista de Documentos Disponíveis Ordenada por Relevância de Vínculos
+    const docTotalLinks = new Map<number, number>();
+    pairMap.forEach(p => {
+      docTotalLinks.set(p.sourceDocId, (docTotalLinks.get(p.sourceDocId) || 0) + p.fieldsMap.length);
+      docTotalLinks.set(p.targetDocId, (docTotalLinks.get(p.targetDocId) || 0) + p.fieldsMap.length);
+    });
 
-    // Em modo "apenas vinculados", elimina qualquer bloco isolado:
-    // Todo nó retornado DEVE obrigatoriamente possuir ao menos uma aresta válida conectada
-    if (onlyLinked) {
-      const connectedDocIds = new Set<string>();
-      validEdges.forEach(e => {
-        connectedDocIds.add(e.sourceDocId);
-        connectedDocIds.add(e.targetDocId);
-      });
-      nodes = nodes.filter(n => connectedDocIds.has(String(n.docId)));
-    }
+    const availableDocs = Array.from(docMap.entries())
+      .filter(([id]) => (docTotalLinks.get(id) || 0) > 0)
+      .map(([id, doc]) => ({
+        id,
+        title: doc.title,
+        totalLinks: docTotalLinks.get(id) || 0
+      }))
+      .sort((a, b) => b.totalLinks - a.totalLinks);
 
     return NextResponse.json({
-      nodes,
-      edges: validEdges,
+      nodes: executiveNodes,
+      edges: executiveEdges,
+      availableDocs,
+      focusDocId: rootNum,
       summary: {
-        totalDocs: nodes.length,
-        totalEdges: validEdges.length,
-        linkedDocs: nodes.filter(n => n.linkedFieldsCount > 0).length
+        totalDocs: executiveNodes.length,
+        totalEdges: executiveEdges.length,
+        totalFieldsLinked: executiveEdges.reduce((acc, e) => acc + e.totalFields, 0)
       }
     });
+
   } catch (err: any) {
     console.error('[Lineage API Error]:', err);
-    return NextResponse.json({ error: err.message || 'Erro ao processar linhagem' }, { status: 500 });
+    return NextResponse.json({ error: err.message || 'Erro ao processar linhagem executiva' }, { status: 500 });
   }
 }
-

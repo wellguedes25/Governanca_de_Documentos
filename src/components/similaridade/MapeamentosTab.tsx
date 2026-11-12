@@ -33,16 +33,16 @@ export function MapeamentosTab({ docMappings, onSave }: MapeamentosTabProps) {
   };
 
   return (
-    <div className="bgbg-slate-900/60 w-full rounded-xl shadow-none relative flex flex-col overflow-hidden animate-in fade-in duration-300 border borderborder-slate-800">
-      <header className="px-8 py-6 border-b borderborder-slate-800 flex items-center justify-between bgbg-slate-900/60 relative overflow-hidden">
+    <div className="bg-slate-900/60 w-full rounded-xl shadow-none relative flex flex-col overflow-hidden animate-in fade-in duration-300 border border-slate-800">
+      <header className="px-8 py-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/60 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-sky-500/5 rounded-md blur-3xl"></div>
         <div className="flex items-center gap-4 relative z-10">
-          <div className="p-3 bg-card texttext-slate-200 rounded-md shadow-none shadow-slate-200">
+          <div className="p-3 bg-card text-slate-200 rounded-md shadow-none shadow-slate-200">
             <SettingsIcon size={22} className="text-sky-400 group-hover:rotate-90 transition-transform duration-500" />
           </div>
           <div>
-            <h3 className="text-xl font-black texttext-slate-200 uppercase tracking-tight">Gerenciar Mapeamentos</h3>
-            <p className="text-[10px] texttext-slate-400 font-bold uppercase tracking-widest mt-0.5 italic">Configuração de Documentos e Campos Oracle</p>
+            <h3 className="text-xl font-black text-slate-200 uppercase tracking-tight">Gerenciar Mapeamentos</h3>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 italic">Configuração de Documentos e Campos Oracle</p>
           </div>
         </div>
       </header>
@@ -50,38 +50,38 @@ export function MapeamentosTab({ docMappings, onSave }: MapeamentosTabProps) {
       <div className="p-8 space-y-8 bg-slate-900/60">
         <div className="space-y-6">
           {localMappings.length === 0 && (
-            <div className="border borderborder-slate-800 rounded-lg p-12 text-center flex flex-col items-center justify-center">
-              <BookOpen size={48} className="texttext-slate-400 mb-4 opacity-50" />
-              <h3 className="text-lg font-bold texttext-slate-200 mb-2">Nenhum Documento Mapeado</h3>
-              <p className="texttext-slate-400 max-w-md text-sm">
+            <div className="border border-slate-800 rounded-lg p-12 text-center flex flex-col items-center justify-center">
+              <BookOpen size={48} className="text-slate-400 mb-4 opacity-50" />
+              <h3 className="text-lg font-bold text-slate-200 mb-2">Nenhum Documento Mapeado</h3>
+              <p className="text-slate-400 max-w-md text-sm">
                 O Motor NLP precisa saber quais documentos ler. Clique em "Adicionar Novo Mapeamento" abaixo para conectar um documento do banco de dados ao motor.
               </p>
             </div>
           )}
 
           {localMappings.map((mapping, mIdx) => (
-            <div key={mIdx} className="bgbg-slate-900/60 border border-slate-800 rounded-lg p-6 shadow-[0_4px_20px_rgb(0,0,0,0.03)] relative group/card transition-all hover:shadow-none hover:border-blue-200/50">
+            <div key={mIdx} className="bg-slate-900/60 border border-slate-800 rounded-lg p-6 shadow-[0_4px_20px_rgb(0,0,0,0.03)] relative group/card transition-all hover:shadow-none hover:border-sky-500/30">
               <button
                 onClick={() => {
                   if (confirm('Deseja remover este mapeamento de documento?')) {
                     setLocalMappings(localMappings.filter((_, i) => i !== mIdx));
                   }
                 }}
-                className="absolute top-4 right-4 p-2 texttext-slate-400 hover:text-rose-500 hover:bg-red-500/10 rounded-md transition-all opacity-0 group-hover/card:opacity-100"
+                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-rose-500 hover:bg-red-500/10 rounded-md transition-all opacity-0 group-hover/card:opacity-100"
               >
                 <Trash2 size={16} />
               </button>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black texttext-slate-400 uppercase tracking-[0.15em] block ml-1">Código do Documento</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] block ml-1">Código do Documento</label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none texttext-slate-400">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                       <Hash size={14} />
                     </div>
                     <input
                       type="text"
-                      className="w-full bg-card border borderborder-slate-800 rounded-md pl-10 pr-4 py-2.5 text-sm font-bold texttext-slate-200 bg-slate-900/60 focus:border-sky-500 transition-all outline-none"
+                      className="w-full bg-card border border-slate-800 rounded-md pl-10 pr-4 py-2.5 text-sm font-bold text-slate-200 bg-slate-900/60 focus:border-sky-500 transition-all outline-none"
                       value={mapping.id}
                       onChange={(e) => {
                         const newList = [...localMappings];
@@ -92,10 +92,10 @@ export function MapeamentosTab({ docMappings, onSave }: MapeamentosTabProps) {
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black texttext-slate-400 uppercase tracking-[0.15em] block ml-1">Nome Amigável</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] block ml-1">Nome Amigável</label>
                   <input
                     type="text"
-                    className="w-full bg-card border borderborder-slate-800 rounded-md px-4 py-2.5 text-sm font-bold texttext-slate-200 bg-slate-900/60 focus:border-sky-500 transition-all outline-none"
+                    className="w-full bg-card border border-slate-800 rounded-md px-4 py-2.5 text-sm font-bold text-slate-200 bg-slate-900/60 focus:border-sky-500 transition-all outline-none"
                     value={mapping.name}
                     onChange={(e) => {
                       const newList = [...localMappings];
@@ -108,10 +108,10 @@ export function MapeamentosTab({ docMappings, onSave }: MapeamentosTabProps) {
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between ml-1">
-                  <label className="text-[10px] font-black texttext-slate-400 uppercase tracking-[0.15em] flex items-center gap-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] flex items-center gap-2">
                     <Layers size={14} className="text-sky-400" /> Campos Vinculados
                   </label>
-                  <span className="text-[9px] font-bold texttext-slate-400 bg-slate-900/60 px-2 py-0.5 rounded-md">{mapping.fields.length} itens</span>
+                  <span className="text-[9px] font-bold text-slate-400 bg-slate-900/60 px-2 py-0.5 rounded-md">{mapping.fields.length} itens</span>
                 </div>
                 
                 <div className="flex flex-wrap gap-2">
@@ -139,21 +139,21 @@ export function MapeamentosTab({ docMappings, onSave }: MapeamentosTabProps) {
                   <div className="absolute top-0 right-0 w-16 h-16 bg-sky-500/5 rounded-md -mr-8 -mt-8 transition-all group-hover/link:bg-sky-500/10"></div>
                   <div className="grid grid-cols-1 md:grid-cols-[1fr_1.2fr_auto] gap-4 relative z-10 items-end">
                     <div className="space-y-1.5">
-                      <label className="text-[9px] font-black texttext-slate-400 uppercase tracking-widest block ml-1">ID Técnico (Oracle)</label>
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block ml-1">ID Técnico (Oracle)</label>
                       <input
                         id={`new-field-id-${mIdx}`}
                         type="text"
                         placeholder="EX: EVOLUCAO"
-                        className="w-full bgbg-slate-900/60 border borderborder-slate-800 px-4 py-2 rounded-md text-xs font-bold outline-none focus:border-sky-500 transition-all shadow-none"
+                        className="w-full bg-slate-900/60 border border-slate-800 px-4 py-2 rounded-md text-xs font-bold outline-none focus:border-sky-500 transition-all shadow-none"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[9px] font-black texttext-slate-400 uppercase tracking-widest block ml-1">Descrição Amigável</label>
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block ml-1">Descrição Amigável</label>
                       <input
                         id={`new-field-name-${mIdx}`}
                         type="text"
                         placeholder="EX: Evolução Médica"
-                        className="w-full bgbg-slate-900/60 border borderborder-slate-800 px-4 py-2 rounded-md text-xs font-bold outline-none focus:border-sky-500 transition-all shadow-none"
+                        className="w-full bg-slate-900/60 border border-slate-800 px-4 py-2 rounded-md text-xs font-bold outline-none focus:border-sky-500 transition-all shadow-none"
                       />
                     </div>
                     <button
@@ -174,7 +174,7 @@ export function MapeamentosTab({ docMappings, onSave }: MapeamentosTabProps) {
                           toast.error('Preencha o ID Técnico e a Descrição.');
                         }
                       }}
-                      className="bg-card texttext-slate-200 px-5 py-2.5 rounded-md text-[9px] font-black uppercase tracking-widest hover:bg-sky-600 hover:shadow-none hover:shadow-blue-200 transition-all flex items-center gap-2 h-[38px]"
+                      className="bg-card text-slate-200 px-5 py-2.5 rounded-md text-[9px] font-black uppercase tracking-widest hover:bg-sky-600 hover:shadow-none hover:shadow-sky-500/20 transition-all flex items-center gap-2 h-[38px]"
                     >
                       <LinkIcon size={14} /> Vincular Campo
                     </button>
@@ -190,7 +190,7 @@ export function MapeamentosTab({ docMappings, onSave }: MapeamentosTabProps) {
               newList.push({ id: '', name: 'Novo Documento', fields: [] });
               setLocalMappings(newList);
             }}
-            className="w-full py-6 border-2 border-dashed borderborder-slate-800 rounded-lg texttext-slate-400 hover:text-sky-400 hover:border-blue-300 hover:bg-blue-50/30 transition-all flex flex-col items-center justify-center gap-3 group/add"
+            className="w-full py-6 border-2 border-dashed border-slate-800 rounded-lg text-slate-400 hover:text-sky-400 hover:border-sky-500/50 hover:bg-sky-500/5 transition-all flex flex-col items-center justify-center gap-3 group/add"
           >
             <div className="p-3 bg-card text-slate-400 rounded-md group-hover/add:bg-blue-100 group-hover/add:text-sky-400 transition-all">
               <Plus size={24} />
@@ -200,11 +200,11 @@ export function MapeamentosTab({ docMappings, onSave }: MapeamentosTabProps) {
         </div>
       </div>
 
-      <footer className="px-8 py-6 bgbg-slate-900/60 border-t borderborder-slate-800 flex items-center justify-end gap-4 shadow-[0_-4px_20px_rgb(0,0,0,0.02)]">
+      <footer className="px-8 py-6 bg-slate-900/60 border-t border-slate-800 flex items-center justify-end gap-4 shadow-[0_-4px_20px_rgb(0,0,0,0.02)]">
         <button 
           onClick={handleSave}
           disabled={isSaving}
-          className="px-8 py-3 bg-sky-600 hover:bg-blue-700 texttext-slate-200 rounded-md font-black uppercase tracking-widest text-[10px] transition-all shadow-none shadow-blue-200 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
+          className="px-8 py-3 bg-sky-600 hover:bg-sky-500 text-slate-200 rounded-md font-black uppercase tracking-widest text-[10px] transition-all shadow-none shadow-sm hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
         >
           {isSaving ? 'Salvando...' : 'Salvar Alterações'}
         </button>

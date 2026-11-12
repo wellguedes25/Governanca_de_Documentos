@@ -10,6 +10,8 @@ import {
   ListFilter,
   XCircle,
   Printer,
+  Download,
+  Play,
   AlertTriangle,
   Loader2,
   ArrowRight,
@@ -45,6 +47,7 @@ import {
 } from 'recharts';
 
 import { DocMapping } from '@/lib/storage';
+import * as XLSX from 'xlsx';
 import toast, { Toaster } from 'react-hot-toast';
 import { useUI } from '@/context/UIContext';
 import { useRouter } from 'next/navigation';
@@ -109,6 +112,12 @@ export default function SimilaridadePage() {
   const [selectedUnidades, setSelectedUnidades] = useState<string[]>([]);
   const [selectedPrestadores, setSelectedPrestadores] = useState<string[]>([]);
 
+  // Estado para execução do motor Python em background
+  const [isRunningScript, setIsRunningScript] = useState(false);
+  const [scriptLogs, setScriptLogs] = useState<string[]>([]);
+  const [scriptModalOpen, setScriptModalOpen] = useState(false);
+  const [filterTipoCopia, setFilterTipoCopia] = useState<'TODOS' | 'CRUZADA' | 'AUTO'>('TODOS');
+
   useEffect(() => {
     checkConnection();
   }, []);
@@ -132,6 +141,89 @@ export default function SimilaridadePage() {
       console.error('[Similaridade] Falha ao verificar conexão:', err);
     }
   }
+
+  const handleExportExcel = () => {
+    if (!filteredData || filteredData.length === 0) {
+      toast.error('Nenhum dado para exportar.');
+      return;
+    }
+
+    const exportRows = filteredData.map(row => {
+      const score = Number(getVal(row, 'SCORE')) || 0;
+      const prestador = String(getVal(row, 'PRESTADOR') || '');
+      const prestadorNome = String(getVal(row, 'NOME_PRESTADOR') || '');
+      const atend = String(getVal(row, 'ATENDIMENTO') || '');
+      const docId = String(getVal(row, 'DOCUMENTO') || '');
+      const docNome = String(getVal(row, 'NOME_DOCUMENTO') || '');
+      const dataHora = String(getVal(row, 'DATA_HORA_ISO') || getVal(row, 'DATA_HORA') || '');
+      const unidade = String(getVal(row, 'UNIDADE') || '');
+      const leito = String(getVal(row, 'LEITO') || '');
+      const empresa = String(getVal(row, 'NOME_EMPRESA') || getVal(row, 'CD_EMPRESA') || '');
+
+      return {
+        'Atendimento': atend,
+        'Cód. Documento': docId,
+        'Nome Documento': docNome,
+        'Identificador': String(getVal(row, 'IDENTIFICADOR') || ''),
+        'Data Fechamento': dataHora,
+        'Prestador': prestadorNome ? `${prestador} - ${prestadorNome}` : prestador,
+        'Hospital/Empresa': empresa,
+        'Unidade': unidade,
+        'Leito': leito,
+        'Similaridade (%)': score,
+        'Classificação': score >= 80 ? 'Crítico (>=80%)' : score >= 50 ? 'Moderado (50-79%)' : 'Baixo (<50%)'
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Auditoria_Similaridade');
+    XLSX.writeFile(workbook, `Goverdoc_Similaridade_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success('Relatório Excel exportado com sucesso!');
+  };
+
+  const handleRunAuditScript = async () => {
+    if (isRunningScript) return;
+    setIsRunningScript(true);
+    setScriptLogs(['[INFO] Conectando ao serviço de execução de scripts...']);
+    setScriptModalOpen(true);
+
+    try {
+      const res = await fetch('/api/scripts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ script: 'similaridade' })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Falha ao acionar motor Python.');
+      }
+
+      if (!res.body) throw new Error('Fluxo de dados indisponível.');
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        if (value) {
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n').filter(Boolean);
+          setScriptLogs(prev => [...prev.slice(-300), ...lines]);
+        }
+      }
+
+      toast.success('Auditoria de similaridade concluída!');
+    } catch (e: any) {
+      setScriptLogs(prev => [...prev, `[ERRO] ${e.message}`]);
+      toast.error(e.message || 'Erro durante a auditoria.');
+    } finally {
+      setIsRunningScript(false);
+    }
+  };
 
   async function handleSaveMappings(newMappings: DocMapping[]) {
     try {
@@ -549,10 +641,10 @@ export default function SimilaridadePage() {
   };
 
   return (
-    <div className="min-h-screen bg-card flex flex-col p-4 md:p-8 space-y-10 font-sans texttext-slate-200 selection:bg-blue-100 selection:text-blue-900">
+    <div className="min-h-screen bg-card flex flex-col p-4 md:p-8 space-y-10 font-sans text-slate-200 selection:bg-blue-100 selection:text-blue-900">
       <Toaster position="top-right" reverseOrder={false} />
       
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b borderborder-slate-800 pb-8 relative overflow-hidden">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-slate-800 pb-8 relative overflow-hidden">
         {/* Glow de fundo sutil */}
         <div className="absolute -top-24 -left-24 w-64 h-64 bg-[var(--primary)]/5 blur-[100px] rounded-md pointer-events-none"></div>
         
@@ -568,12 +660,12 @@ export default function SimilaridadePage() {
         <div className="flex items-center gap-4 relative z-10">
           <div className="relative group">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 texttext-slate-400 group-focus-within:text-[var(--primary)] transition-colors" />
+              <Search className="h-4 w-4 text-slate-400 group-focus-within:text-[var(--primary)] transition-colors" />
             </div>
             <input
               type="text"
               placeholder="Filtro instantâneo..."
-              className="bgbg-slate-900/60 border borderborder-slate-800 rounded-md pl-10 pr-4 py-2.5 text-xs texttext-slate-200 outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--primary)]/10 w-72 transition-all shadow-none font-bold text-slate-400 disabled:opacity-50"
+              className="bg-slate-900/60 border border-slate-800 rounded-md pl-10 pr-4 py-2.5 text-xs text-slate-200 outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--primary)]/10 w-72 transition-all shadow-none font-bold text-slate-400 disabled:opacity-50"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               disabled={!hasSearched || loading}
@@ -581,8 +673,28 @@ export default function SimilaridadePage() {
           </div>
           
           <button 
+            onClick={handleExportExcel}
+            disabled={!hasSearched || loading || filteredData.length === 0}
+            className="px-3 py-2 bg-slate-900/80 border border-slate-800 text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/10 rounded-md transition-all text-xs font-semibold flex items-center gap-2 shadow-xs disabled:opacity-40 disabled:pointer-events-none"
+            title="Exportar dados auditados para planilha Excel"
+          >
+            <Download size={14} />
+            <span className="hidden sm:inline">Exportar Excel</span>
+          </button>
+
+          <button 
+            onClick={handleRunAuditScript}
+            disabled={isRunningScript}
+            className="px-3 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-md transition-all text-xs font-semibold flex items-center gap-2 shadow-xs disabled:opacity-40"
+            title="Executar rotina Python de processamento NLP em background"
+          >
+            <Play size={13} className={isRunningScript ? 'animate-spin' : ''} />
+            <span className="hidden sm:inline">{isRunningScript ? 'Auditando...' : 'Rodar Auditoria NLP'}</span>
+          </button>
+
+          <button 
             onClick={() => window.print()}
-            className="p-2.5 bgbg-slate-900/60 border borderborder-slate-800 texttext-slate-400 text-slate-200 hover:border-slate-400 rounded-md transition-all shadow-none group"
+            className="p-2.5 bg-slate-900/60 border border-slate-800 text-slate-400 text-slate-200 hover:border-slate-400 rounded-md transition-all shadow-none group"
             title="Imprimir Relatório"
           >
             <Printer size={18} className="group-hover:scale-110 transition-transform" />
@@ -591,13 +703,13 @@ export default function SimilaridadePage() {
       </header>
 
       {/* Tabs */}
-      <div className="flex gap-0 border-b borderborder-slate-800">
+      <div className="flex gap-0 border-b border-slate-800">
         <button
           onClick={() => setActiveTab('consulta')}
           className={`flex items-center gap-2 px-6 py-3 text-[9px] font-black uppercase tracking-[0.2em] transition-all font-mono border-b-2 -mb-px ${
             activeTab === 'consulta'
               ? 'border-[var(--primary)] text-[var(--primary)]'
-              : 'border-transparent texttext-slate-400 hover:texttext-slate-200 hover:border-[var(--primary)]'
+              : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-[var(--primary)]'
           }`}
         >
           <SearchCode size={14} />
@@ -608,7 +720,7 @@ export default function SimilaridadePage() {
           className={`flex items-center gap-2 px-6 py-3 text-[9px] font-black uppercase tracking-[0.2em] transition-all font-mono border-b-2 -mb-px ${
             activeTab === 'mapeamentos'
               ? 'border-[var(--primary)] text-[var(--primary)]'
-              : 'border-transparent texttext-slate-400 hover:texttext-slate-200 hover:border-[var(--primary)]'
+              : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-[var(--primary)]'
           }`}
         >
           <BookOpen size={14} />
@@ -618,17 +730,17 @@ export default function SimilaridadePage() {
 
       <div className={activeTab === 'consulta' ? 'space-y-10 animate-in fade-in duration-300' : 'hidden'}>
       {/* Painel de Filtros Ultra-Compacto (Single Line) */}
-      <div className="bg-slate-900/60 backdrop-blur-md border borderborder-slate-800 rounded-3xl p-6 shadow-none relative group overflow-hidden">
+      <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800 rounded-3xl p-6 shadow-none relative group overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[var(--primary)] to-transparent opacity-30"></div>
         <div className="flex flex-wrap items-end gap-6">
           {/* Empresa (Hospital) */}
           {hospitals.length > 0 && (
             <div className="w-[200px] space-y-2">
-              <label className="text-[10px] font-black texttext-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                 <Building2 size={12} className="text-[var(--primary)]" /> Empresa
               </label>
               <select
-                className="w-full bgbg-slate-900/60 border-2 borderborder-slate-800 rounded-md px-4 py-2.5 text-xs font-black texttext-slate-200 outline-none focus:border-[var(--primary)] transition-all shadow-none"
+                className="w-full bg-slate-900/60 border-2 border-slate-800 rounded-md px-4 py-2.5 text-xs font-black text-slate-200 outline-none focus:border-[var(--primary)] transition-all shadow-none"
                 value={filters.empresa}
                 onChange={(e) => setFilters(f => ({ ...f, empresa: e.target.value }))}
               >
@@ -642,11 +754,11 @@ export default function SimilaridadePage() {
 
           {/* Documento (Selector) */}
           <div className="flex-1 min-w-[300px] space-y-2">
-            <label className="text-[10px] font-black texttext-slate-400 uppercase tracking-widest flex items-center gap-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
               <ClipboardList size={12} className="text-[var(--primary)]" /> Documento Alvo
             </label>
             <select
-              className={`w-full bgbg-slate-900/60 border-2 rounded-md px-4 py-2.5 text-xs font-black texttext-slate-200 outline-none transition-all shadow-none hover:shadow-none ${!filters.documento && hasSearched ? 'border-rose-400 animate-shake' : 'borderborder-slate-800 focus:border-[var(--primary)]'}`}
+              className={`w-full bg-slate-900/60 border-2 rounded-md px-4 py-2.5 text-xs font-black text-slate-200 outline-none transition-all shadow-none hover:shadow-none ${!filters.documento && hasSearched ? 'border-rose-400 animate-shake' : 'border-slate-800 focus:border-[var(--primary)]'}`}
               value={filters.documento}
               onChange={(e) => {
                 const newDoc = e.target.value;
@@ -662,11 +774,11 @@ export default function SimilaridadePage() {
 
           {/* Identificador (Selector Dependente) */}
           <div className="flex-1 min-w-[250px] space-y-2">
-            <label className="text-[10px] font-black texttext-slate-400 uppercase tracking-widest flex items-center gap-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
               <Split size={12} className="text-[var(--primary)]" /> Identificador Campo
             </label>
             <select
-              className={`w-full bgbg-slate-900/60 border-2 rounded-md px-4 py-2.5 text-xs font-black texttext-slate-200 outline-none transition-all shadow-none hover:shadow-none ${!filters.campo && hasSearched ? 'border-rose-400 animate-shake' : 'borderborder-slate-800 focus:border-[var(--primary)]'}`}
+              className={`w-full bg-slate-900/60 border-2 rounded-md px-4 py-2.5 text-xs font-black text-slate-200 outline-none transition-all shadow-none hover:shadow-none ${!filters.campo && hasSearched ? 'border-rose-400 animate-shake' : 'border-slate-800 focus:border-[var(--primary)]'}`}
               value={filters.campo}
               onChange={(e) => setFilters(f => ({ ...f, campo: e.target.value }))}
               disabled={!filters.documento}
@@ -680,7 +792,7 @@ export default function SimilaridadePage() {
 
           <button
             onClick={() => setActiveTab('mapeamentos')}
-            className="h-[46px] w-[46px] min-w-[46px] bgbg-slate-900/60 border-2 borderborder-slate-800 texttext-slate-400 hover:text-[var(--primary)] hover:border-[var(--primary)] rounded-md flex items-center justify-center transition-all shadow-none hover:shadow-none hover:-translate-y-0.5 group"
+            className="h-[46px] w-[46px] min-w-[46px] bg-slate-900/60 border-2 border-slate-800 text-slate-400 hover:text-[var(--primary)] hover:border-[var(--primary)] rounded-md flex items-center justify-center transition-all shadow-none hover:shadow-none hover:-translate-y-0.5 group"
             title="Gerenciar Mapeamentos"
           >
             <SettingsIcon size={18} className="group-hover:rotate-90 transition-transform duration-500" />
@@ -689,23 +801,23 @@ export default function SimilaridadePage() {
           {/* Datas */}
           <div className="flex gap-4">
             <div className="w-[140px] space-y-2">
-              <label className="text-[10px] font-black texttext-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                 <Calendar size={12} className="text-[var(--primary)]" /> Período De
               </label>
               <input
                 type="date"
-                className="w-full bgbg-slate-900/60 border-2 borderborder-slate-800 rounded-md px-3 py-2.5 text-xs font-black texttext-slate-200 outline-none focus:border-[var(--primary)] transition-all shadow-none"
+                className="w-full bg-slate-900/60 border-2 border-slate-800 rounded-md px-3 py-2.5 text-xs font-black text-slate-200 outline-none focus:border-[var(--primary)] transition-all shadow-none"
                 value={filters.dataInicio}
                 onChange={(e) => setFilters(f => ({ ...f, dataInicio: e.target.value }))}
               />
             </div>
             <div className="w-[140px] space-y-2">
-              <label className="text-[10px] font-black texttext-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                 <ArrowRight size={12} className="text-[var(--primary)]" /> Até
               </label>
               <input
                 type="date"
-                className="w-full bgbg-slate-900/60 border-2 borderborder-slate-800 rounded-md px-3 py-2.5 text-xs font-black texttext-slate-200 outline-none focus:border-[var(--primary)] transition-all shadow-none"
+                className="w-full bg-slate-900/60 border-2 border-slate-800 rounded-md px-3 py-2.5 text-xs font-black text-slate-200 outline-none focus:border-[var(--primary)] transition-all shadow-none"
                 value={filters.dataFim}
                 min={filters.dataInicio}
                 onChange={(e) => setFilters(f => ({ ...f, dataFim: e.target.value }))}
@@ -715,11 +827,11 @@ export default function SimilaridadePage() {
 
           {/* Score */}
           <div className="w-[120px] space-y-2">
-            <label className="text-[10px] font-black texttext-slate-400 uppercase tracking-widest flex items-center gap-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
               <ChevronUp size={12} className="text-[var(--primary)]" /> Sensibilidade
             </label>
             <select
-              className="w-full bgbg-slate-900/60 border-2 borderborder-slate-800 rounded-md px-3 py-2.5 text-xs font-black texttext-slate-200 outline-none focus:border-[var(--primary)] transition-all shadow-none"
+              className="w-full bg-slate-900/60 border-2 border-slate-800 rounded-md px-3 py-2.5 text-xs font-black text-slate-200 outline-none focus:border-[var(--primary)] transition-all shadow-none"
               value={filters.minScore}
               onChange={(e) => setFilters(f => ({ ...f, minScore: Number(e.target.value) }))}
             >
@@ -734,7 +846,7 @@ export default function SimilaridadePage() {
           <button
             onClick={handleSearch}
             disabled={loading}
-            className="h-[46px] px-8 bg-card hover:bg-black texttext-slate-200 rounded-md flex items-center justify-center gap-3 transition-all shadow-none shadow-sm hover:-translate-y-1 active:translate-y-0 disabled:opacity-50 relative overflow-hidden group/search"
+            className="h-[46px] px-8 bg-card hover:bg-black text-slate-200 rounded-md flex items-center justify-center gap-3 transition-all shadow-none shadow-sm hover:-translate-y-1 active:translate-y-0 disabled:opacity-50 relative overflow-hidden group/search"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-[var(--primary)]/0 via-white/10 to-[var(--primary)]/0 -translate-x-full group-hover/search:animate-shimmer"></div>
             {loading ? <Loader2 size={18} className="animate-spin" /> : <SearchCode size={20} />}
@@ -745,12 +857,12 @@ export default function SimilaridadePage() {
 
       {/* Tabela de Resultados ou Estado Inicial */}
       {!hasSearched ? (
-        <div className="flex-1 flex flex-col items-center justify-center py-24 border-2 border-dashed borderborder-slate-800 rounded-md bg-slate-900/60">
-          <div className="p-8 bgbg-slate-900/60 rounded-md shadow-none shadow-blue-100 mb-8 border borderborder-slate-800">
+        <div className="flex-1 flex flex-col items-center justify-center py-24 border-2 border-dashed border-slate-800 rounded-md bg-slate-900/60">
+          <div className="p-8 bg-slate-900/60 rounded-md shadow-none shadow-blue-100 mb-8 border border-slate-800">
             <ScanEye size={64} className="text-sky-400 animate-pulse" />
           </div>
-          <h3 className="text-2xl font-black texttext-slate-200 uppercase tracking-tighter mb-3">Pronto para Auditar</h3>
-          <p className="texttext-slate-400 font-medium text-center max-w-md leading-relaxed">
+          <h3 className="text-2xl font-black text-slate-200 uppercase tracking-tighter mb-3">Pronto para Auditar</h3>
+          <p className="text-slate-400 font-medium text-center max-w-md leading-relaxed">
             Selecione o <span className="text-sky-400 font-bold italic underline underline-offset-4 decoration-blue-200">documento</span> e o <span className="text-sky-400 font-bold italic underline underline-offset-4 decoration-blue-200">campo</span> acima para iniciar o cruzamento de dados na base Oracle.
           </p>
         </div>
@@ -759,17 +871,17 @@ export default function SimilaridadePage() {
           {/* Skeleton KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {[1,2,3,4].map(i => (
-              <div key={i} className="h-32 bgbg-slate-900/60 border borderborder-slate-800 rounded-xl relative overflow-hidden">
+              <div key={i} className="h-32 bg-slate-900/60 border border-slate-800 rounded-xl relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-50/50 to-transparent -translate-x-full animate-shimmer"></div>
               </div>
             ))}
           </div>
           {/* Skeleton Chart */}
-          <div className="h-[380px] bgbg-slate-900/60 border borderborder-slate-800 rounded-xl relative overflow-hidden">
+          <div className="h-[380px] bg-slate-900/60 border border-slate-800 rounded-xl relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-50/50 to-transparent -translate-x-full animate-shimmer"></div>
           </div>
           {/* Skeleton Table */}
-          <div className="bgbg-slate-900/60 border borderborder-slate-800 rounded-xl p-6 space-y-4">
+          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-4">
             {[1,2,3,4,5].map(i => (
               <div key={i} className="h-12 bg-card rounded-md relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-50/50 to-transparent -translate-x-full animate-shimmer"></div>
@@ -779,7 +891,7 @@ export default function SimilaridadePage() {
         </div>
       ) : filteredData.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center py-24 border-2 border-dashed border-red-500/50/20 rounded-md bg-rose-50/50">
-          <div className="p-8 bgbg-slate-900/60 rounded-md shadow-none shadow-rose-100 mb-8 border border-rose-100">
+          <div className="p-8 bg-slate-900/60 rounded-md shadow-none shadow-rose-100 mb-8 border border-rose-100">
             <Search size={64} className="text-rose-500" />
           </div>
           <h3 className="text-2xl font-black text-rose-800 uppercase tracking-tighter mb-3">Nenhum Registro</h3>
@@ -791,7 +903,7 @@ export default function SimilaridadePage() {
               setFilters(f => ({ ...f, dataInicio: '2026-01-01', dataFim: getToday() }));
               setTimeout(handleSearch, 100);
             }}
-            className="mt-6 px-8 py-3 bg-rose-600 hover:bg-rose-700 texttext-slate-200 rounded-md text-[10px] font-black uppercase tracking-widest transition-all shadow-none shadow-rose-200 active:scale-95"
+            className="mt-6 px-8 py-3 bg-rose-600 hover:bg-rose-700 text-slate-200 rounded-md text-[10px] font-black uppercase tracking-widest transition-all shadow-none shadow-rose-200 active:scale-95"
           >
             Ampliar Período (2026+)
           </button>
@@ -803,14 +915,14 @@ export default function SimilaridadePage() {
             <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-xl p-7 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-1 transition-all group relative overflow-hidden flex flex-col justify-between min-h-[160px]">
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-400/10 rounded-md blur-[40px] group-hover:bg-sky-500/20 transition-colors"></div>
               <div className="flex justify-between items-start z-10">
-                <p className="text-[10px] font-black texttext-slate-400 uppercase tracking-[0.2em]">Dataset Total</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Dataset Total</p>
                 <div className="p-2.5 bg-blue-50/80 text-sky-400 rounded-[14px] group-hover:bg-sky-600 text-slate-200 transition-colors duration-500 shadow-none">
                   <ClipboardList size={20} strokeWidth={2.5} />
                 </div>
               </div>
               <div className="z-10 mt-4">
-                <h3 className="text-4xl font-black texttext-slate-200 tracking-tighter">{similarityData.length}</h3>
-                <p className="text-[10px] font-bold texttext-slate-400 mt-1 flex items-center gap-1.5">
+                <h3 className="text-4xl font-black text-slate-200 tracking-tighter">{similarityData.length}</h3>
+                <p className="text-[10px] font-bold text-slate-400 mt-1 flex items-center gap-1.5">
                   <Database size={10} /> Analisados na base Oracle
                 </p>
               </div>
@@ -820,16 +932,16 @@ export default function SimilaridadePage() {
             <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-xl p-7 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-1 transition-all group relative overflow-hidden flex flex-col justify-between min-h-[160px]">
               <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/10 rounded-md blur-[40px] group-hover:bg-amber-500/20 transition-colors"></div>
               <div className="flex justify-between items-start z-10">
-                <p className="text-[10px] font-black texttext-slate-400 uppercase tracking-[0.2em]">Média de Risco</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Média de Risco</p>
                 <div className="p-2.5 bg-amber-50/80 text-amber-600 rounded-[14px] group-hover:bg-amber-500 text-slate-200 transition-colors duration-500 shadow-none">
                   <AlertTriangle size={20} strokeWidth={2.5} />
                 </div>
               </div>
               <div className="z-10 mt-4">
-                <h3 className="text-4xl font-black texttext-slate-200 tracking-tighter">
-                  {(similarityData.reduce((acc, r) => acc + (Number(getVal(r, 'SCORE')) || 0), 0) / (similarityData.length || 1)).toFixed(1)}<span className="text-2xl texttext-slate-400 ml-1">%</span>
+                <h3 className="text-4xl font-black text-slate-200 tracking-tighter">
+                  {(similarityData.reduce((acc, r) => acc + (Number(getVal(r, 'SCORE')) || 0), 0) / (similarityData.length || 1)).toFixed(1)}<span className="text-2xl text-slate-400 ml-1">%</span>
                 </h3>
-                <p className="text-[10px] font-bold texttext-slate-400 mt-1 flex items-center gap-1.5">
+                <p className="text-[10px] font-bold text-slate-400 mt-1 flex items-center gap-1.5">
                   <ChartIcon size={10} className="text-amber-500" /> Score médio da seleção
                 </p>
               </div>
@@ -839,16 +951,16 @@ export default function SimilaridadePage() {
             <div className={`bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-xl p-7 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:-translate-y-1 transition-all group relative overflow-hidden flex flex-col justify-between min-h-[160px] ${similarityData.filter(r => Number(getVal(r, 'SCORE')) >= 80).length > 0 ? "shadow-rose-100/50 border-rose-100" : "hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)]"}`}>
               <div className="absolute top-0 right-0 w-32 h-32 bg-rose-400/10 rounded-md blur-[40px] group-hover:bg-rose-500/20 transition-colors"></div>
               <div className="flex justify-between items-start z-10">
-                <p className="text-[10px] font-black texttext-slate-400 uppercase tracking-[0.2em]">Docs Críticos</p>
-                <div className={`p-2.5 rounded-[14px] shadow-none transition-colors duration-500 ${similarityData.filter(r => Number(getVal(r, 'SCORE')) >= 80).length > 0 ? 'bg-rose-500 texttext-slate-200 animate-pulse' : 'bg-red-500/10 text-rose-500 group-hover:bg-rose-500 text-slate-200'}`}>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Docs Críticos</p>
+                <div className={`p-2.5 rounded-[14px] shadow-none transition-colors duration-500 ${similarityData.filter(r => Number(getVal(r, 'SCORE')) >= 80).length > 0 ? 'bg-rose-500 text-slate-200 animate-pulse' : 'bg-red-500/10 text-rose-500 group-hover:bg-rose-500 text-slate-200'}`}>
                   <ScanEye size={20} strokeWidth={2.5} />
                 </div>
               </div>
               <div className="z-10 mt-4">
-                <h3 className={`text-4xl font-black tracking-tighter ${similarityData.filter(r => Number(getVal(r, 'SCORE')) >= 80).length > 0 ? 'text-red-500' : 'texttext-slate-200'}`}>
+                <h3 className={`text-4xl font-black tracking-tighter ${similarityData.filter(r => Number(getVal(r, 'SCORE')) >= 80).length > 0 ? 'text-red-500' : 'text-slate-200'}`}>
                   {similarityData.filter(r => Number(getVal(r, 'SCORE')) >= 80).length}
                 </h3>
-                <p className="text-[10px] font-bold texttext-slate-400 mt-1 flex items-center gap-1.5">
+                <p className="text-[10px] font-bold text-slate-400 mt-1 flex items-center gap-1.5">
                   <AlertTriangle size={10} className="text-rose-500" /> Acima de 80% similaridade
                 </p>
               </div>
@@ -858,39 +970,39 @@ export default function SimilaridadePage() {
             <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-xl p-7 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-1 transition-all group relative overflow-hidden flex flex-col justify-between min-h-[160px]">
               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-400/10 rounded-md blur-[40px] group-hover:bg-emerald-500/20 transition-colors"></div>
               <div className="flex justify-between items-start z-10">
-                <p className="text-[10px] font-black texttext-slate-400 uppercase tracking-[0.2em]">Seleção Ativa</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Seleção Ativa</p>
                 <div className="p-2.5 bg-emerald-50/80 text-emerald-600 rounded-[14px] group-hover:bg-emerald-500 text-slate-200 transition-colors duration-500 shadow-none">
                   <ShieldCheck size={20} strokeWidth={2.5} />
                 </div>
               </div>
               <div className="z-10 mt-4">
-                <h3 className="text-4xl font-black texttext-slate-200 tracking-tighter">{filteredData.length}</h3>
-                <p className="text-[10px] font-bold texttext-slate-400 mt-1 flex items-center gap-1.5">
+                <h3 className="text-4xl font-black text-slate-200 tracking-tighter">{filteredData.length}</h3>
+                <p className="text-[10px] font-bold text-slate-400 mt-1 flex items-center gap-1.5">
                   <Filter size={10} /> Volume após filtros em cascata
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bgbg-slate-900/60 p-8 rounded-xl border borderborder-slate-800 shadow-none relative overflow-hidden h-[380px] flex flex-col group">
+          <div className="bg-slate-900/60 p-8 rounded-xl border border-slate-800 shadow-none relative overflow-hidden h-[380px] flex flex-col group">
             <div className="absolute top-0 right-0 w-64 h-64 bg-sky-500/5 blur-[80px] rounded-md -translate-y-1/2 translate-x-1/2"></div>
             
             <div className="flex justify-between items-center mb-8 relative z-10">
               <div>
-                <h4 className="text-xl font-black texttext-slate-200 uppercase italic tracking-tighter flex items-center gap-3">
+                <h4 className="text-xl font-black text-slate-200 uppercase italic tracking-tighter flex items-center gap-3">
                   <ChartIcon size={22} className="text-sky-400" /> 
                   Top 10 Prestadores por Volume
                 </h4>
                 <div className="flex items-center gap-2 mt-1">
                   <div className="h-1.5 w-1.5 rounded-md bg-emerald-500"></div>
-                  <p className="text-[10px] texttext-slate-400 font-black uppercase tracking-[0.2em]">Distribuição de Similaridade por CRM/Registro</p>
+                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">Distribuição de Similaridade por CRM/Registro</p>
                 </div>
               </div>
               
               {selectedPrestadores.length > 0 && (
                 <button
                   onClick={() => setSelectedPrestadores([])}
-                  className="px-5 py-2.5 bg-card texttext-slate-200 rounded-md text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-black transition-all shadow-none active:scale-95 group/reset"
+                  className="px-5 py-2.5 bg-card text-slate-200 rounded-md text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-black transition-all shadow-none active:scale-95 group/reset"
                 >
                   <RefreshCw size={14} className="group-hover/reset:rotate-180 transition-transform duration-500" /> 
                   Limpar Seleção
@@ -935,23 +1047,23 @@ export default function SimilaridadePage() {
                       if (active && payload && payload.length) {
                         const data = payload[0].payload;
                         return (
-                          <div className="bg-slate-900/60 backdrop-blur-xl border borderborder-slate-800 p-5 shadow-none rounded-md animate-in zoom-in-95 duration-200 min-w-[260px]">
+                          <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 p-5 shadow-none rounded-md animate-in zoom-in-95 duration-200 min-w-[260px]">
                             <div className="flex items-center gap-3 mb-4 pb-4 border-b border-slate-800">
                                 <div className="p-2 bg-sky-600 rounded-md">
-                                  <Stethoscope size={16} className="texttext-slate-200" />
+                                  <Stethoscope size={16} className="text-slate-200" />
                                 </div>
                                 <div className="overflow-hidden">
-                                  <p className="texttext-slate-200 text-[11px] font-black uppercase tracking-widest truncate">{data.fullName}</p>
-                                  <p className="texttext-slate-400 text-[8px] font-bold uppercase tracking-widest mt-0.5">Prestador Clínico</p>
+                                  <p className="text-slate-200 text-[11px] font-black uppercase tracking-widest truncate">{data.fullName}</p>
+                                  <p className="text-slate-400 text-[8px] font-bold uppercase tracking-widest mt-0.5">Prestador Clínico</p>
                                 </div>
                             </div>
                             <div className="space-y-3">
                               <div className="flex justify-between items-center">
-                                  <span className="texttext-slate-400 text-[9px] font-black uppercase tracking-widest">Volume de Docs</span>
-                                  <p className="texttext-slate-200 text-[18px] font-black italic">{data.value} <small className="text-[10px] opacity-40 italic">UN</small></p>
+                                  <span className="text-slate-400 text-[9px] font-black uppercase tracking-widest">Volume de Docs</span>
+                                  <p className="text-slate-200 text-[18px] font-black italic">{data.value} <small className="text-[10px] opacity-40 italic">UN</small></p>
                               </div>
                               <div className="flex justify-between items-center">
-                                  <span className="texttext-slate-400 text-[9px] font-black uppercase tracking-widest">Similaridade</span>
+                                  <span className="text-slate-400 text-[9px] font-black uppercase tracking-widest">Similaridade</span>
                                   <div className="flex items-center gap-2">
                                     <div className="w-12 h-1.5 bg-slate-900/60 rounded-md overflow-hidden">
                                       <div className="h-full bg-sky-500" style={{ width: `${data.percentage}%` }}></div>
@@ -961,7 +1073,7 @@ export default function SimilaridadePage() {
                               </div>
                             </div>
                             <div className="mt-4 pt-4 border-t border-slate-800 text-center">
-                              <p className="texttext-slate-400 text-[8px] font-black uppercase tracking-widest animate-pulse italic">Clique para isolar prestador</p>
+                              <p className="text-slate-400 text-[8px] font-black uppercase tracking-widest animate-pulse italic">Clique para isolar prestador</p>
                             </div>
                           </div>
                         );
@@ -1001,32 +1113,32 @@ export default function SimilaridadePage() {
           </div>
 
           {/* Filtros Horizontais Pro Max (Dynamic Toolbar) */}
-          <div className="bg-card rounded-md p-5 texttext-slate-200 shadow-none relative overflow-visible border-b-4 border-blue-600">
+          <div className="bg-card rounded-md p-5 text-slate-200 shadow-none relative overflow-visible border-b-4 border-blue-600">
             <div className="flex flex-col lg:flex-row items-end gap-6 relative z-10">
 
-              <div className="flex items-center gap-3 pr-6 border-r borderborder-slate-800">
-                <div className="p-2.5 bg-sky-600 texttext-slate-200 rounded-md shadow-none">
+              <div className="flex items-center gap-3 pr-6 border-r border-slate-800">
+                <div className="p-2.5 bg-sky-600 text-slate-200 rounded-md shadow-none">
                   <ListFilter size={20} />
                 </div>
                 <div>
-                  <h5 className="text-[12px] font-black uppercase tracking-[0.2em] texttext-slate-200 italic">Filtros Dinâmicos</h5>
-                  <p className="text-[9px] texttext-slate-400 font-bold uppercase mt-0.5">Refinamento Instantâneo</p>
+                  <h5 className="text-[12px] font-black uppercase tracking-[0.2em] text-slate-200 italic">Filtros Dinâmicos</h5>
+                  <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">Refinamento Instantâneo</p>
                 </div>
               </div>
 
               {/* Atendimento */}
               <div className="flex-1 w-full lg:w-48 space-y-1.5">
-                <label className="text-[9px] font-black texttext-slate-400 uppercase tracking-widest flex items-center gap-1">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                   <Search size={10} /> Atendimento
                 </label>
                 <div className="relative group">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 texttext-slate-400 group-focus-within:text-sky-400 transition-colors" size={14} />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-400 transition-colors" size={14} />
                   <input
                     type="text"
                     placeholder="Filtrar atendimento..."
                     value={filterAtendimento}
                     onChange={(e) => setFilterAtendimento(e.target.value)}
-                    className="w-full bg-slate-900/60 border-2 border-slate-800 rounded-md pl-9 pr-3 py-1.5 text-[11px] font-bold texttext-slate-200 text-slate-400 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 transition-all"
+                    className="w-full bg-slate-900/60 border-2 border-slate-800 rounded-md pl-9 pr-3 py-1.5 text-[11px] font-bold text-slate-200 text-slate-400 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 transition-all"
                   />
                 </div>
               </div>
@@ -1057,7 +1169,7 @@ export default function SimilaridadePage() {
                   setSelectedUnidades([]);
                   setSelectedPrestadores([]);
                 }}
-                className="h-[38px] px-6 bg-slate-900/60 hover:bg-rose-900 border-2 border-slate-800 rounded-md text-[10px] font-black uppercase tracking-widest transition-all texttext-slate-400 text-slate-200 flex items-center justify-center gap-2 group whitespace-nowrap"
+                className="h-[38px] px-6 bg-slate-900/60 hover:bg-rose-900 border-2 border-slate-800 rounded-md text-[10px] font-black uppercase tracking-widest transition-all text-slate-400 text-slate-200 flex items-center justify-center gap-2 group whitespace-nowrap"
                 title="Resetar todos os filtros"
               >
                 <RefreshCw size={14} className="group-hover:rotate-180 transition-transform duration-500" />
@@ -1067,20 +1179,20 @@ export default function SimilaridadePage() {
           </div>
 
           {/* Tabela de Resultados Final */}
-          <div className="bgbg-slate-900/60 rounded-xl border borderborder-slate-800 flex flex-col overflow-hidden shadow-none relative">
+          <div className="bg-slate-900/60 rounded-xl border border-slate-800 flex flex-col overflow-hidden shadow-none relative">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-sky-500 via-cyan-500 to-emerald-500"></div>
             <div className="flex-1 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200">
               <table className="w-full text-left border-collapse table-auto min-w-max">
                 <thead>
-                  <tr className="bg-slate-900/60 border-b borderborder-slate-800">
-                    <th className="px-8 py-5 text-[10px] font-black texttext-slate-400 uppercase tracking-[0.2em] text-center">Atendimento</th>
-                    <th className="px-8 py-5 text-[10px] font-black texttext-slate-400 uppercase tracking-[0.2em]">Registro Clínico</th>
-                    <th className="px-8 py-5 text-[10px] font-black texttext-slate-400 uppercase tracking-[0.2em]">Empresa</th>
-                    <th className="px-8 py-5 text-[10px] font-black texttext-slate-400 uppercase tracking-[0.2em]">Data e Hora</th>
-                    <th className="px-8 py-5 text-[10px] font-black texttext-slate-400 uppercase tracking-[0.2em] text-center">Prestador</th>
-                    <th className="px-8 py-5 text-[10px] font-black texttext-slate-400 uppercase tracking-[0.2em]">Localização</th>
-                    <th className="px-8 py-5 text-[10px] font-black texttext-slate-400 uppercase tracking-[0.2em] text-center">Similaridade</th>
-                    <th className="px-8 py-5 text-[10px] font-black texttext-slate-400 uppercase tracking-[0.2em] text-center">Auditoria</th>
+                  <tr className="bg-slate-900/60 border-b border-slate-800">
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Atendimento</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Registro Clínico</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Empresa</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Data e Hora</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Prestador</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Localização</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Similaridade</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Auditoria</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -1089,12 +1201,12 @@ export default function SimilaridadePage() {
                       <td colSpan={8} className="py-32 text-center">
                         <div className="flex flex-col items-center gap-6">
                           <div className="relative">
-                            <div className="w-16 h-16 border-4 borderborder-slate-800 border-t-[var(--primary)] rounded-md animate-spin"></div>
+                            <div className="w-16 h-16 border-4 border-slate-800 border-t-[var(--primary)] rounded-md animate-spin"></div>
                             <ScanEye className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[var(--primary)]" size={24} />
                           </div>
                           <div className="space-y-1">
-                            <span className="text-[12px] font-black uppercase tracking-[0.4em] texttext-slate-200 block">Processando Similaridade</span>
-                            <span className="text-[9px] font-bold texttext-slate-400 uppercase tracking-widest block">Isolando padrões de texto via NLP Oracle...</span>
+                            <span className="text-[12px] font-black uppercase tracking-[0.4em] text-slate-200 block">Processando Similaridade</span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Isolando padrões de texto via NLP Oracle...</span>
                           </div>
                         </div>
                       </td>
@@ -1104,16 +1216,16 @@ export default function SimilaridadePage() {
                       const score = Number(getVal(row, 'SCORE')) || 0;
                       return (
                         <tr key={idx} className="bg-slate-900/60 transition-all group/tr">
-                          <td className="px-8 py-4 text-[12px] font-black text-center texttext-slate-400 font-mono group-hover/text-slate-200 transition-colors">{getVal(row, 'ATENDIMENTO')}</td>
+                          <td className="px-8 py-4 text-[12px] font-black text-center text-slate-400 font-mono group-hover/text-slate-200 transition-colors">{getVal(row, 'ATENDIMENTO')}</td>
                           <td className="px-8 py-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-slate-900/60 rounded-md flex items-center justify-center texttext-slate-400 group-hover/tr:bg-sky-500/10 group-hover/tr:text-sky-400 transition-all">
+                              <div className="w-10 h-10 bg-slate-900/60 rounded-md flex items-center justify-center text-slate-400 group-hover/tr:bg-sky-500/10 group-hover/tr:text-sky-400 transition-all">
                                 <FileText size={18} />
                               </div>
                               <div className="flex flex-col">
-                                <span className="text-[12px] font-black texttext-slate-200 tracking-tight leading-none mb-1">{getVal(row, 'NOME_DOCUMENTO')}</span>
+                                <span className="text-[12px] font-black text-slate-200 tracking-tight leading-none mb-1">{getVal(row, 'NOME_DOCUMENTO')}</span>
                                 <div className="flex items-center gap-2">
-                                  <span className="text-[9px] font-bold texttext-slate-400 uppercase tracking-tighter bg-slate-900/60 px-1.5 py-0.5 rounded">ID: {getVal(row, 'DOCUMENTO')}</span>
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter bg-slate-900/60 px-1.5 py-0.5 rounded">ID: {getVal(row, 'DOCUMENTO')}</span>
                                   <span className="text-[9px] font-bold text-sky-400 uppercase tracking-tighter bg-sky-500/10 px-1.5 py-0.5 rounded italic">{getVal(row, 'IDENTIFICADOR')}</span>
                                 </div>
                               </div>
@@ -1121,12 +1233,12 @@ export default function SimilaridadePage() {
                           </td>
                           <td className="px-8 py-4">
                             <div className="flex items-center gap-2">
-                              <Building2 size={12} className="texttext-slate-400 opacity-40" />
-                              <span className="text-[10px] font-black texttext-slate-400 uppercase tracking-widest">{getVal(row, 'NOME_EMPRESA') || getVal(row, 'CD_EMPRESA') || '—'}</span>
+                              <Building2 size={12} className="text-slate-400 opacity-40" />
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{getVal(row, 'NOME_EMPRESA') || getVal(row, 'CD_EMPRESA') || '—'}</span>
                             </div>
                           </td>
                           <td className="px-8 py-4">
-                            <div className="flex items-center gap-2 texttext-slate-400">
+                            <div className="flex items-center gap-2 text-slate-400">
                               <Calendar size={12} className="opacity-40" />
                               <span className="text-[11px] font-bold">
                                 {(() => {
@@ -1140,17 +1252,17 @@ export default function SimilaridadePage() {
                           </td>
                           <td className="px-8 py-4 text-center">
                              <div className="inline-flex items-center justify-center w-10 h-10 rounded-md bg-slate-900/60 border-2 border-white shadow-none overflow-hidden group-hover/tr:border-blue-200 transition-all" title={getVal(row, 'PRESTADOR')}>
-                               <User size={18} className="texttext-slate-400 group-hover/tr:text-sky-400" />
+                               <User size={18} className="text-slate-400 group-hover/tr:text-sky-400" />
                              </div>
-                             <p className="text-[9px] font-black texttext-slate-400 mt-1 uppercase italic tracking-tighter group-hover/text-slate-400">{getVal(row, 'PRESTADOR')}</p>
+                             <p className="text-[9px] font-black text-slate-400 mt-1 uppercase italic tracking-tighter group-hover/text-slate-400">{getVal(row, 'PRESTADOR')}</p>
                           </td>
                           <td className="px-8 py-4">
                             <div className="flex flex-col gap-1">
                               <div className="flex items-center gap-1.5">
                                 <div className="w-1.5 h-1.5 rounded-md bg-slate-400"></div>
-                                <span className="text-[11px] font-black texttext-slate-200 uppercase italic tracking-tighter">{getVal(row, 'LEITO') || 'N/A'}</span>
+                                <span className="text-[11px] font-black text-slate-200 uppercase italic tracking-tighter">{getVal(row, 'LEITO') || 'N/A'}</span>
                               </div>
-                              <span className="text-[9px] font-bold texttext-slate-400 uppercase tracking-[0.1em]">{getVal(row, 'UNIDADE') || 'SETOR EXTERNO'}</span>
+                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.1em]">{getVal(row, 'UNIDADE') || 'SETOR EXTERNO'}</span>
                             </div>
                           </td>
                           <td className="px-8 py-4 text-center">
@@ -1169,7 +1281,7 @@ export default function SimilaridadePage() {
                                 setComparingDoc(row);
                                 fetchComparison(row);
                               }}
-                              className="w-10 h-10 flex items-center justify-center bg-card texttext-slate-200 rounded-md hover:bg-black hover:-translate-y-1 active:translate-y-0 transition-all shadow-none shadow-sm group/btn-audit"
+                              className="w-10 h-10 flex items-center justify-center bg-card text-slate-200 rounded-md hover:bg-black hover:-translate-y-1 active:translate-y-0 transition-all shadow-none shadow-sm group/btn-audit"
                               title="Audit NLP Lado a Lado"
                             >
                               <Split size={20} className="group-hover/btn-audit:rotate-12 transition-transform" />
@@ -1182,12 +1294,12 @@ export default function SimilaridadePage() {
                     <tr>
                       <td colSpan={7} className="py-48 text-center bg-slate-900/60">
                         <div className="flex flex-col items-center justify-center">
-                          <div className="p-8 bgbg-slate-900/60 rounded-md shadow-none mb-6 relative overflow-hidden">
+                          <div className="p-8 bg-slate-900/60 rounded-md shadow-none mb-6 relative overflow-hidden">
                             <div className="absolute inset-0 bg-gradient-to-br from-slate-50 to-white"></div>
                             <XCircle size={64} className="text-slate-200 relative z-10" />
                           </div>
-                          <h3 className="text-xl font-black texttext-slate-200 uppercase italic tracking-tighter">Vácuo de Similaridade</h3>
-                          <p className="text-sm texttext-slate-400 font-medium max-w-xs mt-3 leading-relaxed">
+                          <h3 className="text-xl font-black text-slate-200 uppercase italic tracking-tighter">Vácuo de Similaridade</h3>
+                          <p className="text-sm text-slate-400 font-medium max-w-xs mt-3 leading-relaxed">
                             Não encontramos registros que correspondam aos filtros aplicados nesta janela de tempo.
                           </p>
                         </div>
@@ -1199,16 +1311,16 @@ export default function SimilaridadePage() {
             </div>
 
             {/* Paginação Premium */}
-            <div className="bgbg-slate-900/60 border-t borderborder-slate-800 px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="bg-slate-900/60 border-t border-slate-800 px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-6 bg-sky-600 rounded-md"></div>
-                  <span className="text-[11px] font-black texttext-slate-200 uppercase tracking-widest italic">
-                    {filteredData.length} <span className="texttext-slate-400">Matches Analisados</span>
+                  <span className="text-[11px] font-black text-slate-200 uppercase tracking-widest italic">
+                    {filteredData.length} <span className="text-slate-400">Matches Analisados</span>
                   </span>
                 </div>
-                <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-card rounded-md border borderborder-slate-800">
-                   <p className="text-[9px] font-black texttext-slate-400 uppercase tracking-widest">Página {currentPage} de {totalPages || 1}</p>
+                <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-card rounded-md border border-slate-800">
+                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Página {currentPage} de {totalPages || 1}</p>
                 </div>
               </div>
 
@@ -1216,14 +1328,14 @@ export default function SimilaridadePage() {
                 <button
                   disabled={currentPage === 1}
                   onClick={() => setCurrentPage(1)}
-                  className="w-10 h-10 flex items-center justify-center bgbg-slate-900/60 border-2 borderborder-slate-800 rounded-md texttext-slate-400 disabled:opacity-30 hover:border-sky-500 hover:text-sky-400 transition-all shadow-none"
+                  className="w-10 h-10 flex items-center justify-center bg-slate-900/60 border-2 border-slate-800 rounded-md text-slate-400 disabled:opacity-30 hover:border-sky-500 hover:text-sky-400 transition-all shadow-none"
                 >
                   <ChevronFirst size={18} />
                 </button>
                 <button
                   disabled={currentPage === 1}
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  className="w-10 h-10 flex items-center justify-center bgbg-slate-900/60 border-2 borderborder-slate-800 rounded-md texttext-slate-400 disabled:opacity-30 hover:border-sky-500 hover:text-sky-400 transition-all shadow-none"
+                  className="w-10 h-10 flex items-center justify-center bg-slate-900/60 border-2 border-slate-800 rounded-md text-slate-400 disabled:opacity-30 hover:border-sky-500 hover:text-sky-400 transition-all shadow-none"
                 >
                   <ChevronLeft size={18} />
                 </button>
@@ -1240,7 +1352,7 @@ export default function SimilaridadePage() {
                       <button
                         key={i}
                         onClick={() => setCurrentPage(pageNum)}
-                        className={`w-10 h-10 rounded-md text-xs font-black transition-all ${currentPage === pageNum ? 'bg-sky-600 texttext-slate-200 shadow-none shadow-blue-200' : 'bg-card texttext-slate-400 bg-slate-900/60'}`}
+                        className={`w-10 h-10 rounded-md text-xs font-black transition-all ${currentPage === pageNum ? 'bg-sky-600 text-slate-200 shadow-none shadow-blue-200' : 'bg-card text-slate-400 bg-slate-900/60'}`}
                       >
                         {pageNum}
                       </button>
@@ -1251,14 +1363,14 @@ export default function SimilaridadePage() {
                 <button
                   disabled={currentPage === totalPages || totalPages === 0}
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  className="w-10 h-10 flex items-center justify-center bgbg-slate-900/60 border-2 borderborder-slate-800 rounded-md texttext-slate-400 disabled:opacity-30 hover:border-sky-500 hover:text-sky-400 transition-all shadow-none"
+                  className="w-10 h-10 flex items-center justify-center bg-slate-900/60 border-2 border-slate-800 rounded-md text-slate-400 disabled:opacity-30 hover:border-sky-500 hover:text-sky-400 transition-all shadow-none"
                 >
                   <ChevronRight size={18} />
                 </button>
                 <button
                   disabled={currentPage === totalPages || totalPages === 0}
                   onClick={() => setCurrentPage(totalPages)}
-                  className="w-10 h-10 flex items-center justify-center bgbg-slate-900/60 border-2 borderborder-slate-800 rounded-md texttext-slate-400 disabled:opacity-30 hover:border-sky-500 hover:text-sky-400 transition-all shadow-none"
+                  className="w-10 h-10 flex items-center justify-center bg-slate-900/60 border-2 border-slate-800 rounded-md text-slate-400 disabled:opacity-30 hover:border-sky-500 hover:text-sky-400 transition-all shadow-none"
                 >
                   <ChevronLast size={18} />
                 </button>
@@ -1273,22 +1385,22 @@ export default function SimilaridadePage() {
         <div className="fixed inset-0 z-[100] flex justify-end">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setComparingDoc(null)}></div>
           
-          <div className="relative w-full max-w-6xl bgbg-slate-900/60 h-full shadow-none flex flex-col animate-in slide-in-from-right duration-500 ease-out">
-            <header className="px-8 py-6 border-b borderborder-slate-800 flex items-center justify-between bg-slate-900/60 backdrop-blur-md">
+          <div className="relative w-full max-w-6xl bg-slate-900/60 h-full shadow-none flex flex-col animate-in slide-in-from-right duration-500 ease-out">
+            <header className="px-8 py-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/60 backdrop-blur-md">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-card texttext-slate-200 rounded-md shadow-none shadow-sm">
+                <div className="p-3 bg-card text-slate-200 rounded-md shadow-none shadow-sm">
                   <ScanEye size={24} />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-black texttext-slate-200 tracking-tighter uppercase italic flex items-center gap-3">
+                  <h2 className="text-2xl font-black text-slate-200 tracking-tighter uppercase italic flex items-center gap-3">
                     Auditoria NLP
                   </h2>
-                  <p className="text-[10px] texttext-slate-400 font-bold uppercase tracking-widest mt-1">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
                     Doc: {getVal(comparingDoc, 'DOCUMENTO')} | <b className="text-[var(--primary)]">{(Number(getVal(comparingDoc, 'SCORE')) || 0).toFixed(1)}% SIMILAR</b>
                   </p>
                 </div>
               </div>
-              <button onClick={() => setComparingDoc(null)} className="p-2 -card rounded-md transition-colors texttext-slate-400">
+              <button onClick={() => setComparingDoc(null)} className="p-2 -card rounded-md transition-colors text-slate-400">
                 <X size={24} />
               </button>
             </header>
@@ -1296,18 +1408,18 @@ export default function SimilaridadePage() {
             <div className="flex-1 overflow-hidden flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-slate-100">
               {/* Texto Anterior */}
               <div className="flex-1 flex flex-col h-1/2 md:h-full bg-slate-900/60">
-                <div className="px-6 py-4 border-b borderborder-slate-800 flex items-center justify-between">
+                <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-black texttext-slate-400 uppercase tracking-widest">Documento Anterior (Original)</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Documento Anterior (Original)</span>
                     {comparisonTexts?.dataAnterior && (
-                      <span className="text-[9px] font-bold texttext-slate-400 mt-0.5 opacity-80 flex items-center gap-2">
+                      <span className="text-[9px] font-bold text-slate-400 mt-0.5 opacity-80 flex items-center gap-2">
                         <span>{comparisonTexts.dataAnterior} {comparisonTexts.cdAnterior && `| DOC: ${comparisonTexts.cdAnterior}`}</span>
                         {comparisonTexts.regAnterior && (
                           <a
                             href={`${reportUrl}${comparisonTexts.regAnterior}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="-card -accent texttext-slate-400 px-2 py-0.5 rounded flex items-center gap-1 transition-colors"
+                            className="-card -accent text-slate-400 px-2 py-0.5 rounded flex items-center gap-1 transition-colors"
                           >
                             <Printer size={10} /> PDF
                           </a>
@@ -1315,9 +1427,9 @@ export default function SimilaridadePage() {
                       </span>
                     )}
                   </div>
-                  <div className="px-2 py-1 -card texttext-slate-400 rounded text-[9px] font-black tracking-widest">ORIGINAL</div>
+                  <div className="px-2 py-1 -card text-slate-400 rounded text-[9px] font-black tracking-widest">ORIGINAL</div>
                 </div>
-                <div className="flex-1 p-6 overflow-y-auto font-serif texttext-slate-400 leading-relaxed text-sm">
+                <div className="flex-1 p-6 overflow-y-auto font-serif text-slate-400 leading-relaxed text-sm">
                   {compLoading ? (
                     <div className="h-full flex flex-col items-center justify-center space-y-4">
                       <Loader2 className="animate-spin text-slate-400" size={32} />
@@ -1336,13 +1448,13 @@ export default function SimilaridadePage() {
               </div>
 
               {/* Divisor Visual central para telas grandes */}
-              <div className="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bgbg-slate-900/60 border borderborder-slate-800 p-2.5 rounded-md shadow-none z-10 text-[var(--primary)]">
+              <div className="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-900/60 border border-slate-800 p-2.5 rounded-md shadow-none z-10 text-[var(--primary)]">
                 <Split size={18} strokeWidth={2.5} />
               </div>
 
               {/* Texto Atual */}
-              <div className="flex-1 flex flex-col h-1/2 md:h-full bgbg-slate-900/60">
-                <div className="px-6 py-4 border-b borderborder-slate-800 flex items-center justify-between">
+              <div className="flex-1 flex flex-col h-1/2 md:h-full bg-slate-900/60">
+                <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
                   <div className="flex flex-col">
                     <span className="text-[10px] font-black text-[var(--primary)] uppercase tracking-widest">Documento Atual (Auditoria)</span>
                     {comparisonTexts?.dataAtual && (
@@ -1365,7 +1477,7 @@ export default function SimilaridadePage() {
                     {(Number(getVal(comparingDoc, 'SCORE')) || 0).toFixed(1)}% SIMILAR
                   </div>
                 </div>
-                <div className="flex-1 p-6 overflow-y-auto font-serif texttext-slate-200 leading-relaxed text-sm">
+                <div className="flex-1 p-6 overflow-y-auto font-serif text-slate-200 leading-relaxed text-sm">
                   {compLoading ? (
                     <div className="h-full flex flex-col items-center justify-center space-y-4">
                       <Loader2 className="animate-spin text-[var(--primary)]/50" size={32} />
@@ -1384,20 +1496,20 @@ export default function SimilaridadePage() {
               </div>
             </div>
 
-            <footer className="px-8 py-5 bg-card border-t borderborder-slate-800 flex items-center justify-between">
+            <footer className="px-8 py-5 bg-card border-t border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
-                  <Building2 size={14} className="texttext-slate-400" />
-                  <span className="text-[11px] font-black texttext-slate-200">{getVal(comparingDoc, 'LEITO')} | {getVal(comparingDoc, 'UNIDADE')}</span>
+                  <Building2 size={14} className="text-slate-400" />
+                  <span className="text-[11px] font-black text-slate-200">{getVal(comparingDoc, 'LEITO')} | {getVal(comparingDoc, 'UNIDADE')}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Stethoscope size={14} className="texttext-slate-400" />
-                  <span className="text-[11px] font-black texttext-slate-200">{getVal(comparingDoc, 'PRESTADOR')}</span>
+                  <Stethoscope size={14} className="text-slate-400" />
+                  <span className="text-[11px] font-black text-slate-200">{getVal(comparingDoc, 'PRESTADOR')}</span>
                 </div>
               </div>
               <button
                 onClick={() => window.print()}
-                className="flex items-center gap-2 px-6 py-2.5 bg-card texttext-slate-200 rounded-md text-[10px] font-black uppercase tracking-widest hover:bg-black hover:shadow-none hover:-translate-y-0.5 transition-all"
+                className="flex items-center gap-2 px-6 py-2.5 bg-card text-slate-200 rounded-md text-[10px] font-black uppercase tracking-widest hover:bg-black hover:shadow-none hover:-translate-y-0.5 transition-all"
               >
                 <Printer size={16} /> Imprimir Laudo
               </button>
@@ -1407,6 +1519,62 @@ export default function SimilaridadePage() {
       )}
 
       </div>
+
+      {/* Modal de Acompanhamento do Script Python */}
+      {scriptModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            <header className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-sky-500/10 text-sky-400 rounded-lg">
+                  <Play size={18} className={isRunningScript ? "animate-spin" : ""} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Motor de Auditoria NLP (Python)</h3>
+                  <p className="text-xs text-slate-400">Processamento assíncrono de similaridade e cópia/cola</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setScriptModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </header>
+
+            <div className="p-6 bg-slate-950 font-mono text-xs text-slate-300 overflow-y-auto flex-1 space-y-1 scrollbar-thin scrollbar-thumb-slate-800">
+              {scriptLogs.map((log, i) => (
+                <div key={i} className={log.includes('[ERRO]') || log.includes('[ERROR]') ? 'text-rose-400' : log.includes('[SUCESSO]') || log.includes('[FINISH]') ? 'text-emerald-400 font-bold' : log.includes('[PROGRESS]') ? 'text-sky-400 font-bold' : 'text-slate-400'}>
+                  {log}
+                </div>
+              ))}
+              {isRunningScript && (
+                <div className="flex items-center gap-2 text-sky-400 pt-2 animate-pulse">
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Processando registros clínicos via Oracle...</span>
+                </div>
+              )}
+            </div>
+
+            <footer className="px-6 py-3.5 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between">
+              <span className="text-xs text-slate-500">
+                {isRunningScript ? 'Execução em andamento. Não feche a conexão.' : 'Processo concluído.'}
+              </span>
+              <button
+                onClick={() => {
+                  setScriptModalOpen(false);
+                  if (!isRunningScript) {
+                    handleSearch();
+                  }
+                }}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-md text-xs font-semibold transition-colors"
+              >
+                {isRunningScript ? 'Ocultar' : 'Fechar e Atualizar'}
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
 
       {/* Aba de Mapeamentos */}
       <div className={activeTab === 'mapeamentos' ? 'mt-8 animate-in fade-in duration-300' : 'hidden'}>

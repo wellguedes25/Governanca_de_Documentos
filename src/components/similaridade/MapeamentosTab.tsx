@@ -33,21 +33,21 @@ export function MapeamentosTab({ docMappings, onSave }: MapeamentosTabProps) {
   };
 
   return (
-    <div className="bg-slate-900/60 w-full rounded-xl shadow-none relative flex flex-col overflow-hidden animate-in fade-in duration-300 border border-slate-800">
-      <header className="px-8 py-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/60 relative overflow-hidden">
+    <div className="bg-white w-full rounded-xl shadow-2xs relative flex flex-col overflow-hidden animate-in fade-in duration-300 border border-slate-200/90">
+      <header className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/60 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-sky-500/5 rounded-md blur-3xl"></div>
         <div className="flex items-center gap-4 relative z-10">
-          <div className="p-3 bg-card text-slate-200 rounded-md shadow-none shadow-slate-200">
+          <div className="p-2.5 bg-sky-50 text-sky-600 border border-sky-100 rounded-lg">
             <SettingsIcon size={22} className="text-sky-400 group-hover:rotate-90 transition-transform duration-500" />
           </div>
           <div>
-            <h3 className="text-xl font-black text-slate-200 uppercase tracking-tight">Gerenciar Mapeamentos</h3>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 italic">Configuração de Documentos e Campos Oracle</p>
+            <h3 className="text-base font-bold text-slate-900 tracking-tight">Gerenciar Mapeamentos</h3>
+            <p className="text-xs text-slate-500 font-normal">Configuração de Documentos e Campos Oracle</p>
           </div>
         </div>
       </header>
 
-      <div className="p-8 space-y-8 bg-slate-900/60">
+      <div className="p-6 space-y-6 bg-slate-50/30">
         <div className="space-y-6">
           {localMappings.length === 0 && (
             <div className="border border-slate-800 rounded-lg p-12 text-center flex flex-col items-center justify-center">
@@ -60,7 +60,7 @@ export function MapeamentosTab({ docMappings, onSave }: MapeamentosTabProps) {
           )}
 
           {localMappings.map((mapping, mIdx) => (
-            <div key={mIdx} className="bg-slate-900/60 border border-slate-800 rounded-lg p-6 shadow-[0_4px_20px_rgb(0,0,0,0.03)] relative group/card transition-all hover:shadow-none hover:border-sky-500/30">
+            <div key={mIdx} className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs relative group/card transition-all hover:shadow-none hover:border-sky-500/30">
               <button
                 onClick={() => {
                   if (confirm('Deseja remover este mapeamento de documento?')) {
@@ -74,14 +74,14 @@ export function MapeamentosTab({ docMappings, onSave }: MapeamentosTabProps) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] block ml-1">Código do Documento</label>
+                  <label className="text-[11px] font-semibold text-slate-700 block ml-1">Código do Documento</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                       <Hash size={14} />
                     </div>
                     <input
                       type="text"
-                      className="w-full bg-card border border-slate-800 rounded-md pl-10 pr-4 py-2.5 text-sm font-bold text-slate-200 bg-slate-900/60 focus:border-sky-500 transition-all outline-none"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-md pl-10 pr-4 py-2 text-xs font-semibold text-slate-800 focus:bg-white focus:border-sky-500 transition-all outline-none"
                       value={mapping.id}
                       onChange={(e) => {
                         const newList = [...localMappings];
@@ -92,10 +92,10 @@ export function MapeamentosTab({ docMappings, onSave }: MapeamentosTabProps) {
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] block ml-1">Nome Amigável</label>
+                  <label className="text-[11px] font-semibold text-slate-700 block ml-1">Nome Amigável</label>
                   <input
                     type="text"
-                    className="w-full bg-card border border-slate-800 rounded-md px-4 py-2.5 text-sm font-bold text-slate-200 bg-slate-900/60 focus:border-sky-500 transition-all outline-none"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-md px-4 py-2 text-xs font-semibold text-slate-800 focus:bg-white focus:border-sky-500 transition-all outline-none"
                     value={mapping.name}
                     onChange={(e) => {
                       const newList = [...localMappings];
@@ -108,7 +108,7 @@ export function MapeamentosTab({ docMappings, onSave }: MapeamentosTabProps) {
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between ml-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] flex items-center gap-2">
+                  <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-2">
                     <Layers size={14} className="text-sky-400" /> Campos Vinculados
                   </label>
                   <span className="text-[9px] font-bold text-slate-400 bg-slate-900/60 px-2 py-0.5 rounded-md">{mapping.fields.length} itens</span>
@@ -200,7 +200,7 @@ export function MapeamentosTab({ docMappings, onSave }: MapeamentosTabProps) {
         </div>
       </div>
 
-      <footer className="px-8 py-6 bg-slate-900/60 border-t border-slate-800 flex items-center justify-end gap-4 shadow-[0_-4px_20px_rgb(0,0,0,0.02)]">
+      <footer className="px-6 py-4 bg-white border-t border-slate-200 flex items-center justify-end gap-4 shadow-[0_-4px_20px_rgb(0,0,0,0.02)]">
         <button 
           onClick={handleSave}
           disabled={isSaving}

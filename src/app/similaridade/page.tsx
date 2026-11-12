@@ -58,6 +58,8 @@ import { DiffText } from '@/components/similaridade/DiffText';
 import { EnhancedMultiSelect } from '@/components/similaridade/EnhancedMultiSelect';
 import { MapeamentosTab } from '@/components/similaridade/MapeamentosTab';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -641,131 +643,135 @@ export default function SimilaridadePage() {
   };
 
   return (
-    <div className="min-h-screen bg-card flex flex-col p-4 md:p-8 space-y-10 font-sans text-slate-200 selection:bg-blue-100 selection:text-blue-900">
+    <div className="min-h-screen bg-slate-50/50 flex flex-col p-4 md:p-8 space-y-6 pb-24">
       <Toaster position="top-right" reverseOrder={false} />
       
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-slate-800 pb-8 relative overflow-hidden">
-        {/* Glow de fundo sutil */}
-        <div className="absolute -top-24 -left-24 w-64 h-64 bg-[var(--primary)]/5 blur-[100px] rounded-md pointer-events-none"></div>
-        
-        <div className="flex-1 relative z-10">
+      {/* 1. Header Padronizado */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
+        <div className="flex items-center gap-3">
           <PageHeader 
-            title="Similaridade NLP"
-            subtitle="EMR Redundancy Audit Engine • v2.0"
+            title="Auditoria de Similaridade NLP"
+            subtitle="Detecção de cópia e cola textual, plágio e redundância clínica em prontuários eletrônicos (DBAMV)"
             icon={ScanEye}
-            badge={activeConnName || 'DISCONNECTED'}
           />
+          <Badge 
+            variant="outline" 
+            suppressHydrationWarning
+            className="text-[10px] font-bold px-2 py-0.5 rounded-full border-sky-300 bg-sky-50 text-sky-800"
+          >
+            Motor {docVersion || 'V3'}
+          </Badge>
         </div>
-
-        <div className="flex items-center gap-4 relative z-10">
-          <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-slate-400 group-focus-within:text-[var(--primary)] transition-colors" />
-            </div>
+        
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
             <input
               type="text"
               placeholder="Filtro instantâneo..."
-              className="bg-slate-900/60 border border-slate-800 rounded-md pl-10 pr-4 py-2.5 text-xs text-slate-200 outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--primary)]/10 w-72 transition-all shadow-none font-bold text-slate-400 disabled:opacity-50"
+              className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 w-52 shadow-2xs transition-all disabled:opacity-50"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               disabled={!hasSearched || loading}
             />
           </div>
-          
-          <button 
+
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleExportExcel}
             disabled={!hasSearched || loading || filteredData.length === 0}
-            className="px-3 py-2 bg-slate-900/80 border border-slate-800 text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/10 rounded-md transition-all text-xs font-semibold flex items-center gap-2 shadow-xs disabled:opacity-40 disabled:pointer-events-none"
-            title="Exportar dados auditados para planilha Excel"
+            className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-emerald-700 shadow-2xs cursor-pointer h-9 px-4 disabled:opacity-40"
           >
-            <Download size={14} />
-            <span className="hidden sm:inline">Exportar Excel</span>
-          </button>
+            <Download className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Exportar Excel</span>
+          </Button>
 
-          <button 
+          <Button
+            size="sm"
             onClick={handleRunAuditScript}
             disabled={isRunningScript}
-            className="px-3 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-md transition-all text-xs font-semibold flex items-center gap-2 shadow-xs disabled:opacity-40"
-            title="Executar rotina Python de processamento NLP em background"
+            className="gap-2 text-xs font-semibold rounded-full bg-sky-600 hover:bg-sky-500 text-white shadow-2xs cursor-pointer h-9 px-4 disabled:opacity-40"
           >
-            <Play size={13} className={isRunningScript ? 'animate-spin' : ''} />
-            <span className="hidden sm:inline">{isRunningScript ? 'Auditando...' : 'Rodar Auditoria NLP'}</span>
-          </button>
+            <Play className={`w-3.5 h-3.5 ${isRunningScript ? 'animate-spin' : ''}`} />
+            <span>{isRunningScript ? 'Auditando...' : 'Rodar Auditoria NLP'}</span>
+          </Button>
 
-          <button 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => window.print()}
-            className="p-2.5 bg-slate-900/60 border border-slate-800 text-slate-400 text-slate-200 hover:border-slate-400 rounded-md transition-all shadow-none group"
+            className="p-0 w-9 h-9 flex items-center justify-center rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-2xs cursor-pointer"
             title="Imprimir Relatório"
           >
-            <Printer size={18} className="group-hover:scale-110 transition-transform" />
-          </button>
+            <Printer className="w-3.5 h-3.5" />
+          </Button>
         </div>
-      </header>
+      </div>
 
-      {/* Tabs */}
-      <div className="flex gap-0 border-b border-slate-800">
+      {/* Navigation Tabs Pill Style */}
+      <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-lg border border-slate-200/80 self-start">
         <button
           onClick={() => setActiveTab('consulta')}
-          className={`flex items-center gap-2 px-6 py-3 text-[9px] font-black uppercase tracking-[0.2em] transition-all font-mono border-b-2 -mb-px ${
+          className={`px-4 py-2 rounded-md text-xs font-semibold transition-all flex items-center gap-2 ${
             activeTab === 'consulta'
-              ? 'border-[var(--primary)] text-[var(--primary)]'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-[var(--primary)]'
+              ? 'bg-white text-sky-700 shadow-xs font-bold'
+              : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           <SearchCode size={14} />
-          Consulta
+          <span>Painel de Auditoria</span>
         </button>
         <button
           onClick={() => setActiveTab('mapeamentos')}
-          className={`flex items-center gap-2 px-6 py-3 text-[9px] font-black uppercase tracking-[0.2em] transition-all font-mono border-b-2 -mb-px ${
+          className={`px-4 py-2 rounded-md text-xs font-semibold transition-all flex items-center gap-2 ${
             activeTab === 'mapeamentos'
-              ? 'border-[var(--primary)] text-[var(--primary)]'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-[var(--primary)]'
+              ? 'bg-white text-sky-700 shadow-xs font-bold'
+              : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           <BookOpen size={14} />
-          Mapeamentos
+          <span>Mapeamentos Oracle</span>
         </button>
       </div>
 
       <div className={activeTab === 'consulta' ? 'space-y-10 animate-in fade-in duration-300' : 'hidden'}>
-      {/* Painel de Filtros Ultra-Compacto (Single Line) */}
-      <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800 rounded-3xl p-6 shadow-none relative group overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[var(--primary)] to-transparent opacity-30"></div>
-        <div className="flex flex-wrap items-end gap-6">
+      {/* Painel de Filtros Clinical Precision (Light Box) */}
+      <div className="bg-white border border-slate-200/90 rounded-xl p-5 shadow-xs space-y-4">
+        <div className="flex flex-wrap items-end gap-3.5">
           {/* Empresa (Hospital) */}
           {hospitals.length > 0 && (
-            <div className="w-[200px] space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                <Building2 size={12} className="text-[var(--primary)]" /> Empresa
+            <div className="w-44 space-y-1.5">
+              <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
+                <Building2 size={13} className="text-slate-500" /> Empresa / Unidade
               </label>
               <select
-                className="w-full bg-slate-900/60 border-2 border-slate-800 rounded-md px-4 py-2.5 text-xs font-black text-slate-200 outline-none focus:border-[var(--primary)] transition-all shadow-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-sky-500 focus:bg-white transition-all shadow-2xs"
                 value={filters.empresa}
                 onChange={(e) => setFilters(f => ({ ...f, empresa: e.target.value }))}
               >
-                <option value="">Todas</option>
+                <option value="">Todas as Empresas</option>
                 {hospitals.map(h => (
-                  <option key={h.id} value={String(h.id)}>{h.sigla}</option>
+                  <option key={h.id} value={String(h.id)}>{h.sigla} - {h.nome}</option>
                 ))}
               </select>
             </div>
           )}
 
           {/* Documento (Selector) */}
-          <div className="flex-1 min-w-[300px] space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-              <ClipboardList size={12} className="text-[var(--primary)]" /> Documento Alvo
+          <div className="flex-1 min-w-[260px] space-y-1.5">
+            <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
+              <ClipboardList size={13} className="text-sky-600" /> Documento Alvo *
             </label>
             <select
-              className={`w-full bg-slate-900/60 border-2 rounded-md px-4 py-2.5 text-xs font-black text-slate-200 outline-none transition-all shadow-none hover:shadow-none ${!filters.documento && hasSearched ? 'border-rose-400 animate-shake' : 'border-slate-800 focus:border-[var(--primary)]'}`}
+              className={`w-full bg-slate-50 border rounded-md px-3 py-2 text-xs font-medium text-slate-800 outline-none transition-all shadow-2xs focus:bg-white ${!filters.documento && hasSearched ? 'border-rose-400 bg-white border-slate-200' : 'border-slate-200 focus:border-sky-500'}`}
               value={filters.documento}
               onChange={(e) => {
                 const newDoc = e.target.value;
                 setFilters(f => ({ ...f, documento: newDoc, campo: '' }));
               }}
             >
-              <option value="">Selecione o Documento...</option>
+              <option value="">Selecione o Documento Clínico...</option>
               {docMappings.map(m => (
                 <option key={m.id} value={m.id}>{m.id} - {m.name}</option>
               ))}
@@ -773,51 +779,53 @@ export default function SimilaridadePage() {
           </div>
 
           {/* Identificador (Selector Dependente) */}
-          <div className="flex-1 min-w-[250px] space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-              <Split size={12} className="text-[var(--primary)]" /> Identificador Campo
+          <div className="flex-1 min-w-[220px] space-y-1.5">
+            <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
+              <Split size={13} className="text-sky-600" /> Campo / Identificador *
             </label>
             <select
-              className={`w-full bg-slate-900/60 border-2 rounded-md px-4 py-2.5 text-xs font-black text-slate-200 outline-none transition-all shadow-none hover:shadow-none ${!filters.campo && hasSearched ? 'border-rose-400 animate-shake' : 'border-slate-800 focus:border-[var(--primary)]'}`}
+              className={`w-full bg-slate-50 border rounded-md px-3 py-2 text-xs font-medium text-slate-800 outline-none transition-all shadow-2xs focus:bg-white ${!filters.campo && hasSearched ? 'border-rose-400 bg-white border-slate-200' : 'border-slate-200 focus:border-sky-500'}`}
               value={filters.campo}
               onChange={(e) => setFilters(f => ({ ...f, campo: e.target.value }))}
               disabled={!filters.documento}
             >
-              <option value="">{filters.documento ? 'Selecione o Identificador...' : 'Aguardando Documento...'}</option>
+              <option value="">{filters.documento ? 'Selecione o Campo Clínico...' : 'Aguardando Documento...'}</option>
               {fieldOptions.map(f => (
-                <option key={f.id} value={f.id}>{f.name}</option>
+                <option key={f.id} value={f.id}>{f.name} ({f.id})</option>
               ))}
             </select>
           </div>
 
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setActiveTab('mapeamentos')}
-            className="h-[46px] w-[46px] min-w-[46px] bg-slate-900/60 border-2 border-slate-800 text-slate-400 hover:text-[var(--primary)] hover:border-[var(--primary)] rounded-md flex items-center justify-center transition-all shadow-none hover:shadow-none hover:-translate-y-0.5 group"
-            title="Gerenciar Mapeamentos"
+            className="h-9 w-9 p-0 rounded-md bg-white border-slate-200 text-slate-600 hover:text-sky-600 hover:border-sky-300"
+            title="Gerenciar Mapeamentos de Documentos"
           >
-            <SettingsIcon size={18} className="group-hover:rotate-90 transition-transform duration-500" />
-          </button>
+            <SettingsIcon size={16} />
+          </Button>
 
-          {/* Datas */}
-          <div className="flex gap-4">
-            <div className="w-[140px] space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                <Calendar size={12} className="text-[var(--primary)]" /> Período De
+          {/* Período */}
+          <div className="flex items-center gap-2">
+            <div className="w-32 space-y-1.5">
+              <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
+                <Calendar size={12} className="text-slate-500" /> De
               </label>
               <input
                 type="date"
-                className="w-full bg-slate-900/60 border-2 border-slate-800 rounded-md px-3 py-2.5 text-xs font-black text-slate-200 outline-none focus:border-[var(--primary)] transition-all shadow-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-sky-500 focus:bg-white shadow-2xs"
                 value={filters.dataInicio}
                 onChange={(e) => setFilters(f => ({ ...f, dataInicio: e.target.value }))}
               />
             </div>
-            <div className="w-[140px] space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                <ArrowRight size={12} className="text-[var(--primary)]" /> Até
+            <div className="w-32 space-y-1.5">
+              <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
+                <ArrowRight size={12} className="text-slate-500" /> Até
               </label>
               <input
                 type="date"
-                className="w-full bg-slate-900/60 border-2 border-slate-800 rounded-md px-3 py-2.5 text-xs font-black text-slate-200 outline-none focus:border-[var(--primary)] transition-all shadow-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-sky-500 focus:bg-white shadow-2xs"
                 value={filters.dataFim}
                 min={filters.dataInicio}
                 onChange={(e) => setFilters(f => ({ ...f, dataFim: e.target.value }))}
@@ -825,45 +833,44 @@ export default function SimilaridadePage() {
             </div>
           </div>
 
-          {/* Score */}
-          <div className="w-[120px] space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-              <ChevronUp size={12} className="text-[var(--primary)]" /> Sensibilidade
+          {/* Sensibilidade */}
+          <div className="w-36 space-y-1.5">
+            <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
+              <ChevronUp size={12} className="text-slate-500" /> Similaridade Mín.
             </label>
             <select
-              className="w-full bg-slate-900/60 border-2 border-slate-800 rounded-md px-3 py-2.5 text-xs font-black text-slate-200 outline-none focus:border-[var(--primary)] transition-all shadow-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-sky-500 focus:bg-white shadow-2xs"
               value={filters.minScore}
               onChange={(e) => setFilters(f => ({ ...f, minScore: Number(e.target.value) }))}
             >
-              <option value="0">Padrão</option>
-              <option value="50">+50%</option>
-              <option value="80">+80% (Crítico)</option>
-              <option value="95">+95% (Cópia)</option>
+              <option value="0">Todos (0% a 100%)</option>
+              <option value="50">A partir de 50%</option>
+              <option value="80">≥ 80% (Crítico / Plágio)</option>
+              <option value="95">≥ 95% (Cópia Integral)</option>
             </select>
           </div>
 
           {/* Botão de Busca */}
-          <button
+          <Button
             onClick={handleSearch}
             disabled={loading}
-            className="h-[46px] px-8 bg-card hover:bg-black text-slate-200 rounded-md flex items-center justify-center gap-3 transition-all shadow-none shadow-sm hover:-translate-y-1 active:translate-y-0 disabled:opacity-50 relative overflow-hidden group/search"
+            className="h-9 px-5 bg-sky-600 hover:bg-sky-500 text-white rounded-md text-xs font-semibold gap-2 shadow-xs cursor-pointer disabled:opacity-50"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-[var(--primary)]/0 via-white/10 to-[var(--primary)]/0 -translate-x-full group-hover/search:animate-shimmer"></div>
-            {loading ? <Loader2 size={18} className="animate-spin" /> : <SearchCode size={20} />}
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Consultar</span>
-          </button>
+            {loading ? <Loader2 size={15} className="animate-spin" /> : <SearchCode size={15} />}
+            <span>Consultar</span>
+          </Button>
         </div>
       </div>
 
       {/* Tabela de Resultados ou Estado Inicial */}
       {!hasSearched ? (
-        <div className="flex-1 flex flex-col items-center justify-center py-24 border-2 border-dashed border-slate-800 rounded-md bg-slate-900/60">
-          <div className="p-8 bg-slate-900/60 rounded-md shadow-none shadow-blue-100 mb-8 border border-slate-800">
-            <ScanEye size={64} className="text-sky-400 animate-pulse" />
+        <div className="flex-1 flex flex-col items-center justify-center py-20 border border-dashed border-slate-300 rounded-xl bg-white shadow-2xs">
+          <div className="w-16 h-16 rounded-2xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center mb-4">
+            <ScanEye size={32} />
           </div>
-          <h3 className="text-2xl font-black text-slate-200 uppercase tracking-tighter mb-3">Pronto para Auditar</h3>
-          <p className="text-slate-400 font-medium text-center max-w-md leading-relaxed">
-            Selecione o <span className="text-sky-400 font-bold italic underline underline-offset-4 decoration-blue-200">documento</span> e o <span className="text-sky-400 font-bold italic underline underline-offset-4 decoration-blue-200">campo</span> acima para iniciar o cruzamento de dados na base Oracle.
+          <h3 className="text-base font-bold text-slate-900 tracking-tight mb-1.5">Pronto para Iniciar a Auditoria</h3>
+          <p className="text-xs text-slate-500 font-normal text-center max-w-md leading-relaxed">
+            Selecione o <strong className="text-slate-700">Documento Alvo</strong> e o <strong className="text-slate-700">Identificador do Campo</strong> no painel de filtros acima para extrair e cruzar os registros clínicos auditados.
           </p>
         </div>
       ) : loading ? (
@@ -871,13 +878,13 @@ export default function SimilaridadePage() {
           {/* Skeleton KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {[1,2,3,4].map(i => (
-              <div key={i} className="h-32 bg-slate-900/60 border border-slate-800 rounded-xl relative overflow-hidden">
+              <div key={i} className="h-32 bg-white border border-slate-200 rounded-xl relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-50/50 to-transparent -translate-x-full animate-shimmer"></div>
               </div>
             ))}
           </div>
           {/* Skeleton Chart */}
-          <div className="h-[380px] bg-slate-900/60 border border-slate-800 rounded-xl relative overflow-hidden">
+          <div className="h-[380px] bg-white border border-slate-200 rounded-xl relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-50/50 to-transparent -translate-x-full animate-shimmer"></div>
           </div>
           {/* Skeleton Table */}
@@ -890,11 +897,11 @@ export default function SimilaridadePage() {
           </div>
         </div>
       ) : filteredData.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center py-24 border-2 border-dashed border-red-500/50/20 rounded-md bg-rose-50/50">
+        <div className="flex-1 flex flex-col items-center justify-center py-24 border-2 border-dashed border-red-500/50/20 rounded-md bg-white border-slate-200">
           <div className="p-8 bg-slate-900/60 rounded-md shadow-none shadow-rose-100 mb-8 border border-rose-100">
             <Search size={64} className="text-rose-500" />
           </div>
-          <h3 className="text-2xl font-black text-rose-800 uppercase tracking-tighter mb-3">Nenhum Registro</h3>
+          <h3 className="text-base font-bold text-slate-900 mb-1.5">Nenhum Registro</h3>
           <p className="text-rose-500 font-medium text-center max-w-md">
             Não encontramos dados para os filtros selecionados. Tente ajustar o <span className="text-red-500 font-bold">período</span> ou a <span className="text-red-500 font-bold">sensibilidade</span>.
           </p>
@@ -912,16 +919,16 @@ export default function SimilaridadePage() {
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* KPI 1: Total */}
-            <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-xl p-7 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-1 transition-all group relative overflow-hidden flex flex-col justify-between min-h-[160px]">
+            <div className="bg-white border border-slate-200/90 rounded-xl p-5 shadow-2xs shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-1 transition-all group relative overflow-hidden flex flex-col justify-between min-h-[160px]">
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-400/10 rounded-md blur-[40px] group-hover:bg-sky-500/20 transition-colors"></div>
               <div className="flex justify-between items-start z-10">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Dataset Total</p>
+                <p className="text-[11px] font-semibold text-slate-600">Dataset Total</p>
                 <div className="p-2.5 bg-blue-50/80 text-sky-400 rounded-[14px] group-hover:bg-sky-600 text-slate-200 transition-colors duration-500 shadow-none">
                   <ClipboardList size={20} strokeWidth={2.5} />
                 </div>
               </div>
               <div className="z-10 mt-4">
-                <h3 className="text-4xl font-black text-slate-200 tracking-tighter">{similarityData.length}</h3>
+                <h3 className="text-2xl font-bold text-slate-900 tracking-tight">{similarityData.length}</h3>
                 <p className="text-[10px] font-bold text-slate-400 mt-1 flex items-center gap-1.5">
                   <Database size={10} /> Analisados na base Oracle
                 </p>
@@ -929,16 +936,16 @@ export default function SimilaridadePage() {
             </div>
 
             {/* KPI 2: Média */}
-            <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-xl p-7 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-1 transition-all group relative overflow-hidden flex flex-col justify-between min-h-[160px]">
+            <div className="bg-white border border-slate-200/90 rounded-xl p-5 shadow-2xs shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-1 transition-all group relative overflow-hidden flex flex-col justify-between min-h-[160px]">
               <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/10 rounded-md blur-[40px] group-hover:bg-amber-500/20 transition-colors"></div>
               <div className="flex justify-between items-start z-10">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Média de Risco</p>
+                <p className="text-[11px] font-semibold text-slate-600">Média de Risco</p>
                 <div className="p-2.5 bg-amber-50/80 text-amber-600 rounded-[14px] group-hover:bg-amber-500 text-slate-200 transition-colors duration-500 shadow-none">
                   <AlertTriangle size={20} strokeWidth={2.5} />
                 </div>
               </div>
               <div className="z-10 mt-4">
-                <h3 className="text-4xl font-black text-slate-200 tracking-tighter">
+                <h3 className="text-2xl font-bold text-slate-900 tracking-tight">
                   {(similarityData.reduce((acc, r) => acc + (Number(getVal(r, 'SCORE')) || 0), 0) / (similarityData.length || 1)).toFixed(1)}<span className="text-2xl text-slate-400 ml-1">%</span>
                 </h3>
                 <p className="text-[10px] font-bold text-slate-400 mt-1 flex items-center gap-1.5">
@@ -948,10 +955,10 @@ export default function SimilaridadePage() {
             </div>
 
             {/* KPI 3: Críticos */}
-            <div className={`bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-xl p-7 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:-translate-y-1 transition-all group relative overflow-hidden flex flex-col justify-between min-h-[160px] ${similarityData.filter(r => Number(getVal(r, 'SCORE')) >= 80).length > 0 ? "shadow-rose-100/50 border-rose-100" : "hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)]"}`}>
+            <div className={`bg-white border border-slate-200/90 rounded-xl p-5 shadow-2xs shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:-translate-y-1 transition-all group relative overflow-hidden flex flex-col justify-between min-h-[160px] ${similarityData.filter(r => Number(getVal(r, 'SCORE')) >= 80).length > 0 ? "shadow-rose-100/50 border-rose-100" : "hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)]"}`}>
               <div className="absolute top-0 right-0 w-32 h-32 bg-rose-400/10 rounded-md blur-[40px] group-hover:bg-rose-500/20 transition-colors"></div>
               <div className="flex justify-between items-start z-10">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Docs Críticos</p>
+                <p className="text-[11px] font-semibold text-slate-600">Docs Críticos</p>
                 <div className={`p-2.5 rounded-[14px] shadow-none transition-colors duration-500 ${similarityData.filter(r => Number(getVal(r, 'SCORE')) >= 80).length > 0 ? 'bg-rose-500 text-slate-200 animate-pulse' : 'bg-red-500/10 text-rose-500 group-hover:bg-rose-500 text-slate-200'}`}>
                   <ScanEye size={20} strokeWidth={2.5} />
                 </div>
@@ -967,16 +974,16 @@ export default function SimilaridadePage() {
             </div>
 
             {/* KPI 4: Filtrados */}
-            <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-xl p-7 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-1 transition-all group relative overflow-hidden flex flex-col justify-between min-h-[160px]">
+            <div className="bg-white border border-slate-200/90 rounded-xl p-5 shadow-2xs shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-1 transition-all group relative overflow-hidden flex flex-col justify-between min-h-[160px]">
               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-400/10 rounded-md blur-[40px] group-hover:bg-emerald-500/20 transition-colors"></div>
               <div className="flex justify-between items-start z-10">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Seleção Ativa</p>
+                <p className="text-[11px] font-semibold text-slate-600">Seleção Ativa</p>
                 <div className="p-2.5 bg-emerald-50/80 text-emerald-600 rounded-[14px] group-hover:bg-emerald-500 text-slate-200 transition-colors duration-500 shadow-none">
                   <ShieldCheck size={20} strokeWidth={2.5} />
                 </div>
               </div>
               <div className="z-10 mt-4">
-                <h3 className="text-4xl font-black text-slate-200 tracking-tighter">{filteredData.length}</h3>
+                <h3 className="text-2xl font-bold text-slate-900 tracking-tight">{filteredData.length}</h3>
                 <p className="text-[10px] font-bold text-slate-400 mt-1 flex items-center gap-1.5">
                   <Filter size={10} /> Volume após filtros em cascata
                 </p>
@@ -1179,23 +1186,23 @@ export default function SimilaridadePage() {
           </div>
 
           {/* Tabela de Resultados Final */}
-          <div className="bg-slate-900/60 rounded-xl border border-slate-800 flex flex-col overflow-hidden shadow-none relative">
+          <div className="bg-white rounded-xl border border-slate-200/90 flex flex-col shadow-2xs overflow-hidden shadow-none relative">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-sky-500 via-cyan-500 to-emerald-500"></div>
             <div className="flex-1 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200">
               <table className="w-full text-left border-collapse table-auto min-w-max">
                 <thead>
-                  <tr className="bg-slate-900/60 border-b border-slate-800">
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Atendimento</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Registro Clínico</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Empresa</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Data e Hora</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Prestador</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Localização</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Similaridade</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Auditoria</th>
+                  <tr className="bg-slate-50/80 border-b border-slate-200">
+                    <th className="px-8 py-5 text-[11px] font-semibold text-slate-600 text-center">Atendimento</th>
+                    <th className="px-8 py-5 text-[11px] font-semibold text-slate-600">Registro Clínico</th>
+                    <th className="px-8 py-5 text-[11px] font-semibold text-slate-600">Empresa</th>
+                    <th className="px-8 py-5 text-[11px] font-semibold text-slate-600">Data e Hora</th>
+                    <th className="px-8 py-5 text-[11px] font-semibold text-slate-600 text-center">Prestador</th>
+                    <th className="px-8 py-5 text-[11px] font-semibold text-slate-600">Localização</th>
+                    <th className="px-8 py-5 text-[11px] font-semibold text-slate-600 text-center">Similaridade</th>
+                    <th className="px-8 py-5 text-[11px] font-semibold text-slate-600 text-center">Auditoria</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
                       <td colSpan={8} className="py-32 text-center">
@@ -1216,14 +1223,14 @@ export default function SimilaridadePage() {
                       const score = Number(getVal(row, 'SCORE')) || 0;
                       return (
                         <tr key={idx} className="bg-slate-900/60 transition-all group/tr">
-                          <td className="px-8 py-4 text-[12px] font-black text-center text-slate-400 font-mono group-hover/text-slate-200 transition-colors">{getVal(row, 'ATENDIMENTO')}</td>
-                          <td className="px-8 py-4">
+                          <td className="px-4 py-3 text-[12px] font-black text-center text-slate-400 font-mono group-hover/text-slate-200 transition-colors">{getVal(row, 'ATENDIMENTO')}</td>
+                          <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 bg-slate-900/60 rounded-md flex items-center justify-center text-slate-400 group-hover/tr:bg-sky-500/10 group-hover/tr:text-sky-400 transition-all">
                                 <FileText size={18} />
                               </div>
                               <div className="flex flex-col">
-                                <span className="text-[12px] font-black text-slate-200 tracking-tight leading-none mb-1">{getVal(row, 'NOME_DOCUMENTO')}</span>
+                                <span className="text-[12px] font-black text-slate-900 font-semibold text-xs leading-none mb-1">{getVal(row, 'NOME_DOCUMENTO')}</span>
                                 <div className="flex items-center gap-2">
                                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter bg-slate-900/60 px-1.5 py-0.5 rounded">ID: {getVal(row, 'DOCUMENTO')}</span>
                                   <span className="text-[9px] font-bold text-sky-400 uppercase tracking-tighter bg-sky-500/10 px-1.5 py-0.5 rounded italic">{getVal(row, 'IDENTIFICADOR')}</span>
@@ -1231,13 +1238,13 @@ export default function SimilaridadePage() {
                               </div>
                             </div>
                           </td>
-                          <td className="px-8 py-4">
+                          <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
                               <Building2 size={12} className="text-slate-400 opacity-40" />
                               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{getVal(row, 'NOME_EMPRESA') || getVal(row, 'CD_EMPRESA') || '—'}</span>
                             </div>
                           </td>
-                          <td className="px-8 py-4">
+                          <td className="px-4 py-3">
                             <div className="flex items-center gap-2 text-slate-400">
                               <Calendar size={12} className="opacity-40" />
                               <span className="text-[11px] font-bold">
@@ -1250,13 +1257,13 @@ export default function SimilaridadePage() {
                               </span>
                             </div>
                           </td>
-                          <td className="px-8 py-4 text-center">
+                          <td className="px-4 py-3 text-center">
                              <div className="inline-flex items-center justify-center w-10 h-10 rounded-md bg-slate-900/60 border-2 border-white shadow-none overflow-hidden group-hover/tr:border-blue-200 transition-all" title={getVal(row, 'PRESTADOR')}>
                                <User size={18} className="text-slate-400 group-hover/tr:text-sky-400" />
                              </div>
                              <p className="text-[9px] font-black text-slate-400 mt-1 uppercase italic tracking-tighter group-hover/text-slate-400">{getVal(row, 'PRESTADOR')}</p>
                           </td>
-                          <td className="px-8 py-4">
+                          <td className="px-4 py-3">
                             <div className="flex flex-col gap-1">
                               <div className="flex items-center gap-1.5">
                                 <div className="w-1.5 h-1.5 rounded-md bg-slate-400"></div>
@@ -1265,7 +1272,7 @@ export default function SimilaridadePage() {
                               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.1em]">{getVal(row, 'UNIDADE') || 'SETOR EXTERNO'}</span>
                             </div>
                           </td>
-                          <td className="px-8 py-4 text-center">
+                          <td className="px-4 py-3 text-center">
                             <div className="flex flex-col items-center gap-1">
                               <div className="w-full max-w-[80px] h-1.5 bg-slate-900/60 rounded-md overflow-hidden">
                                 <div className={`h-full transition-all duration-1000 ${score >= 80 ? 'bg-rose-500' : score >= 50 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${score}%` }}></div>
@@ -1275,7 +1282,7 @@ export default function SimilaridadePage() {
                               </span>
                             </div>
                           </td>
-                          <td className="px-8 py-4 text-center">
+                          <td className="px-4 py-3 text-center">
                             <button
                               onClick={() => {
                                 setComparingDoc(row);

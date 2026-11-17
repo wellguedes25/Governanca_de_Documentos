@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -24,6 +24,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { useUI } from '@/context/UIContext';
 import { getLayoutedElements } from '@/lib/dagre-layout';
+import type { ExecutiveEdgeData, LineageDocNodeData } from '@/app/api/oracle/lineage/route';
 import { Loader2, GitFork, Info } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -41,15 +42,75 @@ function LineageFlowContent() {
   const [focusDocId, setFocusDocId] = useState<number | null>(null);
   const [availableDocs, setAvailableDocs] = useState<{ id: number; title: string; totalLinks: number }[]>([]);
   
-  // Dados brutos da API para cruzamento nos drawers
-  const [rawApiNodes, setRawApiNodes] = useState<any[]>([]);
-  const [rawApiEdges, setRawApiEdges] = useState<any[]>([]);
+  // Dados brutos da API para cruzamento nos drawers (ref evita re-criação cíclica de callbacks)
+  const [rawApiNodes, setRawApiNodes] = useState<LineageDocNodeData[]>([]);
+  const rawDataRef = useRef<{ nodes: LineageDocNodeData[]; edges: ExecutiveEdgeData[] }>({ nodes: [], edges: [] });
   const [summary, setSummary] = useState({ totalDocs: 0, totalEdges: 0, totalFieldsLinked: 0 });
 
   // Estados do Drawer Lateral
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEdgeDetails, setSelectedEdgeDetails] = useState<LineageEdgeDetails | null>(null);
   const [selectedNodeDetails, setSelectedNodeDetails] = useState<LineageNodeDetails | null>(null);
+
+  // Ao clicar no botão Inspecionar ou em um nó
+  const handleInspectNode = useCallback((
+    docId: number,
+    currentNodes: LineageDocNodeData[] = rawDataRef.current.nodes,
+    currentEdges: ExecutiveEdgeData[] = rawDataRef.current.edges
+  ) => {
+    const nodeObj = currentNodes.find((n) => n.docId === docId);
+    if (!nodeObj) return;
+
+    const upstream: LineageEdgeDetails[] = currentEdges
+      .filter((e) => Number(e.targetDocId) === docId)
+      .map((e) => {
+        const sDoc = currentNodes.find((n) => String(n.docId) === String(e.sourceDocId));
+        return {
+          id: e.id,
+          sourceDocId: String(e.sourceDocId),
+          sourceDocTitle: sDoc?.title,
+          targetDocId: String(e.targetDocId),
+          targetDocTitle: nodeObj.title,
+          totalFields: e.totalFields,
+          fieldsMap: e.fieldsMap || [],
+          isHybridV2: e.isHybridV2,
+          isBroken: e.isBroken
+        };
+      });
+
+    const downstream: LineageEdgeDetails[] = currentEdges
+      .filter((e) => Number(e.sourceDocId) === docId)
+      .map((e) => {
+        const tDoc = currentNodes.find((n) => String(n.docId) === String(e.targetDocId));
+        return {
+          id: e.id,
+          sourceDocId: String(e.sourceDocId),
+          sourceDocTitle: nodeObj.title,
+          targetDocId: String(e.targetDocId),
+          targetDocTitle: tDoc?.title,
+          totalFields: e.totalFields,
+          fieldsMap: e.fieldsMap || [],
+          isHybridV2: e.isHybridV2,
+          isBroken: e.isBroken
+        };
+      });
+
+    setSelectedEdgeDetails(null);
+    setSelectedNodeDetails({
+      docId: nodeObj.docId,
+      title: nodeObj.title,
+      version: nodeObj.version,
+      versionType: nodeObj.versionType,
+      tech: nodeObj.tech,
+      totalFields: nodeObj.totalFields,
+      isLegacyV2: nodeObj.isLegacyV2,
+      isBroken: nodeObj.isBroken,
+      selfFields: nodeObj.selfFields || [],
+      upstreamEdges: upstream,
+      downstreamEdges: downstream
+    });
+    setDrawerOpen(true);
+  }, []);
 
   // Consulta à API com validação estrita e suporte a Modo Foco
   const fetchLineage = useCallback(async (targetFocusId: number | null) => {
@@ -67,25 +128,39 @@ function LineageFlowContent() {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
 
-      setRawApiNodes(data.nodes || []);
-      setRawApiEdges(data.edges || []);
+      const apiNodes: LineageDocNodeData[] = data.nodes || [];
+      const apiEdges: ExecutiveEdgeData[] = data.edges || [];
+
+      rawDataRef.current = { nodes: apiNodes, edges: apiEdges };
+      setRawApiNodes(apiNodes);
       setAvailableDocs(data.availableDocs || []);
       setSummary(data.summary || { totalDocs: 0, totalEdges: 0, totalFieldsLinked: 0 });
 
       // Mapeia nós executivos
-      const flowNodes: Node[] = (data.nodes || []).map((n: any) => ({
+      const flowNodes: Node[] = apiNodes.map((n) => ({
         id: n.id,
         type: 'documentNode',
         data: {
           ...n,
-          onInspect: (docId: number) => handleInspectNode(docId, data.nodes, data.edges),
-          onFocus: (docId: number) => handleSelectFocus(docId)
+          onInspect: (docId: number) => handleInspectNode(docId, apiNodes, apiEdges),
+          onFocus: (docId: number) => setFocusDocId(docId)
         },
         position: { x: 0, y: 0 }
       }));
 
       // Mapeia arestas executivas consolidadas
-      const flowEdges: Edge[] = (data.edges || []).map((e: any) => {
+      const flowEdges: Edge[] = apiEdges.map((e) => {
+        const strokeColor = e.isBroken
+          ? '#e11d48'
+          : e.isHybridV2
+            ? '#d97706'
+            : '#0284c7';
+        const labelFill = e.isBroken
+          ? '#be123c'
+          : e.isHybridV2
+            ? '#b45309'
+            : '#0369a1';
+
         return {
           id: e.id,
           source: `doc_${e.sourceDocId}`,
@@ -98,7 +173,7 @@ function LineageFlowContent() {
           labelStyle: {
             fontSize: 10.5,
             fontWeight: 700,
-            fill: '#0369a1'
+            fill: labelFill
           },
           labelBgStyle: {
             fill: '#ffffff',
@@ -108,16 +183,17 @@ function LineageFlowContent() {
           },
           labelBgPadding: [6, 4] as [number, number],
           style: {
-            stroke: '#0284c7',
-            strokeWidth: 2.2
+            stroke: strokeColor,
+            strokeWidth: 2.2,
+            ...(e.isBroken ? { strokeDasharray: '6 4' } : {})
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: '#0284c7',
+            color: strokeColor,
             width: 14,
             height: 14
           },
-          data: e
+          data: e as unknown as Record<string, unknown>
         };
       });
 
@@ -131,13 +207,14 @@ function LineageFlowContent() {
         fitView({ padding: 0.25, duration: 400 });
       }, 100);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      toast.error(err.message || 'Erro ao carregar dados de linhagem');
+      const message = err instanceof Error ? err.message : 'Erro ao carregar dados de linhagem';
+      toast.error(message);
     } finally {
       setLoading(false);
     }
-  }, [fitView, setNodes, setEdges]);
+  }, [fitView, handleInspectNode, setNodes, setEdges]);
 
   // Carrega inicialmente
   useEffect(() => {
@@ -160,11 +237,11 @@ function LineageFlowContent() {
 
   // Ao clicar em uma aresta executiva
   const onEdgeClick = (_: React.MouseEvent, edge: Edge) => {
-    const edgeData = edge.data as any;
+    const edgeData = edge.data as unknown as ExecutiveEdgeData | undefined;
     if (!edgeData) return;
 
-    const sourceDoc = rawApiNodes.find(n => String(n.docId) === String(edgeData.sourceDocId));
-    const targetDoc = rawApiNodes.find(n => String(n.docId) === String(edgeData.targetDocId));
+    const sourceDoc = rawApiNodes.find((n) => String(n.docId) === String(edgeData.sourceDocId));
+    const targetDoc = rawApiNodes.find((n) => String(n.docId) === String(edgeData.targetDocId));
 
     setSelectedNodeDetails(null);
     setSelectedEdgeDetails({
@@ -174,53 +251,9 @@ function LineageFlowContent() {
       targetDocId: String(edgeData.targetDocId),
       targetDocTitle: targetDoc?.title,
       totalFields: edgeData.totalFields,
-      fieldsMap: edgeData.fieldsMap || []
-    });
-    setDrawerOpen(true);
-  };
-
-  // Ao clicar no botão Inspecionar de um nó
-  const handleInspectNode = (docId: number, currentNodes = rawApiNodes, currentEdges = rawApiEdges) => {
-    const nodeObj = currentNodes.find(n => n.docId === docId);
-    if (!nodeObj) return;
-
-    const upstream = currentEdges
-      .filter((e: any) => Number(e.targetDocId) === docId)
-      .map((e: any) => {
-        const sDoc = currentNodes.find(n => String(n.docId) === String(e.sourceDocId));
-        return {
-          id: e.id,
-          sourceDocId: String(e.sourceDocId),
-          sourceDocTitle: sDoc?.title,
-          targetDocId: String(e.targetDocId),
-          totalFields: e.totalFields,
-          fieldsMap: e.fieldsMap || []
-        };
-      });
-
-    const downstream = currentEdges
-      .filter((e: any) => Number(e.sourceDocId) === docId)
-      .map((e: any) => {
-        const tDoc = currentNodes.find(n => String(n.docId) === String(e.targetDocId));
-        return {
-          id: e.id,
-          sourceDocId: String(e.sourceDocId),
-          targetDocId: String(e.targetDocId),
-          targetDocTitle: tDoc?.title,
-          totalFields: e.totalFields,
-          fieldsMap: e.fieldsMap || []
-        };
-      });
-
-    setSelectedEdgeDetails(null);
-    setSelectedNodeDetails({
-      docId: nodeObj.docId,
-      title: nodeObj.title,
-      version: nodeObj.version,
-      versionType: nodeObj.versionType,
-      totalFields: nodeObj.totalFields,
-      upstreamEdges: upstream,
-      downstreamEdges: downstream
+      fieldsMap: edgeData.fieldsMap || [],
+      isHybridV2: edgeData.isHybridV2,
+      isBroken: edgeData.isBroken
     });
     setDrawerOpen(true);
   };
@@ -273,7 +306,10 @@ function LineageFlowContent() {
       />
 
       {/* 3. Main Flow Canvas */}
-      <div className="flex-1 w-full h-[calc(100vh-270px)] min-h-[540px] bg-white rounded-2xl border border-slate-200/90 shadow-xs relative overflow-hidden">
+      <div 
+        className="w-full bg-white rounded-2xl border border-slate-200/90 shadow-xs relative overflow-hidden"
+        style={{ height: 'calc(100vh - 250px)', minHeight: '560px' }}
+      >
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-500">
             <Loader2 className="animate-spin text-sky-600" size={36} />
@@ -293,34 +329,43 @@ function LineageFlowContent() {
             </button>
           </div>
         ) : (
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            nodeTypes={nodeTypes}
-            onEdgeClick={onEdgeClick}
-            fitView
-            minZoom={0.2}
-            maxZoom={1.6}
-            defaultEdgeOptions={{
-              type: 'smoothstep'
-            }}
-          >
-            <Background 
-              variant={BackgroundVariant.Dots} 
-              gap={24} 
-              size={1.2} 
-              color="#cbd5e1"
-            />
-            <Controls className="!bg-white !border !border-slate-200 !rounded-xl !shadow-xs" />
-            <MiniMap 
-              nodeColor={(n: any) => n.data?.isFocus ? '#0284c7' : '#94a3b8'}
-              className="!bg-white !border !border-slate-200 !rounded-xl !shadow-xs overflow-hidden"
-              zoomable
-              pannable
-            />
-          </ReactFlow>
+          <div className="absolute inset-0 w-full h-full">
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              nodeTypes={nodeTypes}
+              onNodeClick={(_, node) => handleInspectNode(Number(node.data.docId))}
+              onEdgeClick={onEdgeClick}
+              fitView
+              minZoom={0.2}
+              maxZoom={1.6}
+              defaultEdgeOptions={{
+                type: 'smoothstep'
+              }}
+            >
+              <Background 
+                variant={BackgroundVariant.Dots} 
+                gap={24} 
+                size={1.2} 
+                color="#cbd5e1"
+              />
+              <Controls className="!bg-white !border !border-slate-200 !rounded-xl !shadow-xs" />
+              <MiniMap 
+                nodeColor={(n) => {
+                  const nodeData = n.data as Partial<LineageDocNodeData> | undefined;
+                  if (nodeData?.isBroken) return '#e11d48';
+                  if (nodeData?.isLegacyV2) return '#d97706';
+                  if (nodeData?.isFocus) return '#0284c7';
+                  return '#94a3b8';
+                }}
+                className="!bg-white !border !border-slate-200 !rounded-xl !shadow-xs overflow-hidden"
+                zoomable
+                pannable
+              />
+            </ReactFlow>
+          </div>
         )}
       </div>
 
@@ -331,6 +376,10 @@ function LineageFlowContent() {
         edgeDetails={selectedEdgeDetails}
         nodeDetails={selectedNodeDetails}
         onFocusDoc={(docId) => handleSelectFocus(docId)}
+        onSelectEdge={(edge) => {
+          setSelectedNodeDetails(null);
+          setSelectedEdgeDetails(edge);
+        }}
       />
     </div>
   );

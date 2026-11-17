@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { FileText, ArrowRightLeft, ArrowDownLeft, ArrowUpRight, Search, Eye, Sparkles } from 'lucide-react';
+import { FileText, ArrowDownLeft, ArrowUpRight, Search, Eye, Sparkles, AlertTriangle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface DocumentNodeData {
@@ -14,7 +14,10 @@ export interface DocumentNodeData {
   totalFields: number;
   upstreamCount: number;
   downstreamCount: number;
+  selfLinksCount?: number;
   isFocus?: boolean;
+  isLegacyV2?: boolean;
+  isBroken?: boolean;
   onInspect?: (docId: number) => void;
   onFocus?: (docId: number) => void;
 }
@@ -29,7 +32,10 @@ export function DocumentNode({ data }: { data: DocumentNodeData }) {
     totalFields = 0,
     upstreamCount = 0,
     downstreamCount = 0,
+    selfLinksCount = 0,
     isFocus = false,
+    isLegacyV2 = false,
+    isBroken = false,
     onInspect,
     onFocus
   } = data;
@@ -40,9 +46,11 @@ export function DocumentNode({ data }: { data: DocumentNodeData }) {
     <div
       className={cn(
         "w-[320px] h-[170px] rounded-2xl border transition-all text-xs font-sans relative group flex flex-col justify-between p-3.5 select-none",
-        isFocus
-          ? "bg-sky-50/40 border-sky-400 ring-2 ring-sky-300/80 shadow-md"
-          : "bg-white border-slate-200/90 shadow-2xs hover:border-slate-300 hover:shadow-sm"
+        isBroken
+          ? "bg-rose-50/60 border-rose-300 ring-1 ring-rose-200/70 shadow-sm hover:border-rose-400"
+          : isFocus
+            ? "bg-sky-50/40 border-sky-400 ring-2 ring-sky-300/80 shadow-md"
+            : "bg-white border-slate-200/90 shadow-2xs hover:border-slate-300 hover:shadow-sm"
       )}
     >
       {/* Handles de Entrada e Saída Globais do Documento */}
@@ -50,14 +58,20 @@ export function DocumentNode({ data }: { data: DocumentNodeData }) {
         type="target" 
         position={Position.Left} 
         id="doc_target" 
-        className="!bg-sky-600 !w-3 !h-3 !-left-1.5 border-2 border-white shadow-xs transition-transform hover:scale-125 cursor-crosshair"
+        className={cn(
+          "!w-3 !h-3 !-left-1.5 border-2 border-white shadow-xs transition-transform hover:scale-125 cursor-crosshair",
+          isBroken ? "!bg-rose-600" : isLegacyV2 ? "!bg-amber-600" : "!bg-sky-600"
+        )}
         title={`Entrada de dados do Doc ${docId}`}
       />
       <Handle 
         type="source" 
         position={Position.Right} 
         id="doc_source" 
-        className="!bg-sky-600 !w-3 !h-3 !-right-1.5 border-2 border-white shadow-xs transition-transform hover:scale-125 cursor-crosshair"
+        className={cn(
+          "!w-3 !h-3 !-right-1.5 border-2 border-white shadow-xs transition-transform hover:scale-125 cursor-crosshair",
+          isBroken ? "!bg-rose-600" : isLegacyV2 ? "!bg-amber-600" : "!bg-sky-600"
+        )}
         title={`Saída de dados do Doc ${docId}`}
       />
 
@@ -67,11 +81,22 @@ export function DocumentNode({ data }: { data: DocumentNodeData }) {
           <div className="flex items-center gap-1.5">
             <span className={cn(
               "px-2 py-0.5 rounded-full font-mono font-bold text-[10px]",
-              isFocus ? "bg-sky-600 text-white shadow-2xs" : "bg-slate-100 text-slate-800 border border-slate-200"
+              isBroken
+                ? "bg-rose-600 text-white shadow-2xs"
+                : isFocus
+                  ? "bg-sky-600 text-white shadow-2xs"
+                  : "bg-slate-100 text-slate-800 border border-slate-200"
             )}>
               DOC {docId}
             </span>
-            <span className="px-1.5 py-0.5 rounded font-mono font-semibold bg-slate-100/90 text-slate-600 text-[9.5px]">
+            <span className={cn(
+              "px-1.5 py-0.5 rounded font-mono font-semibold text-[9.5px]",
+              isBroken
+                ? "bg-rose-100 text-rose-800 border border-rose-200"
+                : isLegacyV2
+                  ? "bg-amber-100 text-amber-800 border border-amber-200"
+                  : "bg-slate-100/90 text-slate-600"
+            )}>
               {tech}
             </span>
           </div>
@@ -83,14 +108,20 @@ export function DocumentNode({ data }: { data: DocumentNodeData }) {
                 FOCO
               </span>
             )}
-            <span className={cn(
-              "px-2 py-0.5 rounded-full font-bold uppercase tracking-wide text-[9.5px]",
-              isPublished 
-                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                : "bg-amber-50 text-amber-700 border border-amber-200"
-            )}>
-              v{version}
-            </span>
+            {isBroken ? (
+              <span className="px-2 py-0.5 rounded-full font-bold uppercase tracking-wide text-[9.5px] bg-rose-100 text-rose-800 border border-rose-300">
+                INEXISTENTE
+              </span>
+            ) : (
+              <span className={cn(
+                "px-2 py-0.5 rounded-full font-bold uppercase tracking-wide text-[9.5px]",
+                isPublished 
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-amber-50 text-amber-700 border border-amber-200"
+              )}>
+                v{version}
+              </span>
+            )}
           </div>
         </div>
 
@@ -98,12 +129,21 @@ export function DocumentNode({ data }: { data: DocumentNodeData }) {
         <div className="flex items-start gap-2 pt-0.5">
           <div className={cn(
             "p-1.5 rounded-lg shrink-0 mt-0.5",
-            isFocus ? "bg-sky-100 text-sky-700" : "bg-slate-100 text-slate-600"
+            isBroken
+              ? "bg-rose-100 text-rose-600"
+              : isFocus
+                ? "bg-sky-100 text-sky-700"
+                : isLegacyV2
+                  ? "bg-amber-100 text-amber-700"
+                  : "bg-slate-100 text-slate-600"
           )}>
-            <FileText size={14} strokeWidth={2.2} />
+            {isBroken ? <AlertTriangle size={14} strokeWidth={2.2} /> : <FileText size={14} strokeWidth={2.2} />}
           </div>
           <h4 
-            className="font-bold text-slate-900 text-[12px] leading-snug line-clamp-2" 
+            className={cn(
+              "font-bold text-[12px] leading-snug line-clamp-2",
+              isBroken ? "text-rose-900" : "text-slate-900"
+            )}
             title={title}
           >
             {title}
@@ -129,10 +169,22 @@ export function DocumentNode({ data }: { data: DocumentNodeData }) {
             <ArrowUpRight size={13} className="text-sky-600" />
             <span>{downstreamCount} out</span>
           </span>
+          {selfLinksCount > 0 && (
+            <>
+              <span className="text-slate-300">•</span>
+              <span
+                className="px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 font-bold text-[9.5px] flex items-center gap-1"
+                title={`Continuidade clínica: ${selfLinksCount} campo(s) herdam de versões/registros anteriores deste mesmo documento`}
+              >
+                <RefreshCw size={9} />
+                <span>{selfLinksCount} auto</span>
+              </span>
+            </>
+          )}
         </div>
 
         <span className="text-[10px] text-slate-400 font-medium">
-          {totalFields} campos
+          {isBroken ? 'Órfão' : `${totalFields} campos`}
         </span>
       </div>
 

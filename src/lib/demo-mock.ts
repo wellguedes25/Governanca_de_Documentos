@@ -101,7 +101,7 @@ const DEMO_DOCS: DemoDocDef[] = [
     fields: [
       { cdCampo: 900101, cdMetadado: 99011, tag: 'MOTIVO_ATENDIMENTO', name: 'Motivo Principal da Admissão', visualType: 'Caixa de Texto', rulesCount: 1 },
       { cdCampo: 900102, cdMetadado: 99012, tag: 'SENSIBILIDADE_MED', name: 'Alertas de Sensibilidade Declarada', visualType: 'Lista Seleção', rulesCount: 2 },
-      { cdCampo: 900103, cdMetadado: 99013, tag: 'REGISTRO_CLINICO', name: 'Registro Clínico Principal', visualType: 'Editor Rico', rulesCount: 1 },
+      { cdCampo: 900103, cdMetadado: 99013, tag: 'REGISTRO_CLINICO', name: 'Registro Clínico Principal', visualType: 'Editor Rico', rulesCount: 2 },
     ],
     rules: [
       {
@@ -109,11 +109,33 @@ const DEMO_DOCS: DemoDocDef[] = [
         numOrdem: 1,
         dsRegra: 'SBX_REG_SENSIBILIDADE_OBRIGATORIA',
         ativa: 1,
-        tipoRegra: 'ALERTA',
-        dsAlerta: 'Confirmar sinalização de sensibilidade medicamentosa no cabeçalho assistencial.',
+        tipoRegra: 'REQUIRED',
+        dsAlerta: 'Confirmar sinalização de sensibilidade medicamentosa antes do salvamento.',
+        condicao: 'MOTIVO_ATENDIMENTO <> ""',
+        camposAfetados: 'SENSIBILIDADE_MED',
+        script: null,
+      },
+      {
+        cdRegra: 91002,
+        numOrdem: 2,
+        dsRegra: 'SBX_REG_HABILITA_DETALHE_ALERGIA',
+        ativa: 1,
+        tipoRegra: 'ENABLE',
+        dsAlerta: null,
         condicao: 'SENSIBILIDADE_MED = "POSITIVA"',
         camposAfetados: 'SENSIBILIDADE_MED, REGISTRO_CLINICO',
         script: null,
+      },
+      {
+        cdRegra: 91003,
+        numOrdem: 3,
+        dsRegra: 'SBX_REG_VALIDA_FECHAMENTO_INICIAL',
+        ativa: 1,
+        tipoRegra: 'ON_CLOSE',
+        dsAlerta: 'Preencha o motivo do atendimento e o registro clínico antes de assinar a ficha.',
+        condicao: 'MOTIVO_ATENDIMENTO = "" OR REGISTRO_CLINICO = ""',
+        camposAfetados: 'MOTIVO_ATENDIMENTO, REGISTRO_CLINICO',
+        script: `SELECT CASE WHEN LENGTH(TRIM(:REGISTRO_CLINICO)) < 20 THEN 'INVÁLIDO' ELSE 'OK' END FROM DUAL`,
       },
     ],
     actions: [],
@@ -128,29 +150,51 @@ const DEMO_DOCS: DemoDocDef[] = [
     lastUsedHoursAgo: 0.2,
     weights: [0.55, 0.45],
     fields: [
-      { cdCampo: 900201, cdMetadado: 99021, tag: 'ALERTA_BASAL', name: 'Sensibilidades Herdadas (Aurora)', visualType: 'Caixa de Texto', rulesCount: 1 },
-      { cdCampo: 900202, cdMetadado: 99022, tag: 'QUADRO_PARAMETROS', name: 'Parâmetros Vitais Recentes', visualType: 'Grade Dinâmica', rulesCount: 1 },
-      { cdCampo: 900203, cdMetadado: 99023, tag: 'SALDO_HIDRICO_SBX', name: 'Balanço Hidroeletrolítico 24h', visualType: 'Numérico Calculado', rulesCount: 1 },
-      { cdCampo: 900204, cdMetadado: 99024, tag: 'REGISTRO_CLINICO', name: 'Registro Clínico Principal', visualType: 'Editor Rico', rulesCount: 2 },
+      { cdCampo: 900201, cdMetadado: 99021, tag: 'ALERTA_BASAL', name: 'Sensibilidades Herdadas (Aurora)', visualType: 'Caixa de Texto', rulesCount: 2 },
+      { cdCampo: 900202, cdMetadado: 99022, tag: 'QUADRO_PARAMETROS', name: 'Parâmetros Vitais Recentes', visualType: 'Grade Dinâmica', rulesCount: 2 },
+      { cdCampo: 900203, cdMetadado: 99023, tag: 'SALDO_HIDRICO_SBX', name: 'Balanço Hidroeletrolítico 24h', visualType: 'Numérico Calculado', rulesCount: 2 },
+      { cdCampo: 900204, cdMetadado: 99024, tag: 'REGISTRO_CLINICO', name: 'Registro Clínico Principal', visualType: 'Editor Rico', rulesCount: 3 },
     ],
     rules: [
       {
-        cdRegra: 91002,
+        cdRegra: 91011,
         numOrdem: 1,
+        dsRegra: 'SBX_REG_PREENCHE_ALERTA_HERDADO',
+        ativa: 1,
+        tipoRegra: 'ANSWER',
+        dsAlerta: null,
+        condicao: 'ALERTA_BASAL = ""',
+        camposAfetados: 'ALERTA_BASAL',
+        script: `SELECT LISTAGG(DS_SUBSTANCIA, ', ') WITHIN GROUP (ORDER BY DS_SUBSTANCIA) FROM DBAMV.SBX_SENSIBILIDADE_PAC WHERE CD_ATENDIMENTO = :CD_ATENDIMENTO`,
+      },
+      {
+        cdRegra: 91012,
+        numOrdem: 2,
         dsRegra: 'SBX_REG_PROTOCOLO_ESTABILIDADE',
         ativa: 1,
-        tipoRegra: 'ALERTA',
+        tipoRegra: 'VALIDATE',
         dsAlerta: 'Parâmetros críticos detectados: revisar conduta diária e registrar plano assistencial.',
         condicao: 'QUADRO_PARAMETROS >= "38.5" OR SALDO_HIDRICO_SBX < "-500"',
-        camposAfetados: 'REGISTRO_CLINICO',
+        camposAfetados: 'QUADRO_PARAMETROS, SALDO_HIDRICO_SBX, REGISTRO_CLINICO',
         script: null,
       },
       {
-        cdRegra: 91003,
-        numOrdem: 2,
+        cdRegra: 91013,
+        numOrdem: 3,
+        dsRegra: 'SBX_REG_EXIBE_PAINEL_HIDRICO',
+        ativa: 1,
+        tipoRegra: 'VISIBLE',
+        dsAlerta: null,
+        condicao: 'SALDO_HIDRICO_SBX <> "0"',
+        camposAfetados: 'SALDO_HIDRICO_SBX, ALERTA_BASAL',
+        script: null,
+      },
+      {
+        cdRegra: 91014,
+        numOrdem: 4,
         dsRegra: 'SBX_REG_VALIDA_TEXTO_MINIMO',
         ativa: 1,
-        tipoRegra: 'VALIDACAO',
+        tipoRegra: 'REQUIRED',
         dsAlerta: 'O boletim diário deve conter descrição clínica antes da assinatura.',
         condicao: 'REGISTRO_CLINICO = ""',
         camposAfetados: 'REGISTRO_CLINICO',
@@ -194,20 +238,31 @@ const DEMO_DOCS: DemoDocDef[] = [
     lastUsedHoursAgo: 0.3,
     weights: [0.52, 0.48],
     fields: [
-      { cdCampo: 900301, cdMetadado: 99031, tag: 'PRESSAO_SISTOLICA', name: 'Pressão Arterial Sistólica (mmHg)', visualType: 'Numérico', rulesCount: 1 },
-      { cdCampo: 900302, cdMetadado: 99032, tag: 'SATURACAO_PERIF', name: 'Oximetria Periférica (%)', visualType: 'Numérico', rulesCount: 1 },
-      { cdCampo: 900303, cdMetadado: 99033, tag: 'INDICE_ALERTA_SBX', name: 'Índice de Alerta Precoce Sandbox', visualType: 'Numérico Calculado', rulesCount: 1 },
+      { cdCampo: 900301, cdMetadado: 99031, tag: 'PRESSAO_SISTOLICA', name: 'Pressão Arterial Sistólica (mmHg)', visualType: 'Numérico', rulesCount: 2 },
+      { cdCampo: 900302, cdMetadado: 99032, tag: 'SATURACAO_PERIF', name: 'Oximetria Periférica (%)', visualType: 'Numérico', rulesCount: 2 },
+      { cdCampo: 900303, cdMetadado: 99033, tag: 'INDICE_ALERTA_SBX', name: 'Índice de Alerta Precoce Sandbox', visualType: 'Numérico Calculado', rulesCount: 2 },
     ],
     rules: [
       {
-        cdRegra: 91004,
+        cdRegra: 91021,
         numOrdem: 1,
         dsRegra: 'SBX_REG_INDICE_ALERTA',
         ativa: 1,
-        tipoRegra: 'CALCULO',
+        tipoRegra: 'RUN',
         dsAlerta: 'Índice elevado: acionar avaliação clínica prioritária.',
         condicao: 'PRESSAO_SISTOLICA < "90" OR SATURACAO_PERIF < "92"',
         camposAfetados: 'INDICE_ALERTA_SBX',
+        script: `SELECT CASE WHEN :PRESSAO_SISTOLICA < 90 THEN 3 WHEN :SATURACAO_PERIF < 92 THEN 2 ELSE 0 END AS ESCORE FROM DUAL`,
+      },
+      {
+        cdRegra: 91022,
+        numOrdem: 2,
+        dsRegra: 'SBX_REG_FAIXA_SATURACAO',
+        ativa: 1,
+        tipoRegra: 'VALIDATE',
+        dsAlerta: 'Oximetria deve estar entre 40% e 100%.',
+        condicao: 'SATURACAO_PERIF < "40" OR SATURACAO_PERIF > "100"',
+        camposAfetados: 'PRESSAO_SISTOLICA, SATURACAO_PERIF',
         script: null,
       },
     ],
@@ -223,11 +278,34 @@ const DEMO_DOCS: DemoDocDef[] = [
     lastUsedHoursAgo: 1.3,
     weights: [0.64, 0.36],
     fields: [
-      { cdCampo: 900401, cdMetadado: 99041, tag: 'ENTRADA_VOL_ML', name: 'Aporte Hídrico Total (mL)', visualType: 'Numérico', rulesCount: 0 },
-      { cdCampo: 900402, cdMetadado: 99042, tag: 'ELIMINACAO_VOL_ML', name: 'Eliminação Total (mL)', visualType: 'Numérico', rulesCount: 0 },
-      { cdCampo: 900403, cdMetadado: 99043, tag: 'SALDO_FINAL_24H', name: 'Saldo Hídrico Consolidado (mL)', visualType: 'Numérico Calculado', rulesCount: 1 },
+      { cdCampo: 900401, cdMetadado: 99041, tag: 'ENTRADA_VOL_ML', name: 'Aporte Hídrico Total (mL)', visualType: 'Numérico', rulesCount: 1 },
+      { cdCampo: 900402, cdMetadado: 99042, tag: 'ELIMINACAO_VOL_ML', name: 'Eliminação Total (mL)', visualType: 'Numérico', rulesCount: 1 },
+      { cdCampo: 900403, cdMetadado: 99043, tag: 'SALDO_FINAL_24H', name: 'Saldo Hídrico Consolidado (mL)', visualType: 'Numérico Calculado', rulesCount: 2 },
     ],
-    rules: [],
+    rules: [
+      {
+        cdRegra: 91031,
+        numOrdem: 1,
+        dsRegra: 'SBX_REG_CALC_SALDO_24H',
+        ativa: 1,
+        tipoRegra: 'ANSWER',
+        dsAlerta: null,
+        condicao: 'ENTRADA_VOL_ML >= "0" AND ELIMINACAO_VOL_ML >= "0"',
+        camposAfetados: 'SALDO_FINAL_24H',
+        script: `SELECT NVL(:ENTRADA_VOL_ML, 0) - NVL(:ELIMINACAO_VOL_ML, 0) FROM DUAL`,
+      },
+      {
+        cdRegra: 91032,
+        numOrdem: 2,
+        dsRegra: 'SBX_REG_DESABILITA_SALDO_MANUAL',
+        ativa: 1,
+        tipoRegra: 'DISABLE',
+        dsAlerta: null,
+        condicao: 'ENTRADA_VOL_ML >= "0" OR ELIMINACAO_VOL_ML >= "0"',
+        camposAfetados: 'ENTRADA_VOL_ML, ELIMINACAO_VOL_ML, SALDO_FINAL_24H',
+        script: null,
+      },
+    ],
     actions: [],
   },
   {
@@ -242,20 +320,31 @@ const DEMO_DOCS: DemoDocDef[] = [
     fields: [
       { cdCampo: 900501, cdMetadado: 99051, tag: 'RESUMO_ADMISSAO', name: 'Resumo da Avaliação Inicial', visualType: 'Editor Rico', rulesCount: 1 },
       { cdCampo: 900502, cdMetadado: 99052, tag: 'SINTESE_ACOMP', name: 'Síntese do Acompanhamento Diário', visualType: 'Editor Rico', rulesCount: 1 },
-      { cdCampo: 900503, cdMetadado: 99053, tag: 'ACHADOS_DIAG', name: 'Síntese de Exames Relevantes', visualType: 'Caixa de Texto', rulesCount: 0 },
-      { cdCampo: 900504, cdMetadado: 99054, tag: 'ORIENTACAO_SAIDA', name: 'Orientações Domiciliares', visualType: 'Editor Rico', rulesCount: 1 },
+      { cdCampo: 900503, cdMetadado: 99053, tag: 'ACHADOS_DIAG', name: 'Síntese de Exames Relevantes', visualType: 'Caixa de Texto', rulesCount: 1 },
+      { cdCampo: 900504, cdMetadado: 99054, tag: 'ORIENTACAO_SAIDA', name: 'Orientações Domiciliares', visualType: 'Editor Rico', rulesCount: 2 },
     ],
     rules: [
       {
-        cdRegra: 91005,
+        cdRegra: 91041,
         numOrdem: 1,
         dsRegra: 'SBX_REG_ORIENTACAO_SAIDA',
         ativa: 1,
-        tipoRegra: 'VALIDACAO',
+        tipoRegra: 'REQUIRED',
         dsAlerta: 'Preencha as orientações domiciliares antes de encerrar o sumário.',
         condicao: 'ORIENTACAO_SAIDA = ""',
         camposAfetados: 'ORIENTACAO_SAIDA',
         script: null,
+      },
+      {
+        cdRegra: 91042,
+        numOrdem: 2,
+        dsRegra: 'SBX_REG_INTEGRA_DESFECHO_ALTA',
+        ativa: 1,
+        tipoRegra: 'ON_SAVE',
+        dsAlerta: 'Auditoria automática de completude dos blocos clínicos ao salvar.',
+        condicao: 'SINTESE_ACOMP <> ""',
+        camposAfetados: 'RESUMO_ADMISSAO, SINTESE_ACOMP, ACHADOS_DIAG, ORIENTACAO_SAIDA',
+        script: `SELECT 'COMPLETO' FROM DUAL WHERE :ORIENTACAO_SAIDA IS NOT NULL`,
       },
     ],
     actions: [
@@ -303,10 +392,33 @@ const DEMO_DOCS: DemoDocDef[] = [
     lastUsedHoursAgo: 1.9,
     weights: [0.51, 0.49],
     fields: [
-      { cdCampo: 900601, cdMetadado: 99061, tag: 'LAUDO_CHAVE', name: 'Achados Laboratoriais e Imagem', visualType: 'Caixa de Texto', rulesCount: 1 },
-      { cdCampo: 900602, cdMetadado: 99062, tag: 'VIT_CONTEXTO', name: 'Contexto Basal Associado', visualType: 'Texto', rulesCount: 0 },
+      { cdCampo: 900601, cdMetadado: 99061, tag: 'LAUDO_CHAVE', name: 'Achados Laboratoriais e Imagem', visualType: 'Caixa de Texto', rulesCount: 2 },
+      { cdCampo: 900602, cdMetadado: 99062, tag: 'VIT_CONTEXTO', name: 'Contexto Basal Associado', visualType: 'Texto', rulesCount: 1 },
     ],
-    rules: [],
+    rules: [
+      {
+        cdRegra: 91051,
+        numOrdem: 1,
+        dsRegra: 'SBX_REG_SINALIZA_LAUDO_CRITICO',
+        ativa: 1,
+        tipoRegra: 'VALIDATE',
+        dsAlerta: 'Achado crítico identificado: validar protocolo de comunicação em até 30 minutos.',
+        condicao: 'LAUDO_CHAVE = "CRITICO"',
+        camposAfetados: 'LAUDO_CHAVE',
+        script: null,
+      },
+      {
+        cdRegra: 91052,
+        numOrdem: 2,
+        dsRegra: 'SBX_REG_CARREGA_CONTEXTO_BASAL',
+        ativa: 1,
+        tipoRegra: 'VISIBLE',
+        dsAlerta: null,
+        condicao: 'VIT_CONTEXTO <> ""',
+        camposAfetados: 'LAUDO_CHAVE, VIT_CONTEXTO',
+        script: null,
+      },
+    ],
     actions: [
       {
         cdCampo: 900602,
@@ -328,10 +440,33 @@ const DEMO_DOCS: DemoDocDef[] = [
     lastUsedHoursAgo: 2.8,
     weights: [0.6, 0.4],
     fields: [
-      { cdCampo: 900701, cdMetadado: 99071, tag: 'META_REABILITACAO', name: 'Metas Assistenciais Semanais', visualType: 'Editor Rico', rulesCount: 1 },
-      { cdCampo: 900702, cdMetadado: 99072, tag: 'FATOR_BASAL', name: 'Fatores Iniciais de Admissão', visualType: 'Texto', rulesCount: 0 },
+      { cdCampo: 900701, cdMetadado: 99071, tag: 'META_REABILITACAO', name: 'Metas Assistenciais Semanais', visualType: 'Editor Rico', rulesCount: 2 },
+      { cdCampo: 900702, cdMetadado: 99072, tag: 'FATOR_BASAL', name: 'Fatores Iniciais de Admissão', visualType: 'Texto', rulesCount: 1 },
     ],
-    rules: [],
+    rules: [
+      {
+        cdRegra: 91061,
+        numOrdem: 1,
+        dsRegra: 'SBX_REG_META_OBRIGATORIA_REAB',
+        ativa: 1,
+        tipoRegra: 'REQUIRED',
+        dsAlerta: 'Defina pelo menos uma meta funcional antes do fechamento.',
+        condicao: 'META_REABILITACAO = ""',
+        camposAfetados: 'META_REABILITACAO',
+        script: null,
+      },
+      {
+        cdRegra: 91062,
+        numOrdem: 2,
+        dsRegra: 'SBX_REG_HABILITA_ROTEIRO_BASAL',
+        ativa: 1,
+        tipoRegra: 'ENABLE',
+        dsAlerta: null,
+        condicao: 'FATOR_BASAL <> ""',
+        camposAfetados: 'META_REABILITACAO, FATOR_BASAL',
+        script: null,
+      },
+    ],
     actions: [
       {
         cdCampo: 900702,
@@ -353,10 +488,33 @@ const DEMO_DOCS: DemoDocDef[] = [
     lastUsedHoursAgo: 4.1,
     weights: [0.47, 0.53],
     fields: [
-      { cdCampo: 900801, cdMetadado: 99081, tag: 'REGISTRO_CLINICO', name: 'Síntese Pré-Movimentação', visualType: 'Editor Rico', rulesCount: 0 },
-      { cdCampo: 900802, cdMetadado: 99082, tag: 'VIT_SAIDA', name: 'Parâmetros Vitais na Saída', visualType: 'Grade Dinâmica', rulesCount: 0 },
+      { cdCampo: 900801, cdMetadado: 99081, tag: 'REGISTRO_CLINICO', name: 'Síntese Pré-Movimentação', visualType: 'Editor Rico', rulesCount: 2 },
+      { cdCampo: 900802, cdMetadado: 99082, tag: 'VIT_SAIDA', name: 'Parâmetros Vitais na Saída', visualType: 'Grade Dinâmica', rulesCount: 1 },
     ],
-    rules: [],
+    rules: [
+      {
+        cdRegra: 91071,
+        numOrdem: 1,
+        dsRegra: 'SBX_REG_CHECK_TRANSICAO_SEGURA',
+        ativa: 1,
+        tipoRegra: 'ON_CLOSE',
+        dsAlerta: 'Exige síntese clínica e sinais vitais da última 1h para liberar transferência.',
+        condicao: 'REGISTRO_CLINICO = "" OR VIT_SAIDA = ""',
+        camposAfetados: 'REGISTRO_CLINICO, VIT_SAIDA',
+        script: null,
+      },
+      {
+        cdRegra: 91072,
+        numOrdem: 2,
+        dsRegra: 'SBX_REG_HERDA_RESUMO_MOVIMENTACAO',
+        ativa: 1,
+        tipoRegra: 'ANSWER',
+        dsAlerta: null,
+        condicao: 'REGISTRO_CLINICO = ""',
+        camposAfetados: 'REGISTRO_CLINICO',
+        script: `SELECT DBMS_LOB.SUBSTR(LO_VALOR, 4000, 1) FROM DBAMV.EDITOR_REGISTRO_CAMPO WHERE CD_CAMPO = 900204`,
+      },
+    ],
     actions: [
       {
         cdCampo: 900801,
@@ -378,9 +536,21 @@ const DEMO_DOCS: DemoDocDef[] = [
     lastUsedHoursAgo: 7.5,
     weights: [0.53, 0.47],
     fields: [
-      { cdCampo: 900901, cdMetadado: 99091, tag: 'CONFERENCIA_SEGURA', name: 'Checklist Pré-Procedimento Confirmado', visualType: 'CheckBox', rulesCount: 0 },
+      { cdCampo: 900901, cdMetadado: 99091, tag: 'CONFERENCIA_SEGURA', name: 'Checklist Pré-Procedimento Confirmado', visualType: 'CheckBox', rulesCount: 1 },
     ],
-    rules: [],
+    rules: [
+      {
+        cdRegra: 91081,
+        numOrdem: 1,
+        dsRegra: 'SBX_REG_TRAVA_PRE_PROCEDIMENTO',
+        ativa: 1,
+        tipoRegra: 'VALIDATE',
+        dsAlerta: 'A conferência segura deve estar marcada antes do encaminhamento.',
+        condicao: 'CONFERENCIA_SEGURA <> "S"',
+        camposAfetados: 'CONFERENCIA_SEGURA',
+        script: null,
+      },
+    ],
     actions: [],
   },
   {
@@ -806,7 +976,47 @@ export function executeDemoQuery(
     return filtered.map(({ TEXTO_ATUAL: _ta, TEXTO_ANTERIOR: _tp, ...row }) => row);
   }
 
-  // 3. Lineage Graph Query 1: Action scripts reading external docs
+  // 3. Document Rules (checked BEFORE Lineage queries so erpv_sub.cd_propriedade IN (4, 36) never collides)
+  if ((upperSql.includes('TIPO_REGRA') && upperSql.includes('CAMPOS_AFETADOS')) || upperSql.includes('EDITOR_REGRA ER')) {
+    const cdDoc = Number(getBindValue(binds, 'CD_DOCUMENTO')) || 9002;
+    const doc = DEMO_DOCS.find((d) => d.id === cdDoc);
+    if (!doc || doc.rules.length === 0) return [];
+
+    const mapRuleRow = (
+      r: DemoDocDef['rules'][number],
+      version: number,
+      tpVersao: 'PUBLISHED' | 'HISTORY',
+      snPublicado: number
+    ) => ({
+      CD_DOCUMENTO: doc.id,
+      DS_DOCUMENTO: doc.name,
+      CD_VERSAO_DOCUMENTO: doc.id * 10 + version,
+      VL_VERSAO: version,
+      TP_VERSAO: tpVersao,
+      SN_PUBLICADO: snPublicado,
+      CD_REGRA: r.cdRegra,
+      NUM_ORDEM: r.numOrdem,
+      DS_REGRA: r.dsRegra,
+      ATIVA: r.ativa,
+      TIPO_REGRA: r.tipoRegra,
+      DS_ALERTA: r.dsAlerta,
+      CONDICAO: r.condicao,
+      QTD_CAMPOS: r.camposAfetados.split(',').filter(Boolean).length,
+      CAMPOS_AFETADOS: r.camposAfetados,
+      SCRIPT: r.script,
+    });
+
+    const rows = doc.rules.map((r) => mapRuleRow(r, doc.version, 'PUBLISHED', 1));
+    if (doc.version > 1) {
+      const prevVersion = doc.version - 1;
+      doc.rules.slice(0, 1).forEach((r) => {
+        rows.push(mapRuleRow(r, prevVersion, 'HISTORY', 0));
+      });
+    }
+    return rows;
+  }
+
+  // 4. Lineage Graph Query 1: Action scripts reading external docs
   if (upperSql.includes('TARGET_DOC_ID') && upperSql.includes('SCRIPT_P1')) {
     const rows: Record<string, unknown>[] = [];
     DEMO_DOCS.forEach((doc) => {
@@ -830,8 +1040,8 @@ export function executeDemoQuery(
     return rows;
   }
 
-  // 4. Lineage Graph Query 2: Involved Document Field Details (V3 or V2)
-  if (upperSql.includes('DS_IDENTIFICADOR') && upperSql.includes('CD_CAMPO') && upperSql.includes('IN (')) {
+  // 5. Lineage Graph Query 2: Involved Document Field Details (V3 or V2)
+  if (upperSql.includes('DS_IDENTIFICADOR') && upperSql.includes('CD_CAMPO') && upperSql.includes('ED.CD_DOCUMENTO IN (')) {
     const requestedIds = new Set(parseInIds(sql));
     const isV2Only = upperSql.includes('DBAMV.EDITOR_DOCUMENTO') && !upperSql.includes('EDITOR.EDITOR_DOCUMENTO');
     const rows: Record<string, unknown>[] = [];
@@ -854,8 +1064,8 @@ export function executeDemoQuery(
     return rows;
   }
 
-  // 5. Lineage Graph Query 3: V2 Header fallback
-  if (upperSql.includes('FROM DBAMV.EDITOR_DOCUMENTO') && upperSql.includes('IN (')) {
+  // 6. Lineage Graph Query 3: V2 Header fallback
+  if (upperSql.includes('FROM DBAMV.EDITOR_DOCUMENTO') && upperSql.includes('ED.CD_DOCUMENTO IN (')) {
     const requestedIds = new Set(parseInIds(sql));
     return DEMO_DOCS.filter((d) => requestedIds.size === 0 || requestedIds.has(d.id)).map((d) => ({
       CD_DOCUMENTO: d.id,
@@ -940,7 +1150,7 @@ export function executeDemoQuery(
         CODIGO_LAYOUT_CABECALHO: 9901,
         DOCUMENTO_CABECALHO: 9000,
         CODIGO_LAYOUT_RODAPE: 9902,
-        QUANTIDADE_REGRAS: Math.max(0, doc.rules.length - 1),
+        QUANTIDADE_REGRAS: doc.rules.length > 0 ? 1 : 0,
         QUANTIDADE_CAMPOS: Math.max(1, doc.fields.length - 1),
       },
     ];
@@ -963,31 +1173,6 @@ export function executeDemoQuery(
       GRUPO_DOCS_RELACIONADOS: a.targetGroup || null,
       DOCUMENTO_RELACIONADO: a.targetDocId ? String(a.targetDocId) : null,
       SCRIPT_ACAO_COMPLETO: a.script,
-    }));
-  }
-
-  // 11. Document Rules
-  if (upperSql.includes('TIPO_REGRA') && upperSql.includes('CAMPOS_AFETADOS')) {
-    const cdDoc = Number(getBindValue(binds, 'CD_DOCUMENTO')) || 9002;
-    const doc = DEMO_DOCS.find((d) => d.id === cdDoc);
-    if (!doc) return [];
-    return doc.rules.map((r) => ({
-      CD_DOCUMENTO: doc.id,
-      DS_DOCUMENTO: doc.name,
-      CD_VERSAO_DOCUMENTO: doc.id * 10 + doc.version,
-      VL_VERSAO: doc.version,
-      TP_VERSAO: 'PUBLISHED',
-      SN_PUBLICADO: 1,
-      CD_REGRA: r.cdRegra,
-      NUM_ORDEM: r.numOrdem,
-      DS_REGRA: r.dsRegra,
-      ATIVA: r.ativa,
-      TIPO_REGRA: r.tipoRegra,
-      DS_ALERTA: r.dsAlerta,
-      CONDICAO: r.condicao,
-      QTD_CAMPOS: r.camposAfetados.split(',').filter(Boolean).length,
-      CAMPOS_AFETADOS: r.camposAfetados,
-      SCRIPT: r.script,
     }));
   }
 

@@ -18,6 +18,7 @@ import {
   StatusMigracao,
   ComplexidadeMigracao
 } from '@/types/migracao.types';
+import { useUI } from '@/context/UIContext';
 import toast from 'react-hot-toast';
 
 interface MigracaoDrawerProps {
@@ -52,6 +53,7 @@ export function MigracaoDrawer({
   initialFlexDoc,
   initialStatus
 }: MigracaoDrawerProps) {
+  const { confirmAction } = useUI();
   // Seção 1: Dados da Demanda
   const [flexId, setFlexId] = useState<string>('');
   const [flexSearch, setFlexSearch] = useState<string>('');
@@ -203,7 +205,14 @@ export function MigracaoDrawer({
 
   const handleDelete = async () => {
     if (!migracao?.id || !onDelete) return;
-    if (confirm('Tem certeza que deseja excluir esta demanda de migração?')) {
+    const confirmed = await confirmAction({
+      title: 'Excluir Demanda de Migração',
+      description: 'Tem certeza que deseja excluir esta demanda de migração do quadro?',
+      confirmLabel: 'Excluir Demanda',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (confirmed) {
       try {
         await onDelete(migracao.id);
         toast.success('Demanda excluída com sucesso!');
@@ -226,24 +235,24 @@ export function MigracaoDrawer({
 
       {/* Drawer deslizante da direita */}
       <div className="fixed inset-y-0 right-0 max-w-full flex pl-6 sm:pl-10">
-        <div className="w-screen max-w-2xl bg-white border-l border-slate-200 shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+        <div className="w-screen max-w-2xl sylva-glass bg-[var(--card-bg)] border-l border-[var(--border-subtle)] shadow-2xl flex flex-col animate-in slide-in-from-right duration-200 text-[var(--text-primary)]">
           
           {/* Header da Gaveta */}
-          <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+          <div className="px-6 py-4.5 border-b border-[var(--border-subtle)] flex items-center justify-between bg-[var(--dock-bg)]/80">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-teal-50 text-[#004953] border border-teal-100 flex items-center justify-center shrink-0 shadow-2xs">
+              <div className="w-10 h-10 rounded-2xl bg-[#CCF352]/10 text-[#CCF352] border border-[#CCF352]/20 flex items-center justify-center shrink-0 shadow-2xs">
                 <Layers size={18} />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                  <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)]">
                     {migracao ? 'Detalhe da Demanda de Migração' : 'Nova Demanda de Migração'}
                   </h3>
-                  <Badge variant="outline" className="text-[10px] font-bold border-teal-200 bg-teal-50 text-[#004953] rounded-full">
+                  <Badge variant="outline" className="text-[10px] font-bold border-[#CCF352]/30 bg-[#CCF352]/10 text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205] rounded-full">
                     PEP MV
                   </Badge>
                 </div>
-                <p className="text-xs text-slate-500 font-medium truncate max-w-md mt-0.5">
+                <p className="text-xs text-[var(--text-muted)] font-medium truncate max-w-md mt-0.5">
                   {tipoDocumento || 'Transição V2 Flex ➔ V3 Editor'}
                 </p>
               </div>
@@ -251,7 +260,7 @@ export function MigracaoDrawer({
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-all cursor-pointer"
+              className="p-1.5 rounded-full text-[var(--text-muted)] hover:text-[#CCF352] hover:bg-white/5 transition-all cursor-pointer"
             >
               <X size={18} />
             </button>
@@ -262,8 +271,8 @@ export function MigracaoDrawer({
             
             {/* 1. DADOS DA DEMANDA */}
             <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-100 text-xs font-bold text-slate-900 uppercase tracking-wider">
-                <Tag size={14} className="text-[#004953]" />
+              <div className="flex items-center gap-2 pb-2 border-b border-[#EDF4F2] text-xs font-bold text-[#0F2426] uppercase tracking-wider">
+                <Tag size={14} className="text-[#074E52]" />
                 <span>Dados da Demanda</span>
               </div>
 
@@ -285,7 +294,7 @@ export function MigracaoDrawer({
                     placeholder="Pesquisar por código (ex: 1914) ou nome..."
                     value={flexSearch}
                     onChange={(e) => setFlexSearch(e.target.value)}
-                    className="w-full h-8 pl-8 pr-2.5 rounded-lg border border-slate-200 bg-slate-50/70 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#004953] focus:bg-white transition-all shadow-2xs"
+                    className="w-full h-8 pl-8 pr-2.5 rounded-lg border border-[#D5E4E0] bg-[#F7FAF9] text-xs text-[#0F2426] placeholder:text-slate-400 focus:outline-none focus:border-[#074E52] focus:bg-white transition-all shadow-2xs"
                   />
                 </div>
 
@@ -297,7 +306,7 @@ export function MigracaoDrawer({
                     if (selected && !tipoDocumento) setTipoDocumento(selected.nome);
                   }}
                   required
-                  className="w-full h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-[#004953] shadow-2xs font-mono"
+                  className="w-full h-9 px-3 rounded-xl border border-[#D5E4E0] bg-white text-xs text-[#0F2426] focus:outline-none focus:border-[#074E52] shadow-2xs font-mono"
                 >
                   <option value="" className="font-sans">Selecione o modelo Flex...</option>
                   {sortedAndFilteredFlex.map(d => (
@@ -314,7 +323,7 @@ export function MigracaoDrawer({
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value as StatusMigracao)}
-                    className="w-full h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-[#004953] shadow-2xs font-semibold"
+                    className="w-full h-9 px-3 rounded-xl border border-[#D5E4E0] bg-white text-xs text-[#0F2426] focus:outline-none focus:border-[#074E52] shadow-2xs font-semibold"
                   >
                     <option value="PENDENTES">Pendentes</option>
                     <option value="DESENVOLVIMENTO">Desenvolvimento</option>
@@ -330,7 +339,7 @@ export function MigracaoDrawer({
                   <select
                     value={complexidade}
                     onChange={(e) => setComplexidade(e.target.value as ComplexidadeMigracao)}
-                    className="w-full h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-[#004953] shadow-2xs"
+                    className="w-full h-9 px-3 rounded-xl border border-[#D5E4E0] bg-white text-xs text-[#0F2426] focus:outline-none focus:border-[#074E52] shadow-2xs"
                   >
                     <option value="BAIXA">Baixa</option>
                     <option value="MEDIA">Média</option>
@@ -351,8 +360,8 @@ export function MigracaoDrawer({
 
             {/* 2. RESPONSÁVEIS */}
             <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-100 text-xs font-bold text-slate-900 uppercase tracking-wider">
-                <User size={14} className="text-[#004953]" />
+              <div className="flex items-center gap-2 pb-2 border-b border-[#EDF4F2] text-xs font-bold text-[#0F2426] uppercase tracking-wider">
+                <User size={14} className="text-[#074E52]" />
                 <span>Responsáveis</span>
               </div>
 
@@ -389,8 +398,8 @@ export function MigracaoDrawer({
 
             {/* 3. DADOS DOCUMENTO (DE-PARA DESTINO) */}
             <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-100 text-xs font-bold text-slate-900 uppercase tracking-wider">
-                <GitBranch size={14} className="text-[#004953]" />
+              <div className="flex items-center gap-2 pb-2 border-b border-[#EDF4F2] text-xs font-bold text-[#0F2426] uppercase tracking-wider">
+                <GitBranch size={14} className="text-[#074E52]" />
                 <span>Dados Documento (Destino V3)</span>
               </div>
 
@@ -414,7 +423,7 @@ export function MigracaoDrawer({
                       placeholder="Pesquisar por código (ex: 622) ou nome..."
                       value={html5Search}
                       onChange={(e) => setHtml5Search(e.target.value)}
-                      className="w-full h-8 pl-8 pr-2.5 rounded-lg border border-slate-200 bg-slate-50/70 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#004953] focus:bg-white transition-all shadow-2xs"
+                      className="w-full h-8 pl-8 pr-2.5 rounded-lg border border-[#D5E4E0] bg-[#F7FAF9] text-xs text-[#0F2426] placeholder:text-slate-400 focus:outline-none focus:border-[#074E52] focus:bg-white transition-all shadow-2xs"
                     />
                   </div>
 
@@ -422,7 +431,7 @@ export function MigracaoDrawer({
                   <select
                     value={html5Id}
                     onChange={(e) => setHtml5Id(e.target.value)}
-                    className="w-full h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-[#004953] shadow-2xs font-mono"
+                    className="w-full h-9 px-3 rounded-xl border border-[#D5E4E0] bg-white text-xs text-[#0F2426] focus:outline-none focus:border-[#074E52] shadow-2xs font-mono"
                   >
                     <option value="" className="font-sans">Ainda não pareado / Em desenvolvimento</option>
                     {sortedAndFilteredHtml5.map(d => (
@@ -450,8 +459,8 @@ export function MigracaoDrawer({
 
             {/* 4. REGRAS E RELACIONAMENTOS FLEX */}
             <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-100 text-xs font-bold text-slate-900 uppercase tracking-wider">
-                <ShieldCheck size={14} className="text-[#004953]" />
+              <div className="flex items-center gap-2 pb-2 border-b border-[#EDF4F2] text-xs font-bold text-[#0F2426] uppercase tracking-wider">
+                <ShieldCheck size={14} className="text-[#074E52]" />
                 <span>Regras e Relacionamentos Flex</span>
               </div>
 
@@ -478,8 +487,8 @@ export function MigracaoDrawer({
 
             {/* 5. CRONOGRAMA */}
             <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-100 text-xs font-bold text-slate-900 uppercase tracking-wider">
-                <Clock size={14} className="text-[#004953]" />
+              <div className="flex items-center gap-2 pb-2 border-b border-[#EDF4F2] text-xs font-bold text-[#0F2426] uppercase tracking-wider">
+                <Clock size={14} className="text-[#074E52]" />
                 <span>Cronograma</span>
               </div>
 
@@ -518,8 +527,8 @@ export function MigracaoDrawer({
 
             {/* 6. CHECKLIST DE GOVERNANÇA ASSISTENCIAL */}
             <div className="space-y-3">
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-100 text-xs font-bold text-slate-900 uppercase tracking-wider">
-                <CheckSquare size={14} className="text-[#004953]" />
+              <div className="flex items-center gap-2 pb-2 border-b border-[#EDF4F2] text-xs font-bold text-[#0F2426] uppercase tracking-wider">
+                <CheckSquare size={14} className="text-[#074E52]" />
                 <span>Checklist de Homologação</span>
               </div>
 
@@ -528,16 +537,16 @@ export function MigracaoDrawer({
                   <div 
                     key={item.id}
                     onClick={() => handleToggleChecklist(item.id)}
-                    className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-slate-50 border border-slate-100 transition-all cursor-pointer select-none"
+                    className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-[#F7FAF9] border border-[#EDF4F2] transition-all cursor-pointer select-none"
                   >
                     {item.concluido ? (
-                      <CheckSquare size={15} className="text-[#004953]" />
+                      <CheckSquare size={15} className="text-[#074E52]" />
                     ) : (
                       <Square size={15} className="text-slate-300" />
                     )}
                     <span className={cn(
                       "text-xs transition-colors",
-                      item.concluido ? "text-slate-900 font-semibold" : "text-slate-500"
+                      item.concluido ? "text-[#0F2426] font-semibold" : "text-slate-500"
                     )}>
                       {item.label}
                     </span>
@@ -560,14 +569,14 @@ export function MigracaoDrawer({
           </form>
 
           {/* Footer Fixo de Ações */}
-          <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between">
+          <div className="px-6 py-3.5 border-t border-[var(--border-subtle)] bg-[var(--dock-bg)]/80 flex items-center justify-between">
             {migracao ? (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={handleDelete}
-                className="h-9 px-3 text-xs text-rose-700 hover:text-rose-900 hover:bg-rose-50 border-rose-200 cursor-pointer shadow-2xs gap-1.5"
+                className="h-9 px-3 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border-rose-500/30 cursor-pointer shadow-2xs gap-1.5"
               >
                 <Trash2 size={13} />
                 <span>Excluir</span>
@@ -580,7 +589,7 @@ export function MigracaoDrawer({
                 variant="outline"
                 size="sm"
                 onClick={onClose}
-                className="h-9 px-4 text-xs font-semibold rounded-full border-slate-200 bg-white hover:bg-slate-50 text-slate-700 cursor-pointer shadow-2xs"
+                className="h-9 px-4 text-xs font-semibold rounded-full border-[var(--border-subtle)] bg-[var(--card-bg)] hover:bg-[var(--dock-bg)] text-[var(--text-primary)] cursor-pointer shadow-2xs"
               >
                 Cancelar
               </Button>
@@ -590,7 +599,7 @@ export function MigracaoDrawer({
                 size="sm"
                 onClick={handleSubmit}
                 disabled={saving}
-                className="h-9 px-5 text-xs font-semibold rounded-full bg-[#004953] hover:bg-[#003b44] text-white cursor-pointer shadow-2xs gap-1.5 transition-all"
+                className="h-9 px-5 text-xs font-bold rounded-full bg-[#CCF352] hover:bg-[#b8dd3e] text-[#141312] cursor-pointer shadow-2xs gap-1.5 transition-all"
               >
                 <Save size={13} />
                 <span>{saving ? 'Salvando...' : 'Salvar Demanda'}</span>

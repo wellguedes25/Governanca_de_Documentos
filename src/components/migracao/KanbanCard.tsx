@@ -2,12 +2,10 @@
 
 import React from 'react';
 import { 
-  Clock, Calendar, User, ArrowRight, CheckCircle2, 
-  ExternalLink, Layers, AlertCircle, FileText
+  User, Layers, ArrowRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DocumentoMigracao } from '@/types/migracao.types';
-import { Badge } from '@/components/ui/badge';
 
 interface KanbanCardProps {
   migracao: DocumentoMigracao;
@@ -17,8 +15,7 @@ interface KanbanCardProps {
 
 export function KanbanCard({
   migracao,
-  onSelect,
-  onMoveToStatus
+  onSelect
 }: KanbanCardProps) {
   const nomeDoc = migracao.documento_flex?.nome || migracao.documento_html5?.nome || migracao.tipo_documento || 'Documento Sem Nome';
   const flexCod = migracao.documento_flex?.cd_documento_mv || migracao.documento_flex_id;
@@ -27,9 +24,9 @@ export function KanbanCard({
 
   // Badges de Complexidade
   const complexidadeBadge = {
-    BAIXA: { label: 'Baixa', class: 'bg-slate-100 text-slate-700 border-slate-200' },
-    MEDIA: { label: 'Média', class: 'bg-amber-50 text-amber-800 border-amber-200' },
-    ALTA: { label: 'Alta', class: 'bg-rose-50 text-rose-800 border-rose-200' }
+    BAIXA: { label: 'Baixa', class: 'bg-[var(--dock-bg)] text-[var(--text-secondary)] border-[var(--border-subtle)]' },
+    MEDIA: { label: 'Média', class: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
+    ALTA: { label: 'Alta', class: 'bg-rose-500/10 text-rose-400 border-rose-500/30' }
   }[migracao.complexidade || 'MEDIA'];
 
   // Formatação de datas
@@ -46,12 +43,12 @@ export function KanbanCard({
   return (
     <div
       onClick={() => onSelect(migracao)}
-      className="group bg-white rounded-xl border border-slate-200/90 hover:border-sky-300 hover:shadow-md transition-all p-3.5 flex flex-col justify-between cursor-pointer space-y-3 relative"
+      className="group sylva-card bg-[var(--card-bg)] rounded-xl border border-[var(--border-subtle)] hover:border-[#CCF352]/40 hover:shadow-md transition-all p-3.5 flex flex-col justify-between cursor-pointer space-y-3 relative text-[var(--text-primary)]"
     >
       {/* Top Header: Nome + Complexidade */}
       <div>
         <div className="flex items-start justify-between gap-2 mb-1.5">
-          <h4 className="text-xs font-bold text-slate-900 group-hover:text-[#004953] transition-colors leading-snug line-clamp-2">
+          <h4 className="text-xs font-bold text-[var(--text-primary)] group-hover:text-[#CCF352] transition-colors leading-snug line-clamp-2 normal-case tracking-normal">
             {nomeDoc}
           </h4>
           <span className={cn(
@@ -63,17 +60,17 @@ export function KanbanCard({
         </div>
 
         {/* Tags de Identificação Técnica */}
-        <div className="flex items-center gap-1.5 flex-wrap text-[10px] font-mono font-medium text-slate-500 mt-1">
-          <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">
-            Flex: <strong className="text-slate-900">{flexCod}</strong>
+        <div className="flex items-center gap-1.5 flex-wrap text-[10px] font-mono font-medium text-[var(--text-muted)] mt-1">
+          <span className="bg-[var(--dock-bg)] px-1.5 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border-subtle)]">
+            Flex: <strong className="text-[var(--text-primary)]">{flexCod}</strong>
           </span>
           {html5Cod && (
-            <span className="bg-emerald-50 px-1.5 py-0.5 rounded text-emerald-800 border border-emerald-200/70">
+            <span className="bg-[#CCF352]/10 px-1.5 py-0.5 rounded text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205] border border-[#CCF352]/30">
               HTML5: <strong>{html5Cod}</strong>
             </span>
           )}
           {migracao.lecom && (
-            <span className="bg-sky-50 px-1.5 py-0.5 rounded text-sky-800 border border-sky-200/70">
+            <span className="bg-sky-500/10 px-1.5 py-0.5 rounded text-sky-400 border border-sky-500/30">
               LECOM: <strong>{migracao.lecom}</strong>
             </span>
           )}
@@ -81,35 +78,35 @@ export function KanbanCard({
       </div>
 
       {/* Datas e Cronograma */}
-      <div className="bg-slate-50/80 rounded-lg p-2 border border-slate-100 text-[10px] space-y-1">
-        <div className="flex justify-between items-center text-slate-500">
+      <div className="bg-[var(--dock-bg)]/50 rounded-lg p-2 border border-[var(--border-subtle)] text-[10px] space-y-1">
+        <div className="flex justify-between items-center text-[var(--text-muted)]">
           <span>Limite dev:</span>
-          <span className="font-mono font-semibold text-slate-700">
+          <span className="font-mono font-semibold text-[var(--text-primary)]">
             {formatDate(migracao.data_conclusao_prevista)}
           </span>
         </div>
-        <div className="flex justify-between items-center text-slate-500">
+        <div className="flex justify-between items-center text-[var(--text-muted)]">
           <span>Entrada produção:</span>
-          <span className="font-mono font-semibold text-slate-700">
+          <span className="font-mono font-semibold text-[var(--text-primary)]">
             {formatDate(migracao.data_conclusao_efetiva)}
           </span>
         </div>
       </div>
 
       {/* Footer: Responsável */}
-      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-        <div className="flex items-center gap-1.5 truncate pr-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0" />
-          <span className="text-slate-600 truncate font-medium text-[10px]">
+      <div className="pt-2 border-t border-[var(--border-subtle)] flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
+        <div className="flex items-center gap-1.5 truncate">
+          <div className="w-5 h-5 rounded-full bg-[var(--dock-bg)] flex items-center justify-center text-[10px] font-bold text-[var(--text-primary)] border border-[var(--border-subtle)] shrink-0">
+            {resp.charAt(0).toUpperCase()}
+          </div>
+          <span className="truncate text-[10px] text-[var(--text-secondary)] font-medium">
             {resp}
           </span>
         </div>
 
-        {migracao.checklist && migracao.checklist.length > 0 && (
-          <span className="text-[10px] font-mono text-slate-400 shrink-0" title="Itens de homologação concluídos">
-            {migracao.checklist.filter(c => c.concluido).length}/{migracao.checklist.length}
-          </span>
-        )}
+        <span className="text-[10px] font-semibold text-[#CCF352] flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+          Detalhes <ArrowRight size={11} />
+        </span>
       </div>
     </div>
   );

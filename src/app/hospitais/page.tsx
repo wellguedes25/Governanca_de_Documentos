@@ -9,25 +9,22 @@ import {
   RotateCw, 
   ArrowLeft,
   TrendingUp,
-  Database,
   AlertTriangle,
   Loader2,
   ShieldCheck,
   CheckCircle2,
-  AlertCircle,
-  ExternalLink,
   Layers,
-  ChevronRight
+  ChevronRight,
+  Sparkles
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn, formatDateTime } from '@/lib/utils';
 import { useUI } from '@/context/UIContext';
-import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DbConnection, HospitalMapping } from '@/lib/storage';
-import { DocumentDetailsDrawer } from '@/components/documentos/DocumentDetailsDrawer';
+import { DocumentDetailsModal } from '@/components/documentos/DocumentDetailsModal';
 
 interface DetailItem {
   CD_DOCUMENTO: string;
@@ -70,8 +67,7 @@ interface HospitalItem extends HospitalMapping {
 }
 
 export default function HospitaisPage() {
-  const { docVersion } = useUI();
-  const router = useRouter();
+  const { docVersion, getCached, setCached, activeConnInfo, setActiveConnInfo } = useUI();
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,11 +77,12 @@ export default function HospitaisPage() {
   const [activeConnName, setActiveConnName] = useState('');
   const [activeConnId, setActiveConnId] = useState('');
 
-  // Drawer de Metadados Integrado
+  // Modal Unificado de Metadados e Perfis Integrado
   const [sidebarDoc, setSidebarDoc] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [metadata, setMetadata] = useState<any[]>([]);
   const [metadataLoading, setMetadataLoading] = useState(false);
+  const [metadataError, setMetadataError] = useState<string | null>(null);
   const [metadataActions, setMetadataActions] = useState<any[]>([]);
   const [metadataActionsLoading, setMetadataActionsLoading] = useState(false);
   const [metadataActionsError, setMetadataActionsError] = useState<string | null>(null);
@@ -95,6 +92,9 @@ export default function HospitaisPage() {
   const [metadataFields, setMetadataFields] = useState<any[]>([]);
   const [metadataFieldsLoading, setMetadataFieldsLoading] = useState(false);
   const [metadataFieldsError, setMetadataFieldsError] = useState<string | null>(null);
+  const [profileData, setProfileData] = useState<any[]>([]);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   // Versão ativa resolvida com fallback
   const resolvedVersion = docVersion || 'V3';
@@ -120,103 +120,189 @@ export default function HospitaisPage() {
 
   const selectedHospital = hospitals[selectedIdx];
 
-  // Busca de Metadados para o Drawer
-  const fetchDocDetails = async (docId: string) => {
+  // Busca de Metadados e Perfis para o Modal com Cache Integrado
+  const fetchDocDetails = async (docId: string, force = false) => {
     setSidebarDoc(docId);
     setSidebarOpen(true);
+
+    const metaKey = `meta_${docId}_${resolvedVersion}`;
+    const actionsKey = `actions_${docId}_${resolvedVersion}`;
+    const rulesKey = `rules_${docId}_${resolvedVersion}`;
+    const fieldsKey = `fields_${docId}`;
+    const profileKey = `profile_${docId}_${resolvedVersion}`;
+
+    if (!force) {
+      const cachedMeta = getCached<any[]>(metaKey);
+      const cachedActions = getCached<any[]>(actionsKey);
+      const cachedRules = getCached<any[]>(rulesKey);
+      const cachedFields = getCached<any[]>(fieldsKey);
+      const cachedProfiles = getCached<any[]>(profileKey);
+
+      if (cachedMeta && cachedActions && cachedRules && cachedFields && cachedProfiles) {
+        setMetadata(cachedMeta);
+        setMetadataActions(cachedActions);
+        setMetadataRules(cachedRules);
+        setMetadataFields(cachedFields);
+        setProfileData(cachedProfiles);
+        setMetadataError(null);
+        setMetadataActionsError(null);
+        setMetadataRulesError(null);
+        setMetadataFieldsError(null);
+        setProfileError(null);
+        setMetadataLoading(false);
+        setMetadataActionsLoading(false);
+        setMetadataRulesLoading(false);
+        setMetadataFieldsLoading(false);
+        setProfileLoading(false);
+        return;
+      }
+    }
+
     setMetadataLoading(true);
     setMetadataActionsLoading(true);
     setMetadataRulesLoading(true);
     setMetadataFieldsLoading(true);
+    setProfileLoading(true);
+    setMetadataError(null);
+    setMetadataActionsError(null);
+    setMetadataRulesError(null);
+    setMetadataFieldsError(null);
+    setProfileError(null);
+
+    const cleanId = String(docId).trim();
 
     try {
-      const [resMeta, resActions, resRules, resFields] = await Promise.all([
+      const [resMeta, resActions, resRules, resFields, resProfiles] = await Promise.all([
         fetch('/api/oracle/execute', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: 'METADATA', version: resolvedVersion, params: { CD_DOCUMENTO: docId } })
+          body: JSON.stringify({ query: 'METADATA', version: resolvedVersion, params: { CD_DOCUMENTO: cleanId }, forceRefresh: force })
         }).then(r => r.json()),
         fetch('/api/oracle/execute', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: 'ACTIONS', version: resolvedVersion, params: { CD_DOCUMENTO: docId } })
+          body: JSON.stringify({ query: 'ACTIONS', version: resolvedVersion, params: { CD_DOCUMENTO: cleanId }, forceRefresh: force })
         }).then(r => r.json()),
         fetch('/api/oracle/execute', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: 'RULES', version: resolvedVersion, params: { CD_DOCUMENTO: docId } })
+          body: JSON.stringify({ query: 'RULES', version: resolvedVersion, params: { CD_DOCUMENTO: cleanId }, forceRefresh: force })
         }).then(r => r.json()),
         fetch('/api/oracle/execute', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: 'FIELDS', params: { CD_DOCUMENTO: docId } })
+          body: JSON.stringify({ query: 'FIELDS', params: { CD_DOCUMENTO: cleanId }, forceRefresh: force })
+        }).then(r => r.json()),
+        fetch('/api/oracle/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: 'PROFILE', version: resolvedVersion, params: { CD_DOCUMENTO: cleanId }, forceRefresh: force })
         }).then(r => r.json())
       ]);
 
-      setMetadata(resMeta.rows || []);
-      setMetadataActions(resActions.rows || []);
-      setMetadataRules(resRules.rows || []);
-      setMetadataFields(resFields.rows || []);
-    } catch (e) {
-      console.error('Erro ao buscar detalhes do documento:', e);
+      if (resMeta.error) setMetadataError(resMeta.error);
+      else {
+        const mRows = resMeta.rows || [];
+        setMetadata(mRows);
+        setCached(metaKey, mRows);
+      }
+
+      if (resActions.error) setMetadataActionsError(resActions.error);
+      else {
+        const aRows = resActions.rows || [];
+        setMetadataActions(aRows);
+        setCached(actionsKey, aRows);
+      }
+
+      if (resRules.error) setMetadataRulesError(resRules.error);
+      else {
+        const rRows = resRules.rows || [];
+        setMetadataRules(rRows);
+        setCached(rulesKey, rRows);
+      }
+
+      if (resFields.error) setMetadataFieldsError(resFields.error);
+      else {
+        const fRows = resFields.rows || [];
+        setMetadataFields(fRows);
+        setCached(fieldsKey, fRows);
+      }
+
+      if (resProfiles.error) setProfileError(resProfiles.error);
+      else {
+        const pRows = resProfiles.rows || [];
+        setProfileData(pRows);
+        setCached(profileKey, pRows);
+      }
+    } catch (err: any) {
+      console.error('Erro ao buscar metadados do documento:', err);
+      setMetadataError('Falha de comunicação com o servidor Oracle.');
     } finally {
       setMetadataLoading(false);
       setMetadataActionsLoading(false);
       setMetadataRulesLoading(false);
       setMetadataFieldsLoading(false);
+      setProfileLoading(false);
     }
   };
 
-  // Busca de Dados do Hospital (Respeitando a Versão V2 vs V3 e Conexão)
-  const fetchData = useCallback(async (id: string, force = false) => {
-    const cacheKey = `hospital_data_${id}_${resolvedVersion}_${activeConnId || 'default'}`;
-    
+  // Busca dados de estatísticas e SLA do hospital com cache multinível
+  const fetchData = useCallback(async (hId: string, force = false) => {
+    const cacheKey = `hospital_data_${hId}_${resolvedVersion}_${activeConnId || 'default'}`;
+
     if (!force) {
-      const cachedStr = sessionStorage.getItem(cacheKey);
-      if (cachedStr) {
-        try {
-          const cached = JSON.parse(cachedStr);
-          setData(cached.stats);
-          setQualityData(cached.quality);
-          setError(null);
-          return;
-        } catch (e) {}
+      const cached = getCached<any>(cacheKey);
+      if (cached) {
+        setData(cached.stats);
+        setQualityData(cached.quality);
+        setLoading(false);
+        return;
       }
     }
 
     setLoading(true);
     setError(null);
+
     try {
+      const forceParam = force ? '&force=true' : '';
       const [resStats, resQuality] = await Promise.all([
-        fetch(`/api/hospitals/stats?id=${id}&version=${resolvedVersion}${force ? '&force=true' : ''}`),
-        fetch(`/api/hospitals/quality?id=${id}&version=${resolvedVersion}${force ? '&force=true' : ''}`)
+        fetch(`/api/dashboard/stats?type=hospital&hospitalId=${hId}&version=${resolvedVersion}${forceParam}`),
+        fetch(`/api/dashboard/quality?hospitalId=${hId}&version=${resolvedVersion}${forceParam}`)
       ]);
-      
+
       const jsonStats = await resStats.json();
       const jsonQuality = await resQuality.json();
-      
+
       if (jsonStats.error) {
         setError(jsonStats.error);
+        setData(null);
         return;
       }
       
       setData(jsonStats);
       setQualityData(jsonQuality);
 
-      sessionStorage.setItem(cacheKey, JSON.stringify({
+      setCached(cacheKey, {
         stats: jsonStats,
         quality: jsonQuality
-      }));
+      });
     } catch (err: any) {
       console.error('Erro ao buscar dados do hospital:', err);
       setError('Falha na comunicação com o servidor Oracle.');
     } finally {
       setLoading(false);
     }
-  }, [resolvedVersion, activeConnId]);
+  }, [resolvedVersion, activeConnId, getCached, setCached]);
 
-  // Carrega conexões e lista de hospitais ativos
+  // Carrega conexões e lista de hospitais ativos reaproveitando contexto global
   useEffect(() => {
+    if (activeConnInfo) {
+      setActiveConnName(activeConnInfo.name);
+      setActiveConnId(activeConnInfo.id);
+      setHospitals(activeConnInfo.activeHospitals);
+      return;
+    }
+
     fetch('/api/connections')
       .then(res => res.json())
       .then(storage => {
@@ -236,6 +322,14 @@ export default function HospitaisPage() {
             }));
           setHospitals(active);
 
+          if (storage.activeConnectionId) {
+            setActiveConnInfo({
+              id: storage.activeConnectionId,
+              name: storage.connections?.find((c: any) => c.id === storage.activeConnectionId)?.name || 'Oracle',
+              activeHospitals: active
+            });
+          }
+
           // Suporte a seleção via query param ?id=X
           if (typeof window !== 'undefined') {
             const urlParams = new URLSearchParams(window.location.search);
@@ -253,7 +347,7 @@ export default function HospitaisPage() {
         console.error('Erro ao carregar conexões:', err);
         setError('Não foi possível obter a lista de hospitais configurados.');
       });
-  }, []);
+  }, [activeConnInfo, setActiveConnInfo]);
 
   // Dispara busca quando hospital selecionado ou versão mudar
   useEffect(() => {
@@ -265,41 +359,41 @@ export default function HospitaisPage() {
   if (hospitals.length === 0 && !error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-        <Loader2 className="w-9 h-9 animate-spin text-sky-600" />
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Carregando unidades hospitalares...</p>
+        <Loader2 className="w-9 h-9 animate-spin text-[#CCF352]" />
+        <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Carregando unidades hospitalares...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 flex flex-col p-4 md:p-8 space-y-6 pb-24">
+    <div className="flex flex-col space-y-6">
       
       {/* 1. Header Padronizado */}
-      <div className="pb-4 border-b border-slate-200/80">
+      <div className="pb-3 border-b border-[var(--border-subtle)]">
         <PageHeader 
+          kicker="REDE ASSISTENCIAL • MONITORAMENTO OPERACIONAL"
           title="Unidades Hospitalares"
-          subtitle={selectedHospital ? `${selectedHospital.nome} — Monitoramento de Uso Clínico` : "Gestão Operacional de Prontuários"}
+          subtitle={selectedHospital ? `${selectedHospital.nome} — Monitoramento de Uso Clínico em Tempo Real` : "Gestão Operacional de Prontuários"}
           icon={Building2}
           badge={
             <Badge 
               variant="outline" 
               suppressHydrationWarning
-              className="text-[10px] font-bold px-2 py-0.5 rounded-full border-sky-300 bg-sky-50 text-sky-800"
+              className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border-[#CCF352]/30 bg-[#CCF352]/10 text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205]"
             >
               Motor {resolvedVersion}
             </Badge>
           }
           action={
-            <>
+            <div className="flex items-center gap-2 flex-wrap">
               {selectedHospital && (
                 <Button
-                  variant="outline"
                   size="sm"
                   onClick={() => fetchData(String(selectedHospital.id), true)}
                   disabled={loading}
-                  className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-2xs cursor-pointer h-9 px-4"
+                  className="gap-2 text-xs font-bold rounded-full bg-[#CCF352] hover:bg-[#b8dd3e] text-[#141312] shadow-2xs cursor-pointer h-9 px-4 transition-all"
                 >
-                  <RotateCw className={cn("w-3.5 h-3.5 text-sky-600", loading && "animate-spin")} />
+                  <RotateCw className={cn("w-3.5 h-3.5 text-[#141312]", loading && "animate-spin")} />
                   <span>Sincronizar Agora</span>
                 </Button>
               )}
@@ -308,9 +402,9 @@ export default function HospitaisPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-2xs h-9 px-4 cursor-pointer"
+                  className="gap-2 text-xs font-semibold rounded-full bg-[var(--dock-bg)] hover:bg-[var(--card-bg)] border-[var(--border-subtle)] text-[var(--text-primary)] shadow-2xs h-9 px-4 cursor-pointer"
                 >
-                  <FileText className="w-3.5 h-3.5 text-slate-500" />
+                  <FileText className="w-3.5 h-3.5 text-[var(--text-muted)]" />
                   <span>Ver Todos os Documentos</span>
                 </Button>
               </Link>
@@ -319,22 +413,22 @@ export default function HospitaisPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-2xs h-9 px-4 cursor-pointer"
+                  className="gap-2 text-xs font-semibold rounded-full bg-[var(--dock-bg)] hover:bg-[var(--card-bg)] border-[var(--border-subtle)] text-[var(--text-primary)] shadow-2xs h-9 px-4 cursor-pointer"
                 >
-                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <ArrowLeft className="w-3.5 h-3.5 text-[var(--text-muted)]" />
                   <span>Dashboard Geral</span>
                 </Button>
               </Link>
-            </>
+            </div>
           }
         />
       </div>
 
-      {/* 2. Seletor de Hospitais em Pílulas Modernas */}
-      <div className="bg-white p-2 rounded-2xl border border-slate-200/80 shadow-2xs overflow-x-auto scrollbar-thin">
+      {/* 2. Seletor de Hospitais em Dock Sylva */}
+      <div className="sylva-dock bg-[var(--dock-bg)]/80 p-2 rounded-2xl border border-[var(--border-subtle)] overflow-x-auto scrollbar-thin backdrop-blur-md">
         <div className="flex items-center gap-1.5 min-w-max">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3 flex items-center gap-1.5">
-            <Building2 size={13} className="text-slate-400" />
+          <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider px-3 flex items-center gap-1.5">
+            <Building2 size={13} className="text-[#CCF352]" />
             Unidade:
           </span>
           {hospitals.map((h, idx) => {
@@ -346,15 +440,17 @@ export default function HospitaisPage() {
                 onClick={() => setSelectedIdx(idx)}
                 className={cn(
                   "px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer",
-                  isSelected 
-                    ? "bg-[#004953] text-white shadow-2xs" 
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
+                  isSelected
+                    ? "bg-[#CCF352] text-[#141312] shadow-2xs font-bold scale-102"
+                    : "bg-[var(--card-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5 border border-[var(--border-subtle)]"
                 )}
               >
                 <span>{h.sigla}</span>
                 <span className={cn(
-                  "text-[10px] font-mono px-1.5 py-0.2 rounded-full",
-                  isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+                  "text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold",
+                  isSelected
+                    ? "bg-black/15 text-[#141312]"
+                    : "bg-[var(--dock-bg)] text-[var(--text-muted)]"
                 )}>
                   #{h.id}
                 </span>
@@ -366,12 +462,12 @@ export default function HospitaisPage() {
 
       {/* 3. Mensagem de Erro de Conectividade */}
       {error && (
-        <div className="bg-rose-50 border border-rose-200 p-4 rounded-2xl flex items-center justify-between gap-4 text-rose-800 shadow-2xs">
+        <div className="bg-rose-500/10 border border-rose-500/30 p-4 rounded-2xl flex items-center justify-between gap-4 text-rose-400 shadow-2xs">
           <div className="flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+            <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0" />
             <div>
               <p className="text-xs font-bold">Falha ao obter métricas da unidade hospitalar</p>
-              <p className="text-[11px] text-rose-600 font-mono mt-0.5">{error}</p>
+              <p className="text-[11px] text-rose-400 font-mono mt-0.5">{error}</p>
             </div>
           </div>
           {selectedHospital && (
@@ -379,7 +475,7 @@ export default function HospitaisPage() {
               size="sm" 
               variant="outline"
               onClick={() => fetchData(String(selectedHospital.id), true)}
-              className="text-xs border-rose-300 text-rose-700 bg-white hover:bg-rose-100/60 rounded-full cursor-pointer shrink-0"
+              className="text-xs border-rose-500/30 text-rose-400 bg-transparent hover:bg-rose-500/20 rounded-full cursor-pointer shrink-0"
             >
               Tentar Novamente
             </Button>
@@ -392,118 +488,120 @@ export default function HospitaisPage() {
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-2xs space-y-3 animate-pulse">
-                <div className="skeleton h-4 w-28 rounded-md" />
-                <div className="skeleton h-8 w-24 rounded-md" />
-                <div className="skeleton h-3 w-36 rounded-md" />
+              <div key={i} className="sylva-glass bg-[var(--card-bg)] rounded-2xl p-5 border border-[var(--border-subtle)] shadow-2xs space-y-3 animate-pulse">
+                <div className="h-4 w-28 bg-black/10 dark:bg-white/10 rounded-md" />
+                <div className="h-8 w-24 bg-black/10 dark:bg-white/10 rounded-md" />
+                <div className="h-3 w-36 bg-black/10 dark:bg-white/10 rounded-md" />
               </div>
             ))}
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs h-72 animate-pulse" />
-            <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs h-72 animate-pulse" />
+            <div className="lg:col-span-2 sylva-glass bg-[var(--card-bg)] rounded-2xl p-6 border border-[var(--border-subtle)] shadow-2xs h-72 animate-pulse" />
+            <div className="sylva-glass bg-[var(--card-bg)] rounded-2xl p-6 border border-[var(--border-subtle)] shadow-2xs h-72 animate-pulse" />
           </div>
         </div>
       ) : data?.kpis ? (
         <div className="space-y-6">
           
-          {/* 5. Linha Harmônica de 4 KPIs Principais (Sem Buracos Vazios) */}
+          {/* 5. Linha Harmônica de 4 KPIs Principais (Bento Tinted Palette Sylva) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
-            {/* Card 1: Total Preenchido */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-2xs flex flex-col justify-between hover:border-sky-300 transition-all">
+            {/* Card 1: Total Preenchido (Olive Tint com Neon Lime) */}
+            <div className="bg-[var(--tint-olive-bg)] border border-[var(--tint-olive-border)] text-[var(--tint-olive-fg)] p-5 rounded-2xl shadow-xs flex flex-col justify-between transition-all">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Preenchido</span>
-                <Badge variant="outline" className="text-[10px] font-semibold bg-sky-50 text-sky-700 border-sky-200 rounded-full px-2 py-0.5">
+                <span className="text-xs font-semibold uppercase tracking-wider opacity-80">Total Preenchido</span>
+                <Badge variant="outline" className="text-[10px] font-bold bg-white/10 text-[var(--tint-olive-fg)] border-white/15 rounded-full px-2 py-0.5">
                   Volume 90d
                 </Badge>
               </div>
-              <div className="text-3xl font-bold font-mono text-slate-900 tracking-tight">
+              <div className="text-3xl font-extrabold font-mono text-[var(--tint-olive-fg)] tracking-tight my-1">
                 {Number(data?.kpis?.TOTAL_DOCS || 0).toLocaleString('pt-BR')}
               </div>
-              <p className="text-[11px] text-slate-400 mt-2 truncate">
-                Prontuários eletrônicos preenchidos na unidade
+              <p className="text-[11px] opacity-80 mt-1 truncate">
+                Prontuários eletrônicos na unidade
               </p>
+              <div className="w-full h-1.5 bg-black/20 dark:bg-white/10 rounded-full overflow-hidden mt-3">
+                <div className="h-full bg-[#CCF352] rounded-full w-4/5 shadow-[0_0_8px_rgba(204,243,82,0.5)]" />
+              </div>
             </div>
 
-            {/* Card 2: Documentos Únicos em Uso */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-2xs flex flex-col justify-between hover:border-emerald-300 transition-all">
+            {/* Card 2: Documentos Únicos em Uso (Mocha Tint) */}
+            <div className="bg-[var(--tint-mocha-bg)] border border-[var(--tint-mocha-border)] text-[var(--tint-mocha-fg)] p-5 rounded-2xl shadow-xs flex flex-col justify-between transition-all">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Modelos Ativos</span>
-                <Badge variant="outline" className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border-emerald-200 rounded-full px-2 py-0.5 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                <span className="text-xs font-semibold uppercase tracking-wider opacity-80">Modelos Ativos</span>
+                <Badge variant="outline" className="text-[10px] font-bold bg-amber-500/15 text-amber-500 border-amber-500/25 rounded-full px-2 py-0.5 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-amber-500" />
                   Aderência Local
                 </Badge>
               </div>
-              <div className="text-3xl font-bold font-mono text-emerald-800 tracking-tight">
+              <div className="text-3xl font-extrabold font-mono text-[var(--tint-mocha-fg)] tracking-tight my-1">
                 {Number(data?.kpis?.DOCS_ATIVOS || 0).toLocaleString('pt-BR')}
               </div>
-              <p className="text-[11px] text-slate-400 mt-2 truncate">
-                Modelos clínicos com registros homologados
+              <p className="text-[11px] opacity-80 mt-1 truncate">
+                Modelos com registros homologados
               </p>
+              <div className="w-full h-1.5 bg-black/20 dark:bg-white/10 rounded-full overflow-hidden mt-3">
+                <div className="h-full bg-amber-500 rounded-full w-2/3 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
+              </div>
             </div>
 
-            {/* Card 3: SLA de Assinatura (24h) */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-2xs flex flex-col justify-between hover:border-teal-300 transition-all">
+            {/* Card 3: SLA de Assinatura (Slate Tint) */}
+            <div className="bg-[var(--tint-slate-bg)] border border-[var(--tint-slate-border)] text-[var(--tint-slate-fg)] p-5 rounded-2xl shadow-xs flex flex-col justify-between transition-all">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">SLA Assinatura (24h)</span>
-                <Badge 
-                  variant="outline" 
-                  className={cn(
-                    "text-[10px] font-semibold rounded-full px-2 py-0.5",
-                    Number(slaPercentage) >= 90 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"
-                  )}
-                >
+                <span className="text-xs font-semibold uppercase tracking-wider opacity-80">SLA Assinatura (24h)</span>
+                <Badge variant="outline" className="text-[10px] font-bold bg-sky-500/15 text-sky-400 border-sky-500/25 rounded-full px-2 py-0.5">
                   Regra CFM
                 </Badge>
               </div>
-              <div className={cn(
-                "text-3xl font-bold font-mono tracking-tight",
-                Number(slaPercentage) >= 90 ? "text-emerald-700" : "text-amber-700"
-              )}>
+              <div className="text-3xl font-extrabold font-mono text-[var(--tint-slate-fg)] tracking-tight my-1">
                 {slaPercentage}%
               </div>
-              <p className="text-[11px] text-slate-400 mt-2 truncate">
+              <p className="text-[11px] opacity-80 mt-1 truncate">
                 Fechamento tempestivo de prontuários
               </p>
+              <div className="w-full h-1.5 bg-black/20 dark:bg-white/10 rounded-full overflow-hidden mt-3">
+                <div className="h-full bg-sky-400 rounded-full w-11/12 shadow-[0_0_8px_rgba(56,189,248,0.5)]" />
+              </div>
             </div>
 
-            {/* Card 4: Recência de Uso */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-2xs flex flex-col justify-between hover:border-sky-300 transition-all">
+            {/* Card 4: Última Atividade Registrada (Sylva Frosted Glass) */}
+            <div className="sylva-glass bg-[var(--card-bg)] border border-[var(--border-subtle)] text-[var(--text-primary)] p-5 rounded-2xl shadow-xs flex flex-col justify-between transition-all">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Última Atividade</span>
-                <Badge variant="outline" className="text-[10px] font-semibold bg-slate-50 text-slate-700 border-slate-200 rounded-full px-2 py-0.5">
+                <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Última Atividade</span>
+                <Badge variant="outline" className="text-[10px] font-bold bg-[#CCF352]/10 text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205] border-[#CCF352]/30 rounded-full px-2 py-0.5">
                   Tempo Real
                 </Badge>
               </div>
-              <div className="text-xl font-bold font-mono text-slate-900 tracking-tight truncate py-1">
-                {data.kpis.ULTIMO_REGISTRO 
-                  ? new Date(data.kpis.ULTIMO_REGISTRO).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-                  : 'N/A'}
+              <div className="text-2xl font-bold font-mono text-[var(--text-primary)] tracking-tight my-1 truncate">
+                {data?.kpis?.ULTIMO_REGISTRO ? formatDateTime(data.kpis.ULTIMO_REGISTRO).slice(0, 16) : 'Hoje'}
               </div>
-              <p className="text-[11px] text-slate-400 mt-2 truncate">
+              <p className="text-[11px] text-[var(--text-muted)] mt-1 truncate">
                 Último atendimento registrado na base
               </p>
+              <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden mt-3">
+                <div className="h-full bg-gradient-to-r from-[#CCF352] to-amber-500 rounded-full w-full" />
+              </div>
             </div>
+
           </div>
 
           {/* 6. Conteúdo Central: Tabela Interativa de Registros + Top 5 */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
             {/* Tabela de Documentos Recentes da Unidade */}
-            <div className="lg:col-span-2 bg-white border border-slate-200/80 rounded-3xl p-6 shadow-2xs flex flex-col justify-between">
+            <div className="lg:col-span-2 sylva-glass bg-[var(--card-bg)] border border-[var(--border-subtle)] rounded-2xl p-6 shadow-xs flex flex-col justify-between">
               <div>
-                <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+                <div className="flex items-center justify-between pb-4 mb-4 border-b border-[var(--border-subtle)]">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                      <FileText size={16} className="text-sky-600" />
+                    <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                      <FileText size={16} className="text-[#CCF352]" />
                       Documentos Mais Movimentados na Unidade
                     </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">
                       Prontuários com maior volume recente em <b>{selectedHospital?.nome}</b>
                     </p>
                   </div>
-                  <span className="text-xs font-bold font-mono px-2.5 py-1 rounded-full bg-sky-50 text-sky-800 border border-sky-200">
+                  <span className="text-xs font-bold font-mono px-2.5 py-1 rounded-full bg-[#CCF352]/10 text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205] border border-[#CCF352]/30">
                     {selectedHospital?.sigla}
                   </span>
                 </div>
@@ -511,7 +609,7 @@ export default function HospitaisPage() {
                 <div className="overflow-x-auto scrollbar-thin">
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="border-b border-slate-200/80 text-slate-500 font-semibold uppercase text-[10px] tracking-wider">
+                      <tr className="border-b border-[var(--border-subtle)] text-[var(--text-muted)] font-semibold uppercase text-[10px] tracking-wider">
                         <th className="py-2.5">Documento Clínico</th>
                         <th className="py-2.5 text-center">Versão</th>
                         <th className="py-2.5 text-right">Volume</th>
@@ -519,24 +617,24 @@ export default function HospitaisPage() {
                         <th className="py-2.5 text-center w-20">Ações</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-[var(--border-subtle)]">
                       {data?.details?.slice(0, 8).map((item: DetailItem) => (
-                        <tr key={item.CD_DOCUMENTO} className="group hover:bg-sky-50/40 transition-colors">
+                        <tr key={item.CD_DOCUMENTO} className="group hover:bg-white/5 dark:hover:bg-white/[0.03] transition-colors">
                           <td className="py-3">
                             <div className="cursor-pointer" onClick={() => fetchDocDetails(item.CD_DOCUMENTO)}>
-                              <p className="font-semibold text-slate-900 group-hover:text-sky-700 transition-colors">{item.NOME}</p>
-                              <p className="text-[10px] text-slate-400 font-mono mt-0.5">CÓDIGO: #{item.CD_DOCUMENTO}</p>
+                              <p className="font-semibold text-[var(--text-primary)] group-hover:text-[#CCF352] transition-colors">{item.NOME}</p>
+                              <p className="text-[10px] text-[var(--text-muted)] font-mono mt-0.5">CÓDIGO: #{item.CD_DOCUMENTO}</p>
                             </div>
                           </td>
                           <td className="py-3 text-center font-mono">
-                            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold">
+                            <span className="px-2 py-0.5 rounded-full bg-[var(--dock-bg)] text-[var(--text-secondary)] text-[10px] font-bold border border-[var(--border-subtle)]">
                               v{item.VERSAO || '1.0'}
                             </span>
                           </td>
-                          <td className="py-3 text-right font-mono font-bold text-sky-800 tabular-nums">
+                          <td className="py-3 text-right font-mono font-bold text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205] tabular-nums">
                             {Number(item.USO_UNIDADE).toLocaleString('pt-BR')}
                           </td>
-                          <td className="py-3 text-right font-mono text-slate-500 text-[11px]">
+                          <td className="py-3 text-right font-mono text-[var(--text-muted)] text-[11px]">
                             {item.ULTIMO_USO ? formatDateTime(item.ULTIMO_USO) : '-'}
                           </td>
                           <td className="py-3 text-center">
@@ -544,7 +642,7 @@ export default function HospitaisPage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => fetchDocDetails(item.CD_DOCUMENTO)}
-                              className="h-7 px-2 text-[10px] rounded-lg text-sky-700 hover:bg-sky-100/70 cursor-pointer"
+                              className="h-7 px-2 text-[10px] rounded-lg text-[#CCF352] hover:bg-[#CCF352]/10 cursor-pointer font-bold"
                               title="Visualizar Metadados & Regras"
                             >
                               <Layers size={13} className="mr-1" />
@@ -558,11 +656,11 @@ export default function HospitaisPage() {
                 </div>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+              <div className="mt-4 pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between text-xs text-[var(--text-muted)]">
                 <span>Exibindo os modelos com maior volume na unidade</span>
                 <Link 
                   href={`/documentos?search=${selectedHospital?.sigla}`}
-                  className="font-semibold text-sky-700 hover:underline flex items-center gap-1"
+                  className="font-bold text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205] hover:underline flex items-center gap-1"
                 >
                   Abrir na Matriz Geral de Documentos <ChevronRight size={13} />
                 </Link>
@@ -573,10 +671,10 @@ export default function HospitaisPage() {
             <div className="space-y-6">
               
               {/* Ranking Top 5 */}
-              <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-2xs">
+              <div className="sylva-glass bg-[var(--card-bg)] border border-[var(--border-subtle)] rounded-2xl p-6 shadow-xs">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <TrendingUp size={16} className="text-sky-600" />
+                  <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                    <TrendingUp size={16} className="text-[#CCF352]" />
                     Top 5 Documentos Mais Usados
                   </h3>
                 </div>
@@ -588,19 +686,19 @@ export default function HospitaisPage() {
                     return (
                       <div key={i} className="group space-y-1.5">
                         <div className="flex justify-between items-center text-xs">
-                          <span className="font-semibold text-slate-800 truncate max-w-[70%]" title={doc.NOME}>
-                            <span className="font-mono text-sky-600 font-bold mr-1.5">#{i + 1}</span>
+                          <span className="font-semibold text-[var(--text-primary)] truncate max-w-[70%]" title={doc.NOME}>
+                            <span className="font-mono text-[#CCF352] font-bold mr-1.5">#{i + 1}</span>
                             {doc.NOME}
                           </span>
-                          <span className="font-mono font-bold text-slate-900 tabular-nums">
+                          <span className="font-mono font-bold text-[var(--text-primary)] tabular-nums">
                             {Number(doc.USO).toLocaleString('pt-BR')}
                           </span>
                         </div>
-                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-2 w-full bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
                           <div
                             className={cn(
                               "h-full rounded-full transition-all duration-500",
-                              i === 0 ? "bg-sky-600" : "bg-sky-400"
+                              i === 0 ? "bg-[#CCF352] shadow-[0_0_8px_rgba(204,243,82,0.5)]" : "bg-sky-400"
                             )}
                             style={{ width: `${percent}%` }}
                           />
@@ -612,32 +710,32 @@ export default function HospitaisPage() {
               </div>
 
               {/* Insight Operacional da Unidade na Rede */}
-              <div className="bg-sky-50/70 border border-sky-100 rounded-3xl p-5 shadow-2xs">
-                <h4 className="text-xs font-bold text-sky-950 flex items-center gap-2 mb-2 uppercase tracking-wide">
-                  <Activity size={14} className="text-sky-600" />
+              <div className="sylva-card bg-[var(--dock-bg)]/80 border border-[var(--border-subtle)] rounded-2xl p-5 shadow-xs">
+                <h4 className="text-xs font-bold text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205] flex items-center gap-2 mb-2 uppercase tracking-wide">
+                  <Activity size={14} className="text-[#CCF352]" />
                   Representatividade na Rede
                 </h4>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  A unidade <b>{selectedHospital?.sigla}</b> é responsável por <span className="font-bold text-sky-900">{(data.globalTotal > 0 ? ((Number(data.kpis.TOTAL_DOCS) / Number(data.globalTotal)) * 100) : 0).toFixed(1)}%</span> de todo o volume de prontuários eletrônicos preenchidos na base <span className="font-semibold text-slate-800">{activeConnName || 'ativa'}</span> (filtro motor {resolvedVersion}).
+                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                  A unidade <b>{selectedHospital?.sigla}</b> é responsável por <span className="font-bold text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205]">{(data.globalTotal > 0 ? ((Number(data.kpis.TOTAL_DOCS) / Number(data.globalTotal)) * 100) : 0).toFixed(1)}%</span> de todo o volume de prontuários eletrônicos preenchidos na base <span className="font-semibold text-[var(--text-primary)]">{activeConnName || 'ativa'}</span> (filtro motor {resolvedVersion}).
                 </p>
               </div>
 
             </div>
           </div>
 
-          {/* 7. Seção de Qualidade e SLA de Assinatura (Completa, Sem Coluna Vazia) */}
-          <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-2xs space-y-6">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          {/* 7. Seção de Qualidade e SLA de Assinatura */}
+          <div className="sylva-glass bg-[var(--card-bg)] border border-[var(--border-subtle)] rounded-2xl p-6 shadow-xs space-y-6">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
               <div>
-                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <Clock size={16} className="text-emerald-600" />
+                <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                  <Clock size={16} className="text-[#CCF352]" />
                   Governança Clínica: SLA de Fechamento e Assinatura Digital
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">
                   Conformidade com resolução CFM nº 1.821 e diretrizes de integridade documental
                 </p>
               </div>
-              <Badge variant="outline" className="text-xs font-mono font-bold text-emerald-800 bg-emerald-50 border-emerald-200 px-2.5 py-0.5 rounded-full">
+              <Badge variant="outline" className="text-xs font-mono font-bold text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205] bg-[#CCF352]/10 border-[#CCF352]/30 px-2.5 py-0.5 rounded-full">
                 {slaPercentage}% em dia
               </Badge>
             </div>
@@ -646,7 +744,7 @@ export default function HospitaisPage() {
               
               {/* Coluna 1: Distribuição de SLA por Faixas */}
               <div className="space-y-4">
-                <span className="text-xs font-bold text-slate-700 block uppercase tracking-wider">
+                <span className="text-xs font-bold text-[var(--text-muted)] block uppercase tracking-wider">
                   Distribuição por Faixa de Tempo
                 </span>
                 <div className="space-y-3.5">
@@ -660,18 +758,18 @@ export default function HospitaisPage() {
                     return (
                       <div key={faixa} className="flex flex-col gap-1 text-xs">
                         <div className="flex justify-between items-center">
-                          <span className={cn("font-semibold", isLate ? "text-rose-700 font-bold" : "text-slate-700")}>
+                          <span className={cn("font-semibold", isLate ? "text-rose-400 font-bold" : "text-[var(--text-primary)]")}>
                             {faixa}
                           </span>
-                          <span className="font-mono text-slate-500 font-medium">
+                          <span className="font-mono text-[var(--text-muted)] font-medium">
                             {total.toLocaleString('pt-BR')} prontuários
                           </span>
                         </div>
-                        <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-2.5 w-full bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
                           <div 
                             className={cn(
                               "h-full rounded-full transition-all duration-500 ease-out", 
-                              isLate ? 'bg-rose-500' : 'bg-emerald-600'
+                              isLate ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]' : 'bg-[#CCF352] shadow-[0_0_8px_rgba(204,243,82,0.4)]'
                             )}
                             style={{ width: `${pct}%` }}
                           />
@@ -682,36 +780,36 @@ export default function HospitaisPage() {
                 </div>
               </div>
 
-              {/* Coluna 2: Card de Avaliação Regulatória e Faturamento (Elimina o Espaço Vazio!) */}
-              <div className="bg-slate-50/80 rounded-2xl p-5 border border-slate-200/70 flex flex-col justify-between space-y-4">
+              {/* Coluna 2: Card de Avaliação Regulatória e Faturamento */}
+              <div className="sylva-card bg-[var(--dock-bg)]/70 rounded-2xl p-5 border border-[var(--border-subtle)] flex flex-col justify-between space-y-4">
                 <div>
-                  <h4 className="text-xs font-bold text-slate-900 flex items-center gap-2 mb-2 uppercase tracking-wide">
-                    <ShieldCheck size={16} className="text-emerald-700" />
-                    Diagnóstico Regulatório & Faturamento
+                  <h4 className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-2 mb-2 uppercase tracking-wide">
+                    <ShieldCheck size={16} className="text-[#CCF352]" />
+                    Diagnóstico Regulatório &amp; Faturamento
                   </h4>
-                  <p className="text-xs text-slate-600 leading-relaxed mb-4">
+                  <p className="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
                     Prontuários médicos que excedem 24 horas para fechamento ou assinatura digital geram passivos em auditorias hospitalares (ONA/JCI) e bloqueios no faturamento de contas de convênios.
                   </p>
 
                   <div className="grid grid-cols-2 gap-3 text-center">
-                    <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Dentro do Prazo (&le; 24h)</span>
-                      <span className="text-xl font-bold font-mono text-emerald-700">{within24h.toLocaleString('pt-BR')}</span>
-                      <span className="text-[10px] text-emerald-600 block font-medium">Conforme regulamentação</span>
+                    <div className="sylva-glass bg-[var(--card-bg)] p-3 rounded-xl border border-[var(--border-subtle)] shadow-2xs">
+                      <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block">Dentro do Prazo (&le; 24h)</span>
+                      <span className="text-xl font-bold font-mono text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205]">{within24h.toLocaleString('pt-BR')}</span>
+                      <span className="text-[10px] text-[var(--text-muted)] block font-medium">Conforme regulamentação</span>
                     </div>
 
-                    <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Acima de 24h (Risco)</span>
-                      <span className="text-xl font-bold font-mono text-rose-700">{over24h.toLocaleString('pt-BR')}</span>
-                      <span className="text-[10px] text-rose-600 block font-medium">Requer intervenção</span>
+                    <div className="sylva-glass bg-[var(--card-bg)] p-3 rounded-xl border border-[var(--border-subtle)] shadow-2xs">
+                      <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block">Acima de 24h (Risco)</span>
+                      <span className="text-xl font-bold font-mono text-rose-400">{over24h.toLocaleString('pt-BR')}</span>
+                      <span className="text-[10px] text-rose-400/80 block font-medium">Requer intervenção</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200/60 flex items-center gap-2.5 text-xs text-emerald-900 font-medium">
-                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                <div className="p-3 bg-[var(--card-bg)] rounded-xl border border-[var(--border-subtle)] flex items-center gap-2.5 text-xs text-[var(--text-primary)] font-medium">
+                  <CheckCircle2 size={16} className="text-[#CCF352] shrink-0" />
                   <span>
-                    Índice de conformidade geral da unidade: <b>{slaPercentage}%</b>.
+                    Índice de conformidade geral da unidade: <b className="text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205]">{slaPercentage}%</b>.
                   </span>
                 </div>
               </div>
@@ -721,22 +819,24 @@ export default function HospitaisPage() {
 
         </div>
       ) : (
-        <div className="bg-white rounded-3xl p-16 text-center border border-slate-200/80 shadow-2xs space-y-3">
-          <Building2 size={42} className="mx-auto text-slate-300" />
-          <h3 className="text-sm font-bold text-slate-800">Nenhum dado encontrado para esta unidade</h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+        <div className="sylva-glass bg-[var(--card-bg)] rounded-2xl p-16 text-center border border-[var(--border-subtle)] shadow-2xs space-y-3">
+          <Building2 size={42} className="mx-auto text-[var(--text-muted)]" />
+          <h3 className="text-sm font-bold text-[var(--text-primary)]">Nenhum dado encontrado para esta unidade</h3>
+          <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto">
             Não há registros de prontuários clínicos para o hospital selecionado nos últimos 90 dias na conexão ativa.
           </p>
         </div>
       )}
 
-      {/* Drawer de Detalhes de Metadados Integrado */}
-      <DocumentDetailsDrawer
+      {/* Modal Central Unificado de Detalhes e Perfis */}
+      <DocumentDetailsModal
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         docId={sidebarDoc}
+        docVersion={resolvedVersion}
         metadata={metadata}
         loading={metadataLoading}
+        metadataError={metadataError}
         actions={metadataActions}
         actionsLoading={metadataActionsLoading}
         actionsError={metadataActionsError}
@@ -746,6 +846,10 @@ export default function HospitaisPage() {
         fields={metadataFields}
         fieldsLoading={metadataFieldsLoading}
         fieldsError={metadataFieldsError}
+        profiles={profileData}
+        profilesLoading={profileLoading}
+        profilesError={profileError}
+        onRefresh={() => sidebarDoc && fetchDocDetails(sidebarDoc, true)}
       />
 
     </div>

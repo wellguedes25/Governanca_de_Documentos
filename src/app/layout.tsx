@@ -16,7 +16,7 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Goverdoc Pro - Governança Clínica",
+  title: "Goverdoc Pro — Governança Clínica",
   description: "Monitoramento e Auditoria Inteligente de Documentos Clínicos",
 };
 
@@ -26,7 +26,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" data-theme="dark" className="dark" suppressHydrationWarning>
       <body
         className={`${inter.variable} ${manrope.variable} antialiased`}
         suppressHydrationWarning

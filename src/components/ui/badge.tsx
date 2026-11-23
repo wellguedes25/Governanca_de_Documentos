@@ -3,22 +3,22 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center gap-1 font-black text-[9px] uppercase tracking-widest transition-colors cursor-default",
+  "inline-flex items-center gap-1 font-bold text-[10px] uppercase tracking-wider transition-colors cursor-default",
   {
     variants: {
       variant: {
         default:
-          "bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20 px-2 py-0.5 rounded-[var(--radius)]",
+          "bg-[var(--accent)] text-[var(--lime)] border border-[var(--tint-olive-border)] px-2.5 py-0.5 rounded-full",
         success:
-          "bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-[var(--radius)]",
+          "bg-[var(--accent)] text-[var(--lime)] border border-[var(--tint-olive-border)] px-2.5 py-0.5 rounded-full",
         warning:
-          "bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-[var(--radius)]",
+          "bg-amber-500/15 text-amber-300 border border-amber-400/25 px-2.5 py-0.5 rounded-full",
         destructive:
-          "bg-rose-50 text-rose-600 border border-rose-200 px-2 py-0.5 rounded-[var(--radius)]",
+          "bg-rose-500/15 text-rose-300 border border-rose-400/25 px-2.5 py-0.5 rounded-full",
         outline:
-          "border border-[var(--border)] text-muted px-2 py-0.5 rounded-[var(--radius)]",
+          "border border-[var(--border-strong)] text-[var(--foreground-secondary)] bg-[var(--card-subtle)] px-2.5 py-0.5 rounded-full",
         live:
-          "bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-[var(--radius)]",
+          "bg-[var(--accent)] text-[var(--lime)] border border-[var(--tint-olive-border)] px-2.5 py-0.5 rounded-full",
       },
     },
     defaultVariants: {

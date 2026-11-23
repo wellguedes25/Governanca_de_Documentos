@@ -4,28 +4,28 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sky-500 disabled:pointer-events-none disabled:opacity-50 select-none",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lime)] disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer",
   {
     variants: {
       variant: {
         default:
-          "bg-sky-600 text-white shadow-xs hover:bg-sky-500 active:bg-sky-700",
+          "sylva-lime-btn font-bold",
         destructive:
-          "bg-rose-600 text-white shadow-xs hover:bg-rose-500 active:bg-rose-700",
+          "bg-rose-500/90 text-white shadow-xs hover:bg-rose-500 active:scale-[0.98]",
         outline:
-          "border border-slate-200 bg-white text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-slate-900",
+          "sylva-pill text-[var(--foreground)] hover:text-[var(--foreground)]",
         secondary:
-          "bg-slate-100 text-slate-800 hover:bg-slate-200",
+          "bg-[var(--card-subtle)] text-[var(--foreground)] border border-[var(--border)] hover:bg-[var(--card-hover)]",
         ghost:
-          "hover:bg-slate-100 text-slate-600 hover:text-slate-900",
+          "hover:bg-[var(--card-subtle)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)]",
         link:
-          "text-sky-600 underline-offset-4 hover:underline",
+          "text-[var(--lime)] underline-offset-4 hover:underline",
       },
       size: {
         default: "h-9 px-4 py-2",
-        sm: "h-8 px-3 text-xs",
+        sm: "h-8 px-3.5 text-xs",
         lg: "h-10 px-6",
-        icon: "h-8 w-8",
+        icon: "h-9 w-9",
       },
     },
     defaultVariants: {

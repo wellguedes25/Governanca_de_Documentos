@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { FileText, AlertTriangle } from 'lucide-react';
 import { useUI } from '@/context/UIContext';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -8,21 +9,46 @@ import { Badge } from '@/components/ui/badge';
 import { DocumentosToolbar } from '@/components/documentos/DocumentosToolbar';
 import { DocumentosTable } from '@/components/documentos/DocumentosTable';
 import { DocumentosCardsGrid } from '@/components/documentos/DocumentosCardsGrid';
-import { DocumentDetailsDrawer } from '@/components/documentos/DocumentDetailsDrawer';
-import { DocumentProfilesDrawer } from '@/components/documentos/DocumentProfilesDrawer';
+import { DocumentDetailsModal, DocumentDetailsTab } from '@/components/documentos/DocumentDetailsModal';
 import { AmbulatoryProfilesView } from '@/components/documentos/AmbulatoryProfilesView';
 
 export default function DocumentosPage() {
-  const { oracleData, setOracleData, columnWidths, setColumnWidth, docVersion } = useUI();
+  return (
+    <Suspense fallback={<div className="py-12 text-center text-xs text-[var(--muted)]">Carregando catálogo de documentos...</div>}>
+      <DocumentosContent />
+    </Suspense>
+  );
+}
+
+function DocumentosContent() {
+  const searchParams = useSearchParams();
+  const urlSearch = searchParams.get('search') || '';
+  const { 
+    oracleData, 
+    setOracleData, 
+    columnWidths, 
+    setColumnWidth, 
+    docVersion,
+    activeConnInfo,
+    setActiveConnInfo,
+    getCached,
+    setCached
+  } = useUI();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [activeConnName, setActiveConnName] = useState('');
   const [activeHospitals, setActiveHospitals] = useState<{ id: number; sigla: string }[]>([]);
   const [selectedHospitals, setSelectedHospitals] = useState<string[]>([]);
+  const [prevUrlSearch, setPrevUrlSearch] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
-  const [density, setDensity] = useState<'compact' | 'normal'>('normal');
   const [currentPage, setCurrentPage] = useState(1);
+
+  if (urlSearch && urlSearch !== prevUrlSearch) {
+    setPrevUrlSearch(urlSearch);
+    setSearchTerm(urlSearch);
+    setCurrentPage(1);
+  }
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({
     key: docVersion === 'V3' ? 'ULT. GERAL' : 'ÚLTIMO USO',
     direction: 'desc'
@@ -32,23 +58,17 @@ export default function DocumentosPage() {
   // Estados de Abas
   const [activeMainTab, setActiveMainTab] = useState<'documentos' | 'perfis'>('documentos');
 
-  // Estados para Gaveta Inferior de Perfis Ambulatoriais
-  const [profilesDrawerOpen, setProfilesDrawerOpen] = useState(false);
-  const [profilesDocInfo, setProfilesDocInfo] = useState<{ id: string; name: string } | null>(null);
+  // Estados para Modal Unificado de Detalhes e Perfis do Documento
+  const [modalDoc, setModalDoc] = useState<{ id: string; name?: string; initialTab: DocumentDetailsTab } | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+
   const [profileData, setProfileData] = useState<any[]>([]);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
-  const handleOpenProfiles = (code: string, name?: string) => {
-    setProfilesDocInfo({ id: code, name: name || `Documento #${code}` });
-    setProfilesDrawerOpen(true);
-    fetchProfile(code);
-  };
-
-  // Estados para Drawer de Metadados Técnicos
-  const [sidebarDoc, setSidebarDoc] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [metadata, setMetadata] = useState<any[]>([]);
   const [metadataLoading, setMetadataLoading] = useState(false);
+  const [metadataError, setMetadataError] = useState<string | null>(null);
   const [metadataActions, setMetadataActions] = useState<any[]>([]);
   const [metadataActionsLoading, setMetadataActionsLoading] = useState(false);
   const [metadataActionsError, setMetadataActionsError] = useState<string | null>(null);
@@ -59,6 +79,11 @@ export default function DocumentosPage() {
   const [metadataFields, setMetadataFields] = useState<any[]>([]);
   const [metadataFieldsLoading, setMetadataFieldsLoading] = useState(false);
   const [metadataFieldsError, setMetadataFieldsError] = useState<string | null>(null);
+
+  const handleOpenDocumentModal = (code: string, name?: string, initialTab: DocumentDetailsTab = 'specs') => {
+    setModalDoc({ id: code, name: name || `Documento #${code}`, initialTab });
+    setModalOpen(true);
+  };
 
   // Estados para Perfis Ambulatoriais
   const [ambulatoryProfilesData, setAmbulatoryProfilesData] = useState<any[]>([]);
@@ -87,20 +112,36 @@ export default function DocumentosPage() {
       setOracleData(null);
     }
     
+    // Se já temos a conexão em cache no contexto, reaproveita sem disparar fetch
+    if (activeConnInfo) {
+      setActiveConnName(activeConnInfo.name);
+      setActiveHospitals(activeConnInfo.activeHospitals);
+      if (!cached) {
+        fetchInitialData(true, currentVersion);
+      }
+      return;
+    }
+
     fetch('/api/connections')
       .then(res => res.json())
       .then(storage => {
         const active = storage.connections?.find((c: any) => c.id === storage.activeConnectionId);
-        if (active) setActiveConnName(active.name);
-        if (storage.hospitalsMapping) {
-          setActiveHospitals(storage.hospitalsMapping.filter((h: any) => h.ativo));
+        const hospitals = storage.hospitalsMapping ? storage.hospitalsMapping.filter((h: any) => h.ativo) : [];
+        if (active) {
+          setActiveConnName(active.name);
+          setActiveConnInfo({
+            id: active.id,
+            name: active.name,
+            activeHospitals: hospitals
+          });
         }
+        setActiveHospitals(hospitals);
         if (!cached) {
           fetchInitialData(true, currentVersion);
         }
       })
       .catch(err => console.error('Erro ao carregar conexões:', err));
-  }, [docVersion]);
+  }, [docVersion, activeConnInfo, setActiveConnInfo]);
 
   // Carrega documentos do Oracle
   async function fetchInitialData(isManual = false, versionOverride?: 'V2' | 'V3') {
@@ -150,84 +191,150 @@ export default function DocumentosPage() {
   }
 
 
-  async function fetchProfile(docId: string) {
+  async function fetchProfile(docId: string, force = false) {
+    const activeVersion = docVersion || 'V3';
+    const cacheKey = `profile_${docId}_${activeVersion}`;
+    if (!force) {
+      const cached = getCached<any[]>(cacheKey);
+      if (cached) {
+        setProfileData(cached);
+        setProfileError(null);
+        return;
+      }
+    }
     setProfileLoading(true);
+    setProfileError(null);
     try {
       const res = await fetch('/api/oracle/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          query: 'PROFILE', 
-          version: docVersion || 'V2',
-          params: { CD_DOCUMENTO: docId } 
+        body: JSON.stringify({
+          query: 'PROFILE',
+          version: activeVersion,
+          params: { CD_DOCUMENTO: String(docId).trim() },
+          forceRefresh: force
         })
       });
       const result = await res.json();
-      setProfileData(result.rows || []);
+      if (!res.ok || result.error) {
+        setProfileError(result.error || `Erro HTTP ${res.status} ao carregar perfis ambulatoriais.`);
+        setProfileData([]);
+      } else {
+        const rows = result.rows || [];
+        setProfileData(rows);
+        setCached(cacheKey, rows);
+      }
     } catch (err) {
       console.error('Erro ao carregar perfis:', err);
+      setProfileError('Falha de comunicação com o servidor Oracle ao buscar perfis.');
     } finally {
       setProfileLoading(false);
     }
   }
 
-  // Dispara busca de metadados para o Drawer
+  // Dispara busca unificada para o Modal de Detalhes e Perfis
   useEffect(() => {
-    if (sidebarDoc && sidebarOpen) {
-      fetchMetadata(sidebarDoc);
-      fetchActions(sidebarDoc);
-      fetchRules(sidebarDoc);
-      fetchFields(sidebarDoc);
-    } else if (!sidebarOpen) {
+    if (modalDoc?.id && modalOpen) {
+      fetchMetadata(modalDoc.id);
+      fetchActions(modalDoc.id);
+      fetchRules(modalDoc.id);
+      fetchFields(modalDoc.id);
+      fetchProfile(modalDoc.id);
+    } else if (!modalOpen) {
       setMetadata([]);
+      setMetadataError(null);
       setMetadataActions([]);
       setMetadataActionsError(null);
       setMetadataRules([]);
       setMetadataRulesError(null);
       setMetadataFields([]);
       setMetadataFieldsError(null);
+      setProfileData([]);
+      setProfileError(null);
     }
-  }, [sidebarDoc, sidebarOpen, docVersion]);
+  }, [modalDoc?.id, modalOpen, docVersion]);
 
-  async function fetchMetadata(docId: string) {
+  const handleRefreshModal = () => {
+    if (!modalDoc?.id) return;
+    fetchMetadata(modalDoc.id, true);
+    fetchActions(modalDoc.id, true);
+    fetchRules(modalDoc.id, true);
+    fetchFields(modalDoc.id, true);
+    fetchProfile(modalDoc.id, true);
+  };
+
+  async function fetchMetadata(docId: string, force = false) {
+    const activeVersion = docVersion || 'V3';
+    const cacheKey = `meta_${docId}_${activeVersion}`;
+    if (!force) {
+      const cached = getCached<any[]>(cacheKey);
+      if (cached) {
+        setMetadata(cached);
+        setMetadataError(null);
+        return;
+      }
+    }
     setMetadataLoading(true);
+    setMetadataError(null);
     try {
       const res = await fetch('/api/oracle/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          query: 'METADATA', 
-          version: docVersion || 'V2',
-          params: { CD_DOCUMENTO: docId } 
+        body: JSON.stringify({
+          query: 'METADATA',
+          version: activeVersion,
+          params: { CD_DOCUMENTO: String(docId).trim() },
+          forceRefresh: force
         })
       });
       const result = await res.json();
-      setMetadata(result.rows || []);
+      if (!res.ok || result.error) {
+        setMetadataError(result.error || `Erro HTTP ${res.status} ao carregar metadados técnicos.`);
+        setMetadata([]);
+      } else {
+        const rows = result.rows || [];
+        setMetadata(rows);
+        setCached(cacheKey, rows);
+      }
     } catch (err) {
       console.error('Erro ao carregar metadados técnicos:', err);
+      setMetadataError('Falha de comunicação com o servidor Oracle. Verifique a conexão ativa.');
     } finally {
       setMetadataLoading(false);
     }
   }
 
-  async function fetchActions(docId: string) {
+  async function fetchActions(docId: string, force = false) {
+    const activeVersion = docVersion || 'V3';
+    const cacheKey = `actions_${docId}_${activeVersion}`;
+    if (!force) {
+      const cached = getCached<any[]>(cacheKey);
+      if (cached) {
+        setMetadataActions(cached);
+        setMetadataActionsError(null);
+        return;
+      }
+    }
     setMetadataActionsLoading(true);
     setMetadataActionsError(null);
     try {
       const res = await fetch('/api/oracle/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          query: 'ACTIONS', 
-          version: docVersion || 'V2',
-          params: { CD_DOCUMENTO: docId } 
+        body: JSON.stringify({
+          query: 'ACTIONS',
+          version: activeVersion,
+          params: { CD_DOCUMENTO: String(docId).trim() },
+          forceRefresh: force
         })
       });
       const result = await res.json();
-      if (result.error) {
-        setMetadataActionsError(result.error);
+      if (!res.ok || result.error) {
+        setMetadataActionsError(result.error || `Erro HTTP ${res.status} ao carregar vínculos SQL.`);
       } else {
-        setMetadataActions(result.rows || []);
+        const rows = result.rows || [];
+        setMetadataActions(rows);
+        setCached(cacheKey, rows);
       }
     } catch (err: any) {
       setMetadataActionsError('Falha na comunicação com o servidor.');
@@ -236,24 +343,37 @@ export default function DocumentosPage() {
     }
   }
 
-  async function fetchRules(docId: string) {
+  async function fetchRules(docId: string, force = false) {
+    const activeVersion = docVersion || 'V3';
+    const cacheKey = `rules_${docId}_${activeVersion}`;
+    if (!force) {
+      const cached = getCached<any[]>(cacheKey);
+      if (cached) {
+        setMetadataRules(cached);
+        setMetadataRulesError(null);
+        return;
+      }
+    }
     setMetadataRulesLoading(true);
     setMetadataRulesError(null);
     try {
       const res = await fetch('/api/oracle/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          query: 'RULES', 
-          version: docVersion || 'V3',
-          params: { CD_DOCUMENTO: docId } 
+        body: JSON.stringify({
+          query: 'RULES',
+          version: activeVersion,
+          params: { CD_DOCUMENTO: String(docId).trim() },
+          forceRefresh: force
         })
       });
       const result = await res.json();
-      if (result.error) {
-        setMetadataRulesError(result.error);
+      if (!res.ok || result.error) {
+        setMetadataRulesError(result.error || `Erro HTTP ${res.status} ao carregar regras.`);
       } else {
-        setMetadataRules(result.rows || []);
+        const rows = result.rows || [];
+        setMetadataRules(rows);
+        setCached(cacheKey, rows);
       }
     } catch (err: any) {
       setMetadataRulesError('Falha na comunicação com o servidor.');
@@ -262,23 +382,35 @@ export default function DocumentosPage() {
     }
   }
 
-  async function fetchFields(docId: string) {
+  async function fetchFields(docId: string, force = false) {
+    const cacheKey = `fields_${docId}`;
+    if (!force) {
+      const cached = getCached<any[]>(cacheKey);
+      if (cached) {
+        setMetadataFields(cached);
+        setMetadataFieldsError(null);
+        return;
+      }
+    }
     setMetadataFieldsLoading(true);
     setMetadataFieldsError(null);
     try {
       const res = await fetch('/api/oracle/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          query: 'FIELDS', 
-          params: { CD_DOCUMENTO: docId } 
+        body: JSON.stringify({
+          query: 'FIELDS',
+          params: { CD_DOCUMENTO: String(docId).trim() },
+          forceRefresh: force
         })
       });
       const result = await res.json();
-      if (result.error) {
-        setMetadataFieldsError(result.error);
+      if (!res.ok || result.error) {
+        setMetadataFieldsError(result.error || `Erro HTTP ${res.status} ao carregar campos.`);
       } else {
-        setMetadataFields(result.rows || []);
+        const rows = result.rows || [];
+        setMetadataFields(rows);
+        setCached(cacheKey, rows);
       }
     } catch (err: any) {
       setMetadataFieldsError('Falha na comunicação com o servidor.');
@@ -288,24 +420,34 @@ export default function DocumentosPage() {
   }
 
   // Perfis Ambulatoriais (Aba Secundária)
-  const fetchAmbulatoryProfiles = async () => {
-    if (ambulatoryProfilesData.length > 0) return;
+  const fetchAmbulatoryProfiles = async (force = false) => {
+    const cacheKey = 'ambulatory_profiles_all';
+    if (!force) {
+      const cached = getCached<any[]>(cacheKey);
+      if (cached) {
+        setAmbulatoryProfilesData(cached);
+        return;
+      }
+    }
+    if (ambulatoryProfilesData.length > 0 && !force) return;
     setAmbulatoryProfilesLoading(true);
     setAmbulatoryProfilesError('');
     try {
       const res = await fetch('/api/oracle/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: 'AMBULATORY_PROFILES' })
+        body: JSON.stringify({ query: 'AMBULATORY_PROFILES', forceRefresh: force })
       });
       const result = await res.json();
       if (res.ok) {
-        setAmbulatoryProfilesData(result.rows || []);
+        const rows = result.rows || [];
+        setAmbulatoryProfilesData(rows);
+        setCached(cacheKey, rows);
       } else {
-        setAmbulatoryProfilesError(result.error || 'Erro ao carregar perfis ambulatoriais.');
+        setAmbulatoryProfilesError(result.error || 'Erro ao carregar perfis');
       }
-    } catch {
-      setAmbulatoryProfilesError('Erro de comunicação com o servidor.');
+    } catch (err: any) {
+      setAmbulatoryProfilesError('Erro de conexão ao buscar perfis');
     } finally {
       setAmbulatoryProfilesLoading(false);
     }
@@ -530,18 +672,18 @@ export default function DocumentosPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 flex flex-col p-4 md:p-8 space-y-6 pb-24">
+    <div className="flex flex-col space-y-5">
       {/* 1. Header Padronizado */}
-      <div className="pb-4 border-b border-slate-200/80">
-        <PageHeader 
-          title="Repositório de Documentos Clínicos"
+      <div className="pb-3 border-b border-[var(--border)]">
+        <PageHeader
+          title="Catálogo Mestre de Documentos Clínicos"
           subtitle="Matriz de Adesão e Utilização em Todas as Unidades ACSC (Oracle DBAMV)"
           icon={FileText}
           badge={
-            <Badge 
-              variant="outline" 
+            <Badge
+              variant="outline"
               suppressHydrationWarning
-              className="text-[10px] font-bold px-2 py-0.5 rounded-full border-sky-300 bg-sky-50 text-sky-800"
+              className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border-[var(--tint-olive-border)] bg-[var(--accent)] text-[var(--accent-ink)]"
             >
               Motor {docVersion || 'V3'}
             </Badge>
@@ -551,8 +693,8 @@ export default function DocumentosPage() {
 
       {/* Error Alert */}
       {error && activeMainTab === 'documentos' && (
-        <div className="mb-4 p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-3 text-rose-700 text-xs font-medium">
-          <AlertTriangle size={16} className="shrink-0 text-rose-600" />
+        <div className="mb-4 p-3.5 tone-danger border rounded-2xl flex items-center gap-3 text-xs font-medium">
+          <AlertTriangle size={16} className="shrink-0" />
           <span>{error}</span>
         </div>
       )}
@@ -565,8 +707,6 @@ export default function DocumentosPage() {
         setSearchTerm={setSearchTerm}
         viewMode={viewMode}
         setViewMode={setViewMode}
-        density={density}
-        setDensity={setDensity}
         loading={loading}
         onRefresh={() => fetchInitialData(true)}
         onExport={handleExportCSV}
@@ -587,14 +727,9 @@ export default function DocumentosPage() {
             columns={columns}
             data={paginatedData}
             loading={loading}
-            density={density}
             sortConfig={sortConfig}
             onSort={handleSort}
-            onOpenDrawer={(code) => {
-              setSidebarDoc(code);
-              setSidebarOpen(true);
-            }}
-            onOpenProfiles={handleOpenProfiles}
+            onOpenModal={handleOpenDocumentModal}
             activeHospitals={activeHospitals}
             selectedHospitals={selectedHospitals}
             currentPage={currentPage}
@@ -608,11 +743,7 @@ export default function DocumentosPage() {
           <DocumentosCardsGrid
             data={paginatedData}
             loading={loading}
-            onOpenDrawer={(code) => {
-              setSidebarDoc(code);
-              setSidebarOpen(true);
-            }}
-            onOpenProfiles={handleOpenProfiles}
+            onOpenModal={handleOpenDocumentModal}
             activeHospitals={activeHospitals}
             currentPage={currentPage}
             totalPages={totalPages}
@@ -633,13 +764,17 @@ export default function DocumentosPage() {
         />
       )}
 
-      {/* Technical Details Drawer */}
-      <DocumentDetailsDrawer
-        open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        docId={sidebarDoc}
+      {/* Modal Central Unificado (Metadados, Regras, Campos & Perfis) */}
+      <DocumentDetailsModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        docId={modalDoc?.id || null}
+        docName={modalDoc?.name}
+        docVersion={docVersion || 'V3'}
+        initialTab={modalDoc?.initialTab || 'specs'}
         metadata={metadata}
         loading={metadataLoading}
+        metadataError={metadataError}
         actions={metadataActions}
         actionsLoading={metadataActionsLoading}
         actionsError={metadataActionsError}
@@ -649,17 +784,10 @@ export default function DocumentosPage() {
         fields={metadataFields}
         fieldsLoading={metadataFieldsLoading}
         fieldsError={metadataFieldsError}
-      />
-
-      {/* Bottom Sheet Drawer for Ambulatory Profiles */}
-      <DocumentProfilesDrawer
-        open={profilesDrawerOpen}
-        onClose={() => setProfilesDrawerOpen(false)}
-        docId={profilesDocInfo?.id || null}
-        docName={profilesDocInfo?.name}
         profiles={profileData}
-        loading={profileLoading}
-        docVersion={docVersion || 'V3'}
+        profilesLoading={profileLoading}
+        profilesError={profileError}
+        onRefresh={handleRefreshModal}
       />
     </div>
   );

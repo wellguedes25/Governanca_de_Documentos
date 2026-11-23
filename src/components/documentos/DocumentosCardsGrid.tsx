@@ -1,19 +1,15 @@
 "use client";
 
 import React from 'react';
-import { 
-  FileText, Calendar, Activity, Building2, 
-  ExternalLink, Layers, ChevronRight, Check, Database,
-  Clock, Sparkles
+import {
+  FileText, Building2, Layers, Database, Clock
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 interface DocumentosCardsGridProps {
   data: any[];
   loading: boolean;
-  onOpenProfiles: (code: string, name?: string) => void;
-  onOpenDrawer: (code: string) => void;
+  onOpenModal: (code: string, name?: string, initialTab?: 'specs' | 'profiles') => void;
   activeHospitals: { id: number; sigla: string }[];
   currentPage: number;
   totalPages: number;
@@ -24,8 +20,7 @@ interface DocumentosCardsGridProps {
 export function DocumentosCardsGrid({
   data,
   loading,
-  onOpenProfiles,
-  onOpenDrawer,
+  onOpenModal,
   activeHospitals,
   currentPage,
   totalPages,
@@ -37,9 +32,9 @@ export function DocumentosCardsGrid({
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, idx) => (
-            <div 
-              key={idx} 
-              className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between space-y-4 animate-pulse"
+            <div
+              key={idx}
+              className="sylva-glass rounded-[22px] p-5 flex flex-col justify-between space-y-4 animate-pulse"
             >
               <div className="flex items-center justify-between">
                 <div className="skeleton h-5 w-20 rounded-full" />
@@ -50,7 +45,7 @@ export function DocumentosCardsGrid({
                 <div className="skeleton h-4 w-3/4 rounded-md" />
               </div>
               <div className="skeleton h-12 w-full rounded-xl" />
-              <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+              <div className="flex items-center gap-2 pt-2 border-t border-[var(--border-subtle)]">
                 <div className="skeleton h-8 w-full rounded-lg" />
               </div>
             </div>
@@ -62,10 +57,10 @@ export function DocumentosCardsGrid({
 
   if (data.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-16 text-center shadow-xs">
-        <Database size={42} className="mx-auto mb-3 opacity-30 text-sky-600" />
-        <h3 className="text-sm font-bold text-slate-800 mb-1">Nenhum documento encontrado</h3>
-        <p className="text-xs text-slate-500">Tente ajustar seus termos de busca ou filtros de hospital.</p>
+      <div className="sylva-glass rounded-[22px] p-16 text-center">
+        <Database size={42} className="mx-auto mb-3 opacity-35 text-[var(--muted)]" />
+        <h3 className="text-sm font-bold text-[var(--foreground)] mb-1">Nenhum documento encontrado</h3>
+        <p className="text-xs text-[var(--muted)]">Tente ajustar seus termos de busca ou filtros de hospital.</p>
       </div>
     );
   }
@@ -88,21 +83,21 @@ export function DocumentosCardsGrid({
           });
 
           return (
-            <div 
+            <div
               key={docId || idx}
-              className="bg-white rounded-2xl border border-slate-200/80 hover:border-sky-300 hover:shadow-md transition-all p-4.5 flex flex-col justify-between group"
+              className="sylva-glass rounded-[22px] hover:border-[var(--border-strong)] hover:-translate-y-0.5 transition-all p-5 flex flex-col justify-between group"
             >
               <div>
                 {/* Header do Card: Código e Métricas Rápidas */}
-                <div className="flex items-center justify-between gap-2 mb-2.5">
-                  <span className="inline-flex items-center gap-1 font-mono text-xs font-bold px-2.5 py-1 rounded-full bg-sky-50 text-sky-800 border border-sky-200/70 shadow-2xs">
-                    <FileText size={11} className="text-sky-600" />
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <span className="inline-flex items-center gap-1 font-mono text-xs font-bold px-2.5 py-1 rounded-full bg-[var(--accent)] text-[var(--accent-ink)] border border-[var(--tint-olive-border)]">
+                    <FileText size={11} />
                     #{docId}
                   </span>
 
                   {totalVal !== null && totalVal !== undefined && (
-                    <span 
-                      className="text-[11px] font-mono font-semibold text-slate-600 bg-slate-100/90 px-2 py-0.5 rounded-md"
+                    <span
+                      className="text-[11px] font-mono font-semibold text-[var(--foreground-secondary)] bg-[var(--card-subtle)] px-2.5 py-0.5 rounded-full border border-[var(--border)]"
                       title="Total de registros produzidos"
                     >
                       {Number(totalVal).toLocaleString('pt-BR')} reg.
@@ -111,32 +106,32 @@ export function DocumentosCardsGrid({
                 </div>
 
                 {/* Título do Documento Clínico */}
-                <h3 
-                  className="text-xs font-bold text-slate-900 group-hover:text-sky-800 transition-colors line-clamp-2 min-h-[36px] leading-snug cursor-pointer mb-3"
-                  onClick={() => onOpenDrawer(docId)}
+                <h3
+                  className="text-xs font-bold text-[var(--foreground)] group-hover:text-[var(--accent-ink)] transition-colors line-clamp-2 min-h-[36px] leading-snug cursor-pointer mb-3"
+                  onClick={() => onOpenModal(docId, docName, 'specs')}
                   title={docName}
                 >
                   {docName}
                 </h3>
 
                 {/* Metadados: Último uso */}
-                <div className="bg-slate-50/80 rounded-xl p-2.5 border border-slate-100 text-[11px] text-slate-600 space-y-1.5 mb-3.5">
+                <div className="bg-[var(--card-subtle)] rounded-xl p-2.5 border border-[var(--border)] text-[11px] text-[var(--foreground-secondary)] space-y-1.5 mb-3.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400 flex items-center gap-1">
-                      <Clock size={12} className="text-slate-400" />
+                    <span className="text-[var(--muted)] flex items-center gap-1">
+                      <Clock size={12} />
                       Último uso:
                     </span>
-                    <span className="font-mono font-semibold text-slate-700">
+                    <span className="font-mono font-semibold text-[var(--foreground)]">
                       {ultUso !== '-' ? ultUso : 'Sem registro'}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400 flex items-center gap-1">
-                      <Building2 size={12} className="text-slate-400" />
+                    <span className="text-[var(--muted)] flex items-center gap-1">
+                      <Building2 size={12} />
                       Hospitais ativos:
                     </span>
-                    <span className="font-semibold text-sky-700">
+                    <span className="font-semibold text-[var(--accent-ink)]">
                       {hospitalsWithUsage.length} de {activeHospitals.length}
                     </span>
                   </div>
@@ -144,28 +139,28 @@ export function DocumentosCardsGrid({
 
                 {/* Pílulas de Hospitais onde o documento está em uso */}
                 <div className="mb-4">
-                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-1.5">
+                  <span className="text-[10px] font-semibold text-[var(--muted)] uppercase tracking-wider block mb-1.5">
                     Presença em Unidades
                   </span>
                   <div className="flex flex-wrap gap-1">
                     {hospitalsWithUsage.length > 0 ? (
                       hospitalsWithUsage.slice(0, 5).map(h => (
-                        <span 
-                          key={h.id} 
-                          className="inline-flex items-center gap-0.5 text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        <span
+                          key={h.id}
+                          className="inline-flex items-center gap-1.5 text-[10px] font-bold font-mono px-2 py-0.5 rounded-full tone-success border"
                           title={`Ativo em ${h.sigla}`}
                         >
-                          <Check size={9} strokeWidth={3} className="text-emerald-600" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--lime)]" />
                           {h.sigla}
                         </span>
                       ))
                     ) : (
-                      <span className="text-[11px] text-slate-400 italic">
+                      <span className="text-[11px] text-[var(--muted)] italic">
                         Não ativo em hospitais selecionados
                       </span>
                     )}
                     {hospitalsWithUsage.length > 5 && (
-                      <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full">
+                      <span className="text-[10px] font-semibold font-mono px-2 py-0.5 rounded-full tone-neutral border opacity-60">
                         +{hospitalsWithUsage.length - 5}
                       </span>
                     )}
@@ -174,25 +169,25 @@ export function DocumentosCardsGrid({
               </div>
 
               {/* Botões de Ação do Card */}
-              <div className="pt-3 border-t border-slate-100 flex items-center gap-2">
+              <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => onOpenDrawer(docId)}
-                  className="flex-1 h-8 text-[11px] font-semibold gap-1.5 rounded-xl border-slate-200 hover:bg-sky-50 hover:text-sky-800 hover:border-sky-200 cursor-pointer shadow-2xs"
+                  onClick={() => onOpenModal(docId, docName, 'specs')}
+                  className="flex-1 h-8 text-[11px] gap-1.5"
                 >
-                  <Layers size={12} className="text-sky-600" />
+                  <Layers size={12} className="text-[var(--accent-ink)]" />
                   Metadados
                 </Button>
 
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => onOpenProfiles(docId, docName)}
-                  className="h-8 px-3 text-[11px] font-semibold rounded-xl border-slate-200 bg-white hover:bg-teal-50 hover:text-[#004953] hover:border-teal-200 transition-all cursor-pointer shadow-2xs gap-1.5 text-slate-700"
+                  onClick={() => onOpenModal(docId, docName, 'profiles')}
+                  className="h-8 px-3 text-[11px] gap-1.5"
                   title="Abrir Perfis Ambulatoriais Vinculados"
                 >
-                  <Layers size={12} className="text-[#004953]" />
+                  <Layers size={12} className="text-[var(--accent-ink)]" />
                   <span>Perfis</span>
                 </Button>
               </div>
@@ -202,27 +197,32 @@ export function DocumentosCardsGrid({
       </div>
 
       {/* Paginação */}
-      <div className="p-3.5 rounded-2xl border border-slate-200/80 bg-white shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600">
+      <div className="p-3.5 rounded-[22px] sylva-glass flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[var(--foreground-secondary)]">
         <div className="flex items-center gap-2">
-          <span>Exibindo <b>{data.length}</b> de <b>{totalFiltered}</b> documentos em Cards</span>
+          <span>
+            Exibindo <b className="text-[var(--foreground)]">{data.length}</b> de{' '}
+            <b className="text-[var(--foreground)]">{totalFiltered}</b> documentos em Cards
+          </span>
         </div>
 
         {totalPages > 1 && (
           <div className="flex items-center gap-1.5 self-center sm:self-auto">
             <button
+              type="button"
               onClick={() => onPageChange(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
-              className="px-3 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none text-xs font-semibold text-slate-700 transition-all shadow-2xs cursor-pointer"
+              className="h-8 px-3.5 rounded-full sylva-pill text-xs font-semibold text-[var(--foreground)] disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
             >
               Anterior
             </button>
-            <span className="px-2 text-xs font-mono font-medium text-slate-700">
-              Página {currentPage} de {totalPages}
+            <span className="px-3 py-1 rounded-full bg-[var(--card-subtle)] border border-[var(--border)] font-mono font-bold text-[var(--foreground)] text-xs">
+              {currentPage} / {totalPages}
             </span>
             <button
+              type="button"
               onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
-              className="px-3 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none text-xs font-semibold text-slate-700 transition-all shadow-2xs cursor-pointer"
+              className="h-8 px-3.5 rounded-full sylva-pill text-xs font-semibold text-[var(--foreground)] disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
             >
               Próxima
             </button>
@@ -232,4 +232,3 @@ export function DocumentosCardsGrid({
     </div>
   );
 }
-

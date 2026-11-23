@@ -2,16 +2,21 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  FileText, Activity, ShieldCheck, Archive, RotateCw,
-  Building2, BarChart3, Clock, ChevronRight, ChevronDown, AlertTriangle,
-  Sun, Moon, CheckCircle2
+  RotateCw,
+  Building2,
+  ChevronRight,
+  ChevronDown,
+  AlertTriangle,
+  Sun,
+  Moon,
+  ArrowUpRight,
+  Sparkles,
+  CheckCircle2,
+  Clock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUI } from '@/context/UIContext';
 import { useRouter } from 'next/navigation';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDatabaseError } from '@/lib/error-formatter';
 
@@ -37,24 +42,71 @@ interface TurnoItem {
   QTD: number;
 }
 
+interface DashboardStats {
+  total?: string | number;
+  prod24h?: string | number;
+  assinadosPercent?: string;
+}
+
+interface DashboardAnalytics {
+  top10?: Top10Item[];
+  unitAdherence?: UnitAdherenceItem[];
+  idle?: Array<{ TOTAL_TEMPLATES?: number; TOTAL_DOCS_OCIOSOS?: number }>;
+  volumeTurno?: TurnoItem[];
+}
+
+interface DashboardQuality {
+  sla24h?: string | number;
+  faixas?: SlaFaixaItem[];
+}
+
+type ChartMode = 'modelos' | 'unidades';
+
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Bom dia';
+  if (hour < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
+
+function formatCompactNumber(val: number): string {
+  if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(2).replace('.', ',')}M`;
+  if (val >= 1_000) return `${(val / 1_000).toFixed(1).replace('.', ',')}K`;
+  return val.toLocaleString('pt-BR');
+}
+
 export default function Dashboard() {
   const { docVersion } = useUI();
   const router = useRouter();
   const resolvedVersion = docVersion || 'V3';
 
-  const [stats, setStats] = useState<any>(null);
-  const [analytics, setAnalytics] = useState<any>(null);
-  const [quality, setQuality] = useState<any>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [analytics, setAnalytics] = useState<DashboardAnalytics | null>(null);
+  const [quality, setQuality] = useState<DashboardQuality | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showTechDetails, setShowTechDetails] = useState(false);
   const [activeConnId, setActiveConnId] = useState('');
+  const [chartMode, setChartMode] = useState<ChartMode>('modelos');
+  const [hoveredBar, setHoveredBar] = useState<number | null>(null);
 
-  // Busca dados de conexões ativas
+  const greeting = useMemo(() => getGreeting(), []);
+  const formattedDate = useMemo(() => {
+    try {
+      return new Intl.DateTimeFormat('pt-BR', {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+      }).format(new Date());
+    } catch {
+      return '';
+    }
+  }, []);
+
   useEffect(() => {
     fetch('/api/connections')
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         if (data.activeConnectionId) {
           setActiveConnId(data.activeConnectionId);
         }
@@ -62,7 +114,6 @@ export default function Dashboard() {
       .catch(console.error);
   }, []);
 
-  // Busca centralizada de todos os dados do Cockpit
   const fetchDashboardData = useCallback(async (force = false) => {
     const cacheKey = `dashboard_unified_${activeConnId || 'default'}_${resolvedVersion}`;
 
@@ -88,9 +139,9 @@ export default function Dashboard() {
     try {
       const forceParam = force ? '&force=true' : '';
       const [resStats, resAnalytics, resQuality] = await Promise.all([
-        fetch(`/api/dashboard/stats?version=${resolvedVersion}${forceParam}`).then(r => r.json()),
-        fetch(`/api/dashboard/analytics?version=${resolvedVersion}${forceParam}`).then(r => r.json()),
-        fetch(`/api/dashboard/quality?version=${resolvedVersion}${forceParam}`).then(r => r.json()),
+        fetch(`/api/dashboard/stats?version=${resolvedVersion}${forceParam}`).then((r) => r.json()),
+        fetch(`/api/dashboard/analytics?version=${resolvedVersion}${forceParam}`).then((r) => r.json()),
+        fetch(`/api/dashboard/quality?version=${resolvedVersion}${forceParam}`).then((r) => r.json()),
       ]);
 
       if (resStats.error) throw new Error(resStats.error);
@@ -102,15 +153,19 @@ export default function Dashboard() {
       setQuality(resQuality);
 
       if (typeof window !== 'undefined') {
-        sessionStorage.setItem(cacheKey, JSON.stringify({
-          stats: resStats,
-          analytics: resAnalytics,
-          quality: resQuality
-        }));
+        sessionStorage.setItem(
+          cacheKey,
+          JSON.stringify({
+            stats: resStats,
+            analytics: resAnalytics,
+            quality: resQuality,
+          })
+        );
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Falha na comunicação com o banco Oracle.';
       console.error('Erro ao carregar telemetria do dashboard:', err);
-      setError(err.message || 'Falha na comunicação com o banco Oracle.');
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -120,131 +175,161 @@ export default function Dashboard() {
     fetchDashboardData(false);
   }, [fetchDashboardData]);
 
-  // Métricas calculadas para os Top Cards
-  const top10List: Top10Item[] = analytics?.top10 || [];
-  const maxTopDoc = top10List[0]?.QTD_TOTAL || 1;
-
-  const unitList: UnitAdherenceItem[] = analytics?.unitAdherence || [];
+  // Dados processados
+  const top10List = useMemo(() => analytics?.top10 ?? [], [analytics]);
+  const unitList = useMemo(() => analytics?.unitAdherence ?? [], [analytics]);
   const maxUnitVal = unitList[0]?.QTD_TOTAL_PREENCHIDA || 1;
-  const totalUnitProduction = useMemo(() => {
-    return unitList.reduce((acc, u) => acc + Number(u.QTD_TOTAL_PREENCHIDA || 0), 0);
-  }, [unitList]);
+  const totalUnitProduction = useMemo(
+    () => unitList.reduce((acc, u) => acc + Number(u.QTD_TOTAL_PREENCHIDA || 0), 0),
+    [unitList]
+  );
 
-  // Métricas do Catálogo (Ociosos vs Ativos)
   const idleItem = analytics?.idle?.[0];
   const totalTemplates = Number(idleItem?.TOTAL_TEMPLATES || 0);
   const idleTemplates = Number(idleItem?.TOTAL_DOCS_OCIOSOS || 0);
   const activeTemplates = Math.max(0, totalTemplates - idleTemplates);
+  const activeRatio = totalTemplates > 0 ? Math.round((activeTemplates / totalTemplates) * 100) : 0;
 
-  // Métricas de Turno
-  const turnos: TurnoItem[] = analytics?.volumeTurno || [];
-  const turnoDia = Number(turnos.find(t => t.TURNO === 'DIA')?.QTD || 0);
-  const turnoNoite = Number(turnos.find(t => t.TURNO === 'NOITE')?.QTD || 0);
+  const turnos = useMemo(() => analytics?.volumeTurno ?? [], [analytics]);
+  const turnoDia = Number(turnos.find((t) => t.TURNO === 'DIA')?.QTD || 0);
+  const turnoNoite = Number(turnos.find((t) => t.TURNO === 'NOITE')?.QTD || 0);
   const totalTurnos = turnoDia + turnoNoite || 1;
   const pctDia = ((turnoDia / totalTurnos) * 100).toFixed(1);
   const pctNoite = ((turnoNoite / totalTurnos) * 100).toFixed(1);
 
-  // Faixas de SLA
-  const faixasSla: SlaFaixaItem[] = quality?.faixas || [];
-  const totalSlaSigned = useMemo(() => {
-    return faixasSla.reduce((acc, f) => acc + Number(f.TOTAL || 0), 0);
-  }, [faixasSla]);
+  const faixasSla = useMemo(() => quality?.faixas ?? [], [quality]);
+
+  // Dados para o Gráfico de Colunas Verticais estilo Sylva ("Revenue won")
+  const barChartData = useMemo(() => {
+    if (chartMode === 'modelos') {
+      return top10List.slice(0, 10).map((d, idx) => ({
+        id: String(d.CD_DOCUMENTO || idx),
+        shortLabel: `#${String(idx + 1).padStart(2, '0')}`,
+        fullLabel: d.DS_DOCUMENTO,
+        value: Number(d.QTD_TOTAL || 0),
+        isHighlight: idx === 0,
+      }));
+    }
+    return unitList.slice(0, 10).map((u, idx) => ({
+      id: String(u.CD_MULTI_EMPRESA || idx),
+      shortLabel: u.SIGLA_UNIDADE.slice(0, 6),
+      fullLabel: u.SIGLA_UNIDADE,
+      value: Number(u.QTD_TOTAL_PREENCHIDA || 0),
+      isHighlight: idx === 0,
+    }));
+  }, [chartMode, top10List, unitList]);
+
+  const maxBarValue = useMemo(
+    () => Math.max(...barChartData.map((b) => b.value), 1),
+    [barChartData]
+  );
+
+  const avgBarValue = useMemo(() => {
+    if (barChartData.length === 0) return 0;
+    const sum = barChartData.reduce((acc, b) => acc + b.value, 0);
+    return sum / barChartData.length;
+  }, [barChartData]);
+
+  const avgLinePct = Math.min(92, Math.max(12, (avgBarValue / maxBarValue) * 100));
+
+  const stageColors = [
+    'bg-[var(--lime)]',
+    'bg-[var(--sky)]',
+    'bg-[var(--sky)]/85',
+    'bg-[var(--sand)]',
+    'bg-white/35',
+  ];
 
   return (
-    <div className="min-h-screen bg-slate-50/50 flex flex-col p-4 md:p-8 space-y-6 pb-24">
-      
-      {/* 1. Header Executivo Padronizado */}
-      <div className="pb-4 border-b border-slate-200/80">
-        <PageHeader 
-          title="Cockpit de Governança"
-          subtitle="Visão executiva consolidada · Produção clínica, aderência das unidades e conformidade regulatória"
-          icon={BarChart3}
-          badge={
-            <Badge 
-              variant="outline" 
-              suppressHydrationWarning
-              className="text-[10px] font-bold px-2 py-0.5 rounded-full border-sky-300 bg-sky-50 text-sky-800"
-            >
-              Motor {resolvedVersion}
-            </Badge>
-          }
-          action={
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.push('/hospitais')}
-                className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-2xs cursor-pointer h-9 px-4"
-              >
-                <Building2 className="w-3.5 h-3.5 text-slate-500" />
-                <span>Visão por Hospital</span>
-              </Button>
+    <div className="flex flex-col space-y-5">
+      {/* 1. Hero Header — Estilo "Good morning, Ananya" do Sylva */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pt-1">
+        <div className="space-y-1.5">
+          <h1
+            className="text-[28px] md:text-[34px] font-bold tracking-tight text-[var(--foreground)] leading-none relative inline-block pb-2"
+            suppressHydrationWarning
+          >
+            {greeting}, Governança
+            <span className="absolute left-0 bottom-0 h-[3px] w-full max-w-[260px] rounded-full bg-[var(--lime)]" />
+          </h1>
+          <p className="text-[12.5px] text-[var(--foreground-secondary)] flex items-center gap-2 flex-wrap" suppressHydrationWarning>
+            <span className="font-medium text-[var(--foreground)]">Motor {resolvedVersion}</span>
+            <span className="text-[var(--muted)]">·</span>
+            <span className="capitalize">{formattedDate}</span>
+            <span className="text-[var(--muted)]">·</span>
+            <span>{activeTemplates} templates ativos</span>
+            <span className="text-[var(--muted)]">·</span>
+            <span>{unitList.length} unidades monitoradas</span>
+          </p>
+        </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchDashboardData(true)}
-                disabled={loading}
-                className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-2xs cursor-pointer h-9 px-4"
-              >
-                <RotateCw className={cn("w-3.5 h-3.5 text-sky-600", loading && "animate-spin")} />
-                <span>Sincronizar Cockpit</span>
-              </Button>
-            </>
-          }
-        />
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => router.push('/hospitais')}
+            className="inline-flex items-center gap-2 h-10 px-4 rounded-full sylva-pill text-[12.5px] font-semibold text-[var(--foreground)] cursor-pointer"
+          >
+            <Building2 size={15} className="text-[var(--foreground-secondary)]" />
+            <span>Unidades</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => fetchDashboardData(true)}
+            disabled={loading}
+            className="inline-flex items-center gap-2 h-10 px-5 rounded-full sylva-lime-btn text-[12.5px] font-bold cursor-pointer disabled:opacity-60"
+          >
+            <RotateCw size={14} strokeWidth={2.4} className={cn(loading && 'animate-spin')} />
+            <span>{loading ? 'Sincronizando...' : 'Sincronizar'}</span>
+          </button>
+        </div>
       </div>
 
-      {/* Alerta Amigável de Erro */}
+      {/* Alerta Amigável de Erro Oracle (Glass Style) */}
       {error && (() => {
         const friendlyError = formatDatabaseError(error);
         return (
-          <div className="border border-rose-200 bg-rose-50/90 rounded-2xl p-4 sm:p-5 shadow-xs transition-all">
+          <div className="sylva-glass border-rose-400/30 rounded-[22px] p-5 transition-all">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-start gap-3.5">
-                <div className="p-2.5 rounded-xl bg-rose-100 text-rose-700 shrink-0 mt-0.5 sm:mt-0">
-                  <AlertTriangle size={20} className="stroke-[2.2]" />
+                <div className="p-2.5 rounded-2xl bg-rose-500/15 text-rose-300 border border-rose-400/25 shrink-0">
+                  <AlertTriangle size={19} />
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h4 className="font-semibold text-rose-950 text-sm">{friendlyError.title}</h4>
-                    <Badge variant="outline" className="text-[10px] bg-rose-100/60 text-rose-700 border-rose-200">
+                    <h4 className="font-semibold text-[var(--foreground)] text-sm">{friendlyError.title}</h4>
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-400/25">
                       Banco Oracle
-                    </Badge>
+                    </span>
                   </div>
-                  <p className="text-xs text-rose-800 leading-relaxed">{friendlyError.message}</p>
-                  <p className="text-xs text-rose-600 font-medium">{friendlyError.actionSuggestion}</p>
+                  <p className="text-xs text-[var(--foreground-secondary)] leading-relaxed">{friendlyError.message}</p>
+                  <p className="text-xs text-rose-300/90 font-medium">{friendlyError.actionSuggestion}</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fetchDashboardData(true)}
-                  disabled={loading}
-                  className="gap-1.5 text-xs font-semibold rounded-xl bg-white hover:bg-rose-50 border-rose-200 text-rose-800 shadow-2xs h-8.5 px-3.5 cursor-pointer"
-                >
-                  <RotateCw className={cn("w-3.5 h-3.5 text-rose-700", loading && "animate-spin")} />
-                  <span>{loading ? "Reconectando..." : "Tentar Novamente"}</span>
-                </Button>
-              </div>
+              <button
+                type="button"
+                onClick={() => fetchDashboardData(true)}
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full sylva-pill text-xs font-semibold text-[var(--foreground)] cursor-pointer shrink-0"
+              >
+                <RotateCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
+                <span>Tentar Novamente</span>
+              </button>
             </div>
 
-            {/* Seletor de Detalhes Técnicos */}
             {friendlyError.technicalDetails && (
-              <div className="mt-3 pt-3 border-t border-rose-200/70">
+              <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
                 <button
                   type="button"
-                  onClick={() => setShowTechDetails(prev => !prev)}
-                  className="flex items-center gap-1.5 text-[11px] font-medium text-rose-700 hover:text-rose-950 transition-colors cursor-pointer"
+                  onClick={() => setShowTechDetails((prev) => !prev)}
+                  className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--foreground-secondary)] hover:text-[var(--foreground)] cursor-pointer"
                 >
-                  <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200", showTechDetails && "rotate-180")} />
-                  <span>{showTechDetails ? "Ocultar detalhes técnicos" : "Ver código do erro (para DBA / Suporte Técnico)"}</span>
+                  <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', showTechDetails && 'rotate-180')} />
+                  <span>{showTechDetails ? 'Ocultar detalhes técnicos' : 'Ver código do erro (DBA / Suporte)'}</span>
                 </button>
-
                 {showTechDetails && (
-                  <div className="mt-2 p-2.5 bg-white/70 border border-rose-200/80 rounded-xl font-mono text-[11px] text-rose-900 break-all select-all">
+                  <div className="mt-2 p-3 rounded-xl bg-black/30 border border-[var(--border)] font-mono text-[11px] text-rose-200 break-all select-all">
                     {friendlyError.technicalDetails}
                   </div>
                 )}
@@ -254,252 +339,272 @@ export default function Dashboard() {
         );
       })()}
 
-      {/* 2. Top Executive KPI Bar (4 Cards de Alto Impacto) */}
+      {/* 2. Row 1 — 4 KPI Cards Translúcidos Coloridos (Slate, Olive, Mocha, Charcoal) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Volume Geral (90d) */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:border-sky-300 transition-all">
-          <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-2">
-            <span>Volume Geral (90d)</span>
-            <div className="p-2 rounded-xl bg-sky-50 text-sky-700 border border-sky-100">
-              <FileText size={17} />
+        {/* Card 1: Slate Blue Glass — Volume Geral */}
+        <div className="sylva-card-slate rounded-[22px] p-5 flex flex-col justify-between min-h-[144px] hover:-translate-y-0.5 transition-transform">
+          <div className="text-[12px] font-medium text-[var(--tint-slate-muted)]">Volume geral (90d)</div>
+          <div className="my-2">
+            <div className="text-[30px] font-bold font-[family-name:var(--font-manrope)] tabular-nums text-[var(--tint-slate-fg)] tracking-tight leading-none">
+              {loading ? <Skeleton className="h-8 w-32" /> : stats?.total || '0'}
             </div>
           </div>
-          <div>
-            <div className="text-3xl font-bold font-mono tabular-nums text-slate-900 tracking-tight my-1">
-              {loading ? <Skeleton className="h-9 w-28" /> : stats?.total || '0'}
+          <div className="space-y-2">
+            <div className="w-full h-1.5 bg-[var(--tint-slate-track)] rounded-full overflow-hidden">
+              <div className="h-full bg-[var(--tint-slate-bar)] rounded-full w-full" />
             </div>
-            <p className="text-[11px] text-slate-500 mt-1 font-medium">
-              Prontuários e evoluções na rede
-            </p>
-          </div>
-          <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden mt-4">
-            <div className="h-full bg-sky-600 rounded-full w-full" />
+            <div className="flex items-center justify-between text-[11px] text-[var(--tint-slate-muted)]">
+              <span>Prontuários sob governança</span>
+              <span className="text-[var(--lime)] font-semibold flex items-center gap-0.5">
+                <ArrowUpRight size={12} />
+                Ativo
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Card 2: Produção 24 Horas */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:border-sky-300 transition-all">
-          <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-2">
-            <span>Produção Recente (24h)</span>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100">
-              <Activity size={17} />
+        {/* Card 2: Olive Glass — Produção 24h */}
+        <div className="sylva-card-olive rounded-[22px] p-5 flex flex-col justify-between min-h-[144px] hover:-translate-y-0.5 transition-transform">
+          <div className="text-[12px] font-medium text-[var(--tint-olive-muted)]">Produção recente (24h)</div>
+          <div className="my-2">
+            <div className="text-[30px] font-bold font-[family-name:var(--font-manrope)] tabular-nums text-[var(--tint-olive-fg)] tracking-tight leading-none">
+              {loading ? <Skeleton className="h-8 w-28" /> : stats?.prod24h || '0'}
             </div>
           </div>
-          <div>
-            <div className="text-3xl font-bold font-mono tabular-nums text-slate-900 tracking-tight my-1">
-              {loading ? <Skeleton className="h-9 w-24" /> : stats?.prod24h || '0'}
-            </div>
-            <p className="text-[11px] text-emerald-700 font-medium flex items-center gap-1.5 mt-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Documentos registrados hoje
-            </p>
-          </div>
-          <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden mt-4">
-            <div className="h-full bg-emerald-500 rounded-full w-3/4" />
+          <div className="text-[11.5px] text-[var(--tint-olive-muted)] flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--lime)] animate-pulse" />
+            <span>Documentos registrados hoje</span>
           </div>
         </div>
 
-        {/* Card 3: Conformidade de SLA (24h) */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:border-sky-300 transition-all">
-          <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-2">
-            <span>SLA Fechamento (24h)</span>
-            <div className="p-2 rounded-xl bg-teal-50 text-[#004953] border border-teal-100">
-              <ShieldCheck size={17} />
+        {/* Card 3: Mocha/Bronze Glass — SLA Fechamento */}
+        <div className="sylva-card-mocha rounded-[22px] p-5 flex flex-col justify-between min-h-[144px] hover:-translate-y-0.5 transition-transform">
+          <div className="text-[12px] font-medium text-[var(--tint-mocha-muted)]">SLA fechamento (24h)</div>
+          <div className="my-2">
+            <div className="text-[30px] font-bold font-[family-name:var(--font-manrope)] tabular-nums text-[var(--tint-mocha-fg)] tracking-tight leading-none">
+              {loading ? <Skeleton className="h-8 w-24" /> : `${quality?.sla24h || '100.0'}%`}
             </div>
           </div>
-          <div>
-            <div className="text-3xl font-bold font-mono tabular-nums text-[#004953] tracking-tight my-1">
-              {loading ? <Skeleton className="h-9 w-24" /> : `${quality?.sla24h || '100.0'}%`}
-            </div>
-            <p className="text-[11px] text-slate-500 mt-1 font-medium">
-              Taxa de assinatura: <strong className="text-slate-800">{stats?.assinadosPercent || '0.0%'}</strong>
-            </p>
-          </div>
-          <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden mt-4">
-            <div className="h-full bg-[#004953] rounded-full w-[95%]" />
+          <div className="text-[11.5px] text-[var(--tint-mocha-muted)]">
+            Assinados: <strong className="text-[var(--tint-mocha-fg)] font-semibold">{stats?.assinadosPercent || '0.0%'}</strong>
           </div>
         </div>
 
-        {/* Card 4: Saúde do Catálogo */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:border-sky-300 transition-all">
-          <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-2">
-            <span>Catálogo Clínico</span>
-            <div className="p-2 rounded-xl bg-amber-50 text-amber-700 border border-amber-100">
-              <Archive size={17} />
+        {/* Card 4: Charcoal Glass — Catálogo Clínico */}
+        <div className="sylva-card-charcoal rounded-[22px] p-5 flex flex-col justify-between min-h-[144px] hover:-translate-y-0.5 transition-transform">
+          <div className="text-[12px] font-medium text-[var(--foreground-secondary)]">Catálogo clínico</div>
+          <div className="my-2">
+            <div className="text-[30px] font-bold font-[family-name:var(--font-manrope)] tabular-nums text-[var(--foreground)] tracking-tight leading-none">
+              {loading ? <Skeleton className="h-8 w-24" /> : `${activeRatio}%`}
             </div>
           </div>
-          <div>
-            <div className="text-3xl font-bold font-mono tabular-nums text-slate-900 tracking-tight my-1">
-              {loading ? <Skeleton className="h-9 w-24" /> : `${activeTemplates} Ativos`}
-            </div>
-            <p className="text-[11px] text-slate-500 mt-1 font-medium">
-              {idleTemplates} templates ociosos em 90 dias
-            </p>
-          </div>
-          <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden mt-4">
-            <div 
-              className="h-full bg-amber-500 rounded-full" 
-              style={{ width: `${totalTemplates > 0 ? (activeTemplates / totalTemplates) * 100 : 50}%` }} 
-            />
+          <div className="text-[11.5px] text-[var(--foreground-secondary)]">
+            {activeTemplates} ativos de {totalTemplates} templates
           </div>
         </div>
       </div>
 
-      {/* 3. Painel Central: Grid 2 Colunas (7/5) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
-        {/* COLUNA ESQUERDA: Curva ABC (Top 10 Modelos Clínicos) - 7 Colunas */}
-        <div className="lg:col-span-7 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
-            <div className="flex items-center gap-2.5">
-              <div className="p-1.5 rounded-lg bg-sky-50 text-sky-700 border border-sky-100">
-                <BarChart3 size={16} />
-              </div>
-              <div>
-                <h2 className="text-sm font-bold text-slate-900 tracking-wide uppercase">
-                  Curva ABC · Modelos Mais Utilizados
-                </h2>
-                <span className="text-[11px] text-slate-400 font-medium">
-                  Ranking dos 10 documentos de maior relevância assistencial
+      {/* 3. Row 2 — Painel Principal Assimétrico (7/5 igual à imagem 2 do Sylva) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+        {/* Esquerda (7 cols): Gráfico Vertical estilo "Revenue won" com barra líder em Neon Lime */}
+        <div className="lg:col-span-7 sylva-glass rounded-[24px] p-6 flex flex-col justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+            <div>
+              <h2 className="text-[15px] font-bold text-[var(--foreground)] tracking-tight">
+                {chartMode === 'modelos' ? 'Curva ABC · Top Modelos' : 'Produção por Unidade'}
+              </h2>
+              <p className="text-[12px] text-[var(--muted)] mt-0.5">
+                {chartMode === 'modelos'
+                  ? 'Top 10 documentos mais preenchidos nos últimos 90 dias'
+                  : 'Volume consolidado de preenchimentos por hospital'}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Legenda igual ao "Won | Target" da imagem 2 */}
+              <div className="hidden sm:flex items-center gap-3 text-[11px] text-[var(--foreground-secondary)]">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-[4px] bg-[var(--sky)]" />
+                  Volume
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 border-t border-dashed border-[var(--foreground-secondary)]" />
+                  Média {formatCompactNumber(Math.round(avgBarValue))}
                 </span>
               </div>
+
+              {/* Segmented Pill Control igual à imagem 1 do Sylva */}
+              <div className="inline-flex items-center p-1 rounded-full bg-[var(--card-subtle)] border border-[var(--border)]">
+                <button
+                  type="button"
+                  onClick={() => setChartMode('modelos')}
+                  className={cn(
+                    'px-3 py-1 rounded-full text-[11.5px] font-semibold cursor-pointer transition-all',
+                    chartMode === 'modelos'
+                      ? 'bg-[var(--glass-pill-active)] text-[var(--glass-pill-active-ink)] shadow-xs'
+                      : 'text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
+                  )}
+                >
+                  Modelos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChartMode('unidades')}
+                  className={cn(
+                    'px-3 py-1 rounded-full text-[11.5px] font-semibold cursor-pointer transition-all',
+                    chartMode === 'unidades'
+                      ? 'bg-[var(--glass-pill-active)] text-[var(--glass-pill-active-ink)] shadow-xs'
+                      : 'text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
+                  )}
+                >
+                  Unidades
+                </button>
+              </div>
             </div>
-            <Badge variant="outline" className="text-[10px] font-semibold text-slate-500 border-slate-200 bg-slate-50 self-start sm:self-auto">
-              Últimos 90 dias
-            </Badge>
           </div>
 
-          <div className="space-y-3.5">
-            {loading ? (
-              <div className="space-y-4">
-                {[100, 85, 70, 55, 40].map((width, i) => (
-                  <div key={i} className="space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <Skeleton className="h-4 w-64" />
-                      <Skeleton className="h-4 w-16" />
-                    </div>
-                    <Skeleton className="h-2.5 w-full" />
-                  </div>
-                ))}
-              </div>
-            ) : top10List.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 text-xs font-semibold">
-                Nenhum dado analítico encontrado para os últimos 90 dias.
-              </div>
-            ) : (
-              top10List.map((doc, idx) => {
-                const percent = (doc.QTD_TOTAL / maxTopDoc) * 100;
-                return (
-                  <div key={doc.CD_DOCUMENTO || idx} className="group p-2.5 rounded-xl hover:bg-slate-50/80 transition-all border border-transparent hover:border-slate-100">
-                    <div className="flex items-center justify-between text-xs mb-1.5">
-                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                        <span className={cn(
-                          "w-6 h-6 rounded-md flex items-center justify-center font-mono font-bold text-[11px] shrink-0 border",
-                          idx === 0 ? "bg-[#004953] text-white border-[#004953]" :
-                          idx === 1 ? "bg-sky-700 text-white border-sky-700" :
-                          idx === 2 ? "bg-sky-600 text-white border-sky-600" :
-                          "bg-slate-100 text-slate-600 border-slate-200"
-                        )}>
-                          #{String(idx + 1).padStart(2, '0')}
-                        </span>
-                        <div className="truncate">
-                          <span className="font-semibold text-slate-800 group-hover:text-sky-800 transition-colors block truncate">
-                            {doc.DS_DOCUMENTO}
-                          </span>
+          {/* Área do Gráfico de Colunas Verticais */}
+          {loading ? (
+            <div className="grid grid-cols-10 gap-2.5 h-56 items-end pt-4">
+              {[88, 72, 65, 58, 52, 46, 40, 35, 28, 22].map((h, i) => (
+                <Skeleton key={i} className="w-full rounded-xl" style={{ height: `${h}%` }} />
+              ))}
+            </div>
+          ) : barChartData.length === 0 ? (
+            <div className="h-56 flex items-center justify-center text-xs text-[var(--muted)]">
+              Nenhum dado analítico encontrado para o período.
+            </div>
+          ) : (
+            <div className="relative pt-6">
+              {/* Linha tracejada de Média/Meta */}
+              <div
+                className="absolute left-0 right-0 border-t border-dashed border-[var(--foreground)]/25 pointer-events-none z-10 transition-all duration-500"
+                style={{ bottom: `calc(${avgLinePct}% * 0.84 + 28px)` }}
+              />
+
+              {/* Colunas Verticais */}
+              <div className="grid gap-2 sm:gap-2.5 items-end h-56" style={{ gridTemplateColumns: `repeat(${barChartData.length}, minmax(0, 1fr))` }}>
+                {barChartData.map((bar, idx) => {
+                  const heightPct = Math.max(10, Math.round((bar.value / maxBarValue) * 100));
+                  const isHovered = hoveredBar === idx;
+                  return (
+                    <div
+                      key={bar.id}
+                      className="relative flex flex-col items-center h-full justify-end group cursor-pointer"
+                      onMouseEnter={() => setHoveredBar(idx)}
+                      onMouseLeave={() => setHoveredBar(null)}
+                    >
+                      {/* Tooltip flutuante */}
+                      {isHovered && (
+                        <div className="absolute -top-11 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-xl bg-[#11100F] border border-white/15 shadow-xl whitespace-nowrap pointer-events-none">
+                          <div className="text-[11px] font-semibold text-white max-w-[200px] truncate">
+                            {bar.fullLabel}
+                          </div>
+                          <div className="text-[10.5px] font-mono text-[var(--lime)] font-bold">
+                            {bar.value.toLocaleString('pt-BR')} registros
+                          </div>
                         </div>
+                      )}
+
+                      {/* Trilho translúcido vertical */}
+                      <div className="w-full flex-1 rounded-xl bg-[var(--card-subtle)] flex items-end overflow-hidden p-[1px]">
+                        <div
+                          className={cn(
+                            'w-full rounded-[10px] transition-all duration-500 ease-out',
+                            bar.isHighlight
+                              ? 'bg-[var(--lime)] shadow-[0_0_24px_rgba(204,243,82,0.28)]'
+                              : 'bg-[var(--sky)] group-hover:brightness-110'
+                          )}
+                          style={{ height: `${heightPct}%` }}
+                        />
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="font-mono font-bold text-slate-900 tabular-nums">
-                          {Number(doc.QTD_TOTAL).toLocaleString('pt-BR')}
-                        </span>
-                        <span className="text-[10px] text-slate-400 uppercase font-medium">usos</span>
-                      </div>
+
+                      {/* Rótulo X */}
+                      <span
+                        className={cn(
+                          'mt-2 text-[10.5px] font-mono truncate max-w-full',
+                          bar.isHighlight ? 'text-[var(--foreground)] font-bold' : 'text-[var(--muted)]'
+                        )}
+                      >
+                        {bar.shortLabel}
+                      </span>
                     </div>
-                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-[#004953] to-sky-600 rounded-full transition-all duration-500"
-                        style={{ width: `${percent}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* COLUNA DIREITA: Aderência por Unidade + Qualidade & Turnos - 5 Colunas */}
-        <div className="lg:col-span-5 space-y-6">
-          
-          {/* Módulo 1: Aderência por Unidade Hospitalar com link direto */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-5">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-teal-50 text-[#004953] border border-teal-100">
-                  <Building2 size={16} />
-                </div>
-                <div>
-                  <h2 className="text-sm font-bold text-slate-900 tracking-wide uppercase">
-                    Aderência por Unidade
-                  </h2>
-                  <span className="text-[11px] text-slate-400 font-medium">
-                    Participação de cada hospital na produção
-                  </span>
-                </div>
+        {/* Direita (5 cols): Aderência por Unidade estilo "Pipeline by stage" */}
+        <div className="lg:col-span-5 sylva-glass rounded-[24px] p-6 flex flex-col justify-between">
+          <div>
+            <div className="flex items-start justify-between gap-2 mb-5">
+              <div>
+                <h2 className="text-[15px] font-bold text-[var(--foreground)] tracking-tight">
+                  Aderência por unidade
+                </h2>
+                <p className="text-[12px] text-[var(--muted)] mt-0.5">
+                  Participação de cada hospital na produção
+                </p>
               </div>
-              <Badge variant="outline" className="text-[10px] font-semibold text-slate-500 border-slate-200 bg-slate-50">
-                {unitList.length} Unidades
-              </Badge>
+              <button
+                type="button"
+                onClick={() => router.push('/hospitais')}
+                className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--foreground-secondary)] hover:text-[var(--foreground)] cursor-pointer shrink-0"
+              >
+                <span>Hospitais</span>
+                <ChevronRight size={14} />
+              </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               {loading ? (
-                <div className="space-y-3">
-                  {[1, 2, 3, 4].map(i => (
-                    <div key={i} className="space-y-1">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-2.5 w-full" />
+                <div className="space-y-4">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="space-y-2">
+                      <Skeleton className="h-4 w-36" />
+                      <Skeleton className="h-2.5 w-full rounded-full" />
                     </div>
                   ))}
                 </div>
               ) : unitList.length === 0 ? (
-                <div className="p-6 text-center text-slate-400 text-xs">
-                  Nenhum dado por unidade retornado.
+                <div className="py-12 text-center text-xs text-[var(--muted)]">
+                  Nenhuma unidade retornada pelo Oracle.
                 </div>
               ) : (
-                unitList.map((unit) => {
-                  const percent = (unit.QTD_TOTAL_PREENCHIDA / maxUnitVal) * 100;
-                  const share = totalUnitProduction > 0 
-                    ? ((unit.QTD_TOTAL_PREENCHIDA / totalUnitProduction) * 100).toFixed(1) 
-                    : '0.0';
+                unitList.slice(0, 5).map((unit, idx) => {
+                  const percent = Math.max(8, (unit.QTD_TOTAL_PREENCHIDA / maxUnitVal) * 100);
+                  const share =
+                    totalUnitProduction > 0
+                      ? ((unit.QTD_TOTAL_PREENCHIDA / totalUnitProduction) * 100).toFixed(1)
+                      : '0.0';
+                  const barColor = stageColors[idx] || 'bg-white/30';
 
                   return (
-                    <div 
-                      key={unit.CD_MULTI_EMPRESA} 
-                      className="group p-2.5 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200/80 transition-all cursor-pointer"
+                    <div
+                      key={unit.CD_MULTI_EMPRESA}
                       onClick={() => router.push(`/hospitais?id=${unit.CD_MULTI_EMPRESA}`)}
+                      className="grid grid-cols-12 items-center gap-3 group cursor-pointer"
                     >
-                      <div className="flex items-center justify-between text-xs mb-1.5">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 font-mono px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200/60 text-[11px]">
-                            {unit.SIGLA_UNIDADE}
-                          </span>
-                          <span className="text-[11px] text-slate-400 font-medium">
-                            {share}% do total
-                          </span>
+                      <div className="col-span-4 min-w-0">
+                        <div className="text-[12.5px] font-semibold text-[var(--foreground)] group-hover:text-[var(--lime)] transition-colors truncate">
+                          {unit.SIGLA_UNIDADE}
                         </div>
-                        <div className="flex items-center gap-1 text-slate-700 group-hover:text-sky-800 transition-colors">
-                          <span className="font-mono font-bold tabular-nums">
-                            {Number(unit.QTD_TOTAL_PREENCHIDA).toLocaleString('pt-BR')}
-                          </span>
-                          <ChevronRight size={13} className="text-slate-400 group-hover:text-sky-600 transition-transform group-hover:translate-x-0.5" />
+                        <div className="text-[11px] text-[var(--muted)]">{share}% do total</div>
+                      </div>
+
+                      <div className="col-span-5">
+                        <div className="h-2.5 w-full rounded-full bg-[var(--card-subtle)] overflow-hidden">
+                          <div
+                            className={cn('h-full rounded-full transition-all duration-500', barColor)}
+                            style={{ width: `${percent}%` }}
+                          />
                         </div>
                       </div>
-                      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-sky-600 group-hover:bg-[#004953] transition-all rounded-full duration-500"
-                          style={{ width: `${percent}%` }}
-                        />
+
+                      <div className="col-span-3 text-right font-mono text-[12px] font-semibold text-[var(--foreground)] tabular-nums">
+                        {formatCompactNumber(Number(unit.QTD_TOTAL_PREENCHIDA))}
                       </div>
                     </div>
                   );
@@ -507,86 +612,125 @@ export default function Dashboard() {
               )}
             </div>
           </div>
-
-          {/* Módulo 2: Operação & Distribuição de Turno */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-5">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-sky-50 text-sky-700 border border-sky-100">
-                  <Clock size={16} />
-                </div>
-                <div>
-                  <h2 className="text-sm font-bold text-slate-900 tracking-wide uppercase">
-                    Dinâmica de Turnos
-                  </h2>
-                  <span className="text-[11px] text-slate-400 font-medium">
-                    Distribuição da carga clínica (Últimos 7 dias)
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Barra bipartida Dia vs Noite */}
-            <div className="space-y-3">
-              <div className="flex justify-between items-center text-xs">
-                <div className="flex items-center gap-1.5 text-amber-700 font-semibold">
-                  <Sun size={14} className="text-amber-500" />
-                  <span>Diurno (07h às 19h): <strong>{pctDia}%</strong></span>
-                </div>
-                <div className="flex items-center gap-1.5 text-indigo-700 font-semibold">
-                  <Moon size={14} className="text-indigo-500" />
-                  <span>Noturno: <strong>{pctNoite}%</strong></span>
-                </div>
-              </div>
-
-              <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
-                <div 
-                  className="h-full bg-amber-400 hover:bg-amber-500 transition-all duration-500" 
-                  style={{ width: `${pctDia}%` }}
-                  title={`Diurno: ${turnoDia.toLocaleString('pt-BR')} registros`}
-                />
-                <div 
-                  className="h-full bg-slate-700 hover:bg-slate-800 transition-all duration-500" 
-                  style={{ width: `${pctNoite}%` }}
-                  title={`Noturno: ${turnoNoite.toLocaleString('pt-BR')} registros`}
-                />
-              </div>
-
-              <div className="flex justify-between text-[11px] font-mono text-slate-500 pt-1">
-                <span>{turnoDia.toLocaleString('pt-BR')} preenchimentos</span>
-                <span>{turnoNoite.toLocaleString('pt-BR')} preenchimentos</span>
-              </div>
-            </div>
-
-            {/* Faixas de Tempo de Fechamento */}
-            <div className="pt-4 border-t border-slate-100 space-y-2.5">
-              <div className="flex items-center justify-between text-xs font-semibold text-slate-800">
-                <span className="flex items-center gap-1.5">
-                  <CheckCircle2 size={13} className="text-emerald-600" />
-                  Cumprimento de SLA de Fechamento
-                </span>
-                <span className="text-emerald-700 font-mono font-bold">
-                  {quality?.sla24h || '100.0'}% em &lt;24h
-                </span>
-              </div>
-
-              <div className="grid grid-cols-5 gap-1.5 text-center pt-1">
-                {faixasSla.map((f, i) => (
-                  <div key={i} className="p-1.5 rounded-lg bg-slate-50 border border-slate-100 text-[10px]">
-                    <span className="block text-slate-400 font-medium">{f.FAIXA_SLA}</span>
-                    <strong className="block text-slate-800 font-mono mt-0.5 font-bold">
-                      {Number(f.TOTAL).toLocaleString('pt-BR')}
-                    </strong>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
         </div>
-
       </div>
 
+      {/* 4. Row 3 — 3 Cards Inferiores estilo "Next Best Move", "Today" e "Leaderboard" */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Card 1 (Olive Glass): Destaque / Próxima Ação de Governança */}
+        <div
+          onClick={() => router.push('/documentos')}
+          className="sylva-card-olive rounded-[24px] p-6 flex flex-col justify-between min-h-[190px] cursor-pointer group hover:-translate-y-0.5 transition-transform"
+        >
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-[var(--lime)]">
+              <Sparkles size={12} />
+              <span>Próximo passo</span>
+            </div>
+            <h3 className="text-xl font-bold text-[var(--tint-olive-fg)] tracking-tight">
+              Saneamento de Catálogo
+            </h3>
+            <p className="text-[12.5px] text-[var(--tint-olive-muted)] leading-relaxed">
+              {idleTemplates > 0
+                ? `${idleTemplates} templates sem uso nos últimos 90 dias prontos para revisão ou arquivamento.`
+                : 'Todos os templates clínicos estão com uso saudável nos últimos 90 dias.'}
+            </p>
+          </div>
+
+          <div className="pt-4 flex items-end justify-between">
+            <div>
+              <div className="text-2xl font-bold font-mono text-[var(--tint-olive-fg)] tabular-nums">
+                {loading ? <Skeleton className="h-7 w-20" /> : `${idleTemplates} ociosos`}
+              </div>
+              <div className="text-[11px] text-[var(--tint-olive-muted)]">de {totalTemplates} modelos cadastrados</div>
+            </div>
+            <span className="w-9 h-9 rounded-full bg-[var(--tint-olive-btn)] group-hover:bg-[var(--lime)] group-hover:text-[var(--lime-ink)] text-[var(--tint-olive-fg)] flex items-center justify-center transition-colors">
+              <ArrowUpRight size={16} />
+            </span>
+          </div>
+        </div>
+
+        {/* Card 2 (Charcoal Glass): Dinâmica de Turnos */}
+        <div className="sylva-glass rounded-[24px] p-6 flex flex-col justify-between min-h-[190px]">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h3 className="text-[15px] font-bold text-[var(--foreground)]">Dinâmica de turnos</h3>
+              <p className="text-[12px] text-[var(--muted)] mt-0.5">Carga assistencial · últimos 7 dias</p>
+            </div>
+            <Clock size={16} className="text-[var(--muted)] shrink-0 mt-0.5" />
+          </div>
+
+          <div className="space-y-3 my-4">
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 font-semibold text-[var(--sand)]">
+                <Sun size={14} />
+                Diurno · {pctDia}%
+              </span>
+              <span className="flex items-center gap-1.5 font-semibold text-[var(--sky)]">
+                <Moon size={14} />
+                Noturno · {pctNoite}%
+              </span>
+            </div>
+
+            <div className="h-3 w-full rounded-full bg-[var(--card-subtle)] overflow-hidden flex gap-0.5">
+              <div
+                className="h-full bg-[var(--sand)] rounded-l-full transition-all duration-500"
+                style={{ width: `${pctDia}%` }}
+              />
+              <div
+                className="h-full bg-[var(--sky)] rounded-r-full transition-all duration-500"
+                style={{ width: `${pctNoite}%` }}
+              />
+            </div>
+
+            <div className="flex justify-between text-[11px] font-mono text-[var(--muted)]">
+              <span>{turnoDia.toLocaleString('pt-BR')} docs</span>
+              <span>{turnoNoite.toLocaleString('pt-BR')} docs</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3 (Charcoal Glass): Faixas de SLA estilo Leaderboard */}
+        <div className="sylva-glass rounded-[24px] p-6 flex flex-col justify-between min-h-[190px]">
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <div>
+              <h3 className="text-[15px] font-bold text-[var(--foreground)]">Faixas de SLA</h3>
+              <p className="text-[12px] text-[var(--muted)] mt-0.5">Tempo médio até assinatura</p>
+            </div>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[var(--accent)] text-[var(--lime)]">
+              <CheckCircle2 size={12} />
+              {quality?.sla24h || '100.0'}%
+            </span>
+          </div>
+
+          {loading ? (
+            <div className="space-y-2.5">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-6 w-full" />
+              ))}
+            </div>
+          ) : faixasSla.length === 0 ? (
+            <div className="text-xs text-[var(--muted)] py-6 text-center">Sem faixas de SLA registradas.</div>
+          ) : (
+            <div className="space-y-2">
+              {faixasSla.slice(0, 4).map((f, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between text-[12.5px] py-1.5 border-b border-[var(--border-subtle)] last:border-0"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-[11px] font-mono text-[var(--muted)] w-4">{idx + 1}</span>
+                    <span className="font-medium text-[var(--foreground)]">{f.FAIXA_SLA}</span>
+                  </div>
+                  <span className="font-mono font-semibold text-[var(--foreground-secondary)] tabular-nums">
+                    {Number(f.TOTAL).toLocaleString('pt-BR')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

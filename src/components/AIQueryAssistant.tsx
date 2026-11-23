@@ -51,7 +51,7 @@ export function AIQueryAssistant({ currentQuery, onApply, context }: AIQueryAssi
         <button
           onClick={handleOptimize}
           disabled={loading}
-          className="flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-[var(--radius)] text-[10px] font-black uppercase hover:bg-indigo-100 transition-all disabled:opacity-50"
+          className="flex items-center gap-2 px-3 py-1 bg-[#E6F4F1] text-[#074E52] border border-[#CBE5DF] rounded-lg text-[10px] font-black uppercase hover:bg-[#D5ECE6] transition-all disabled:opacity-50 cursor-pointer"
         >
           {loading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
           {loading ? 'Analisando...' : 'Otimizar com IA'}

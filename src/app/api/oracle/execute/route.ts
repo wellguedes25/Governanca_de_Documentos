@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getData } from '@/lib/storage';
 import { executeQuery, testConnection } from '@/lib/oracle';
 
@@ -174,9 +174,11 @@ export async function POST(request: Request) {
 
     // Usa bind variables nomeados do oracledb — elimina SQL Injection.
     const binds = body.params && typeof body.params === 'object' ? body.params : {};
+    const forceRefresh = body.forceRefresh === true || body.force === true;
+    const ttlSeconds = typeof body.ttlSeconds === 'number' ? body.ttlSeconds : 600; // 10 minutos padrão para consultas de leitura
 
-    const rows = await executeQuery(connection, sql, binds);
-    return NextResponse.json({ rows });
+    const rows = await executeQuery(connection, sql, binds, { ttlSeconds, forceRefresh });
+    return NextResponse.json({ rows, cached: !forceRefresh });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

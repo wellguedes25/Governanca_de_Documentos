@@ -70,33 +70,33 @@ export function KanbanBacklogRail({
   return (
     <div 
       className={cn(
-        "bg-white rounded-2xl border border-slate-200/80 shadow-xs transition-all duration-300 flex flex-col shrink-0 overflow-hidden",
+        "sylva-glass bg-[var(--card-bg)] rounded-2xl border border-[var(--border-subtle)] shadow-xs transition-all duration-300 flex flex-col shrink-0 overflow-hidden",
         isPinnedAsColumn 
-          ? "min-w-[280px] max-w-[300px] h-full max-h-[calc(100vh-280px)] bg-slate-50/50" 
+          ? "min-w-[280px] max-w-[300px] h-full max-h-[calc(100vh-280px)] bg-[var(--card-bg)]/90" 
           : collapsed 
             ? "w-14 h-[calc(100vh-280px)]" 
             : "w-80 h-[calc(100vh-280px)]"
       )}
     >
       {/* Header do Backlog */}
-      <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+      <div className="p-3 border-b border-[var(--border-subtle)] flex items-center justify-between bg-[var(--dock-bg)]/50">
         {(!collapsed || isPinnedAsColumn) ? (
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="p-1.5 rounded-lg bg-teal-50 text-[#004953] border border-teal-100 shrink-0">
+            <div className="p-1.5 rounded-lg bg-[#CCF352]/10 text-[#CCF352] border border-[#CCF352]/20 shrink-0">
               <Layers size={14} />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide leading-none truncate">
+                <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wide leading-none truncate">
                   Backlog Flex V2
                 </h3>
               </div>
-              <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
-                <Database size={10} className="text-emerald-600" />
+              <span className="text-[10px] text-[var(--text-muted)] font-medium flex items-center gap-1 mt-0.5">
+                <Database size={10} className="text-[#CCF352]" />
                 {total} no Oracle
               </span>
             </div>
-            <Badge variant="outline" className="text-[10px] font-mono font-bold bg-white border-slate-200 text-[#004953] shrink-0">
+            <Badge variant="outline" className="text-[10px] font-mono font-bold bg-[var(--dock-bg)] border-[var(--border-subtle)] text-[#CCF352] shrink-0">
               {total}
             </Badge>
           </div>
@@ -105,7 +105,7 @@ export function KanbanBacklogRail({
         {!isPinnedAsColumn && (
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-all cursor-pointer mx-auto ml-1"
+            className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[#CCF352] hover:bg-white/5 transition-all cursor-pointer mx-auto ml-1"
             title={collapsed ? `Expandir Backlog Flex (${total} itens)` : "Recolher Backlog"}
           >
             {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
@@ -119,7 +119,7 @@ export function KanbanBacklogRail({
           
           {/* Busca Rápida no Backlog */}
           <div className="relative">
-            <Search className="absolute left-2.5 top-2 text-slate-400" size={13} />
+            <Search className="absolute left-2.5 top-2 text-[var(--text-muted)]" size={13} />
             <input
               type="text"
               placeholder={`Buscar em ${total} prontuários V2...`}
@@ -128,19 +128,19 @@ export function KanbanBacklogRail({
                 setSearchTerm(e.target.value);
                 setDisplayCount(40);
               }}
-              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#004953] focus:border-[#004953] transition-all"
+              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-[var(--border-subtle)] bg-[var(--dock-bg)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[#CCF352] focus:border-[#CCF352] transition-all"
             />
           </div>
 
           {/* Filtros de Ordenação Rápida */}
-          <div className="flex items-center justify-between text-[10px] text-slate-500 px-0.5">
-            <span className="font-medium text-slate-400">Ordenar por:</span>
+          <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)] px-0.5">
+            <span className="font-medium">Ordenar por:</span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setSortBy('usos')}
                 className={cn(
-                  "px-1.5 py-0.5 rounded font-semibold transition-colors cursor-pointer",
-                  sortBy === 'usos' ? "bg-teal-50 text-[#004953] border border-teal-200" : "hover:text-slate-700"
+                  "px-2 py-0.5 rounded font-semibold transition-all cursor-pointer",
+                  sortBy === 'usos' ? "bg-[#CCF352] text-[#141312] font-bold shadow-2xs" : "hover:text-[var(--text-primary)]"
                 )}
                 title="Mais utilizados no hospital"
               >
@@ -149,8 +149,8 @@ export function KanbanBacklogRail({
               <button
                 onClick={() => setSortBy('recente')}
                 className={cn(
-                  "px-1.5 py-0.5 rounded font-semibold transition-colors cursor-pointer",
-                  sortBy === 'recente' ? "bg-teal-50 text-[#004953] border border-teal-200" : "hover:text-slate-700"
+                  "px-2 py-0.5 rounded font-semibold transition-all cursor-pointer",
+                  sortBy === 'recente' ? "bg-[#CCF352] text-[#141312] font-bold shadow-2xs" : "hover:text-[var(--text-primary)]"
                 )}
                 title="Uso mais recente"
               >
@@ -159,8 +159,8 @@ export function KanbanBacklogRail({
               <button
                 onClick={() => setSortBy('nome')}
                 className={cn(
-                  "px-1.5 py-0.5 rounded font-semibold transition-colors cursor-pointer",
-                  sortBy === 'nome' ? "bg-teal-50 text-[#004953] border border-teal-200" : "hover:text-slate-700"
+                  "px-2 py-0.5 rounded font-semibold transition-all cursor-pointer",
+                  sortBy === 'nome' ? "bg-[#CCF352] text-[#141312] font-bold shadow-2xs" : "hover:text-[var(--text-primary)]"
                 )}
                 title="Ordem alfabética"
               >
@@ -169,8 +169,8 @@ export function KanbanBacklogRail({
               <button
                 onClick={() => setSortBy('codigo')}
                 className={cn(
-                  "px-1.5 py-0.5 rounded font-semibold transition-colors cursor-pointer",
-                  sortBy === 'codigo' ? "bg-teal-50 text-[#004953] border border-teal-200" : "hover:text-slate-700"
+                  "px-2 py-0.5 rounded font-semibold transition-all cursor-pointer",
+                  sortBy === 'codigo' ? "bg-[#CCF352] text-[#141312] font-bold shadow-2xs" : "hover:text-[var(--text-primary)]"
                 )}
                 title="Código MV"
               >
@@ -182,7 +182,7 @@ export function KanbanBacklogRail({
           {/* Lista de Documentos V2 (Cards Draggable) */}
           <div className="flex-1 overflow-y-auto space-y-2 pr-0.5 scrollbar-thin">
             {filteredAndSortedDocs.length === 0 ? (
-              <div className="p-6 text-center text-slate-400 text-xs">
+              <div className="p-6 text-center text-[var(--text-muted)] text-xs">
                 Nenhum documento Flex encontrado para o filtro.
               </div>
             ) : (
@@ -194,28 +194,28 @@ export function KanbanBacklogRail({
                     onDragStart={(e) => {
                       e.dataTransfer.setData('text/plain', JSON.stringify({ isBacklog: true, doc }));
                     }}
-                    className="group bg-white hover:bg-slate-50/90 rounded-xl border border-slate-200/90 hover:border-sky-300 hover:shadow-xs p-2.5 transition-all space-y-1.5 cursor-grab active:cursor-grabbing"
+                    className="group sylva-card bg-[var(--dock-bg)]/80 hover:bg-[var(--dock-bg)] rounded-xl border border-[var(--border-subtle)] hover:border-[#CCF352]/40 hover:shadow-xs p-2.5 transition-all space-y-1.5 cursor-grab active:cursor-grabbing text-[var(--text-primary)]"
                     title="Arraste para uma coluna do Kanban ou clique em Migrar"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-[11px] font-bold text-[#004953] bg-teal-50 px-1.5 py-0.5 rounded border border-teal-100">
+                      <span className="font-mono text-[11px] font-bold text-[#CCF352] bg-[var(--card-bg)] px-1.5 py-0.5 rounded border border-[var(--border-subtle)]">
                         #{doc.cd_documento_mv}
                       </span>
                       {doc.total_usos !== undefined && doc.total_usos > 0 ? (
-                        <span className="text-[10px] font-mono font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded flex items-center gap-1">
-                          <TrendingUp size={10} className="text-slate-400" />
+                        <span className="text-[10px] font-mono font-semibold text-[var(--text-secondary)] bg-[var(--card-bg)] px-1.5 py-0.5 rounded border border-[var(--border-subtle)] flex items-center gap-1">
+                          <TrendingUp size={10} className="text-[#CCF352]" />
                           {doc.total_usos.toLocaleString('pt-BR')} usos
                         </span>
                       ) : (
-                        <span className="text-[9px] text-slate-400 font-medium">Sem uso</span>
+                        <span className="text-[9px] text-[var(--text-muted)] font-medium">Sem uso</span>
                       )}
                     </div>
 
-                    <h4 className="text-xs font-semibold text-slate-800 group-hover:text-[#004953] transition-colors line-clamp-2 leading-snug">
+                    <h4 className="text-xs font-semibold text-[var(--text-primary)] group-hover:text-[#CCF352] transition-colors line-clamp-2 leading-snug normal-case tracking-normal">
                       {doc.nome}
                     </h4>
 
-                    <div className="pt-1 flex items-center justify-between border-t border-slate-100/70 text-[10px] text-slate-400">
+                    <div className="pt-1 flex items-center justify-between border-t border-[var(--border-subtle)] text-[10px] text-[var(--text-muted)]">
                       <span className="truncate max-w-[130px]">
                         {doc.ultimo_uso ? new Date(doc.ultimo_uso).toLocaleDateString('pt-BR') : 'Legado V2'}
                       </span>
@@ -224,7 +224,7 @@ export function KanbanBacklogRail({
                         variant="ghost"
                         size="sm"
                         onClick={() => onPromoverDoc(doc)}
-                        className="h-6 px-2 text-[10px] font-bold text-sky-700 hover:text-sky-900 hover:bg-sky-50 rounded gap-1 cursor-pointer"
+                        className="h-6 px-2 text-[10px] font-bold text-[#CCF352] hover:bg-[#CCF352]/10 rounded gap-1 cursor-pointer"
                         title="Criar demanda e abrir no Kanban"
                       >
                         <span>+ Migrar</span>
@@ -241,7 +241,7 @@ export function KanbanBacklogRail({
                       variant="outline"
                       size="sm"
                       onClick={() => setDisplayCount(prev => prev + 50)}
-                      className="w-full text-xs font-semibold text-slate-600 hover:text-[#004953] hover:border-teal-300 py-1 h-7 rounded-xl cursor-pointer"
+                      className="w-full text-xs font-semibold text-[var(--text-secondary)] hover:text-[#CCF352] border-[var(--border-subtle)] hover:border-[#CCF352]/40 py-1 h-7 rounded-xl cursor-pointer"
                     >
                       Ver mais 50 (restam {filteredAndSortedDocs.length - displayedDocs.length})
                     </Button>
@@ -251,27 +251,27 @@ export function KanbanBacklogRail({
             )}
           </div>
 
-          <div className="pt-1 px-1 flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-100">
+          <div className="pt-1 px-1 flex items-center justify-between text-[10px] text-[var(--text-muted)] border-t border-[var(--border-subtle)]">
             <span>Exibindo {displayedDocs.length} de {filteredAndSortedDocs.length}</span>
-            <span className="font-medium text-slate-500">Arraste para o Kanban</span>
+            <span className="font-medium text-[var(--text-secondary)]">Arraste para o Kanban</span>
           </div>
         </div>
       ) : (
         /* Modo Recolhido */
         <div 
           onClick={() => setCollapsed(false)}
-          className="flex-1 flex flex-col items-center justify-between py-6 space-y-4 cursor-pointer hover:bg-slate-50 transition-colors"
+          className="flex-1 flex flex-col items-center justify-between py-6 space-y-4 cursor-pointer hover:bg-[var(--dock-bg)]/40 transition-colors"
           title={`Expandir Backlog (${total} documentos)`}
         >
-          <div className="p-1.5 rounded-lg bg-teal-50 text-[#004953] border border-teal-100">
+          <div className="p-1.5 rounded-lg bg-[#CCF352]/10 text-[#CCF352] border border-[#CCF352]/20">
             <Layers size={14} />
           </div>
 
-          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest -rotate-90 whitespace-nowrap hover:text-[#004953]">
+          <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest -rotate-90 whitespace-nowrap hover:text-[#CCF352]">
             Backlog ({total})
           </span>
 
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="w-2 h-2 rounded-full bg-[#CCF352] animate-pulse" />
         </div>
       )}
     </div>

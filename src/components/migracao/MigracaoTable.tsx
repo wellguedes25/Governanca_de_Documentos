@@ -2,14 +2,11 @@
 
 import React, { useState, useMemo } from 'react';
 import { 
-  ArrowRight, Check, X, FileSpreadsheet, Printer, 
-  ExternalLink, Layers, Database, ChevronLeft, ChevronRight,
+  Database,
   Edit2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DocumentoMigracao } from '@/types/migracao.types';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 
 interface MigracaoTableProps {
   migracoes: DocumentoMigracao[];
@@ -73,42 +70,42 @@ export function MigracaoTable({
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'EM_PRODUCAO':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">Produção</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#CCF352]/20 text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205] border border-[#CCF352]/30">Produção</span>;
       case 'HOMOLOGACAO':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200">Homologação</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/30">Homologação</span>;
       case 'DESENVOLVIMENTO':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">Desenvolvimento</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">Desenvolvimento</span>;
       case 'CONFIGURACAO_PERFIL':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-200">Perfil</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--dock-bg)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">Perfil</span>;
       case 'AGENDADO':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200">Agendado</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">Agendado</span>;
       default:
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">Pendentes</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--dock-bg)] text-[var(--text-muted)] border border-[var(--border-subtle)]">Pendentes</span>;
     }
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col">
+    <div className="sylva-glass bg-[var(--card-bg)] rounded-2xl border border-[var(--border-subtle)] shadow-2xs overflow-hidden flex flex-col">
       <div className="overflow-x-auto scrollbar-thin">
         <table className="w-full text-left border-collapse text-xs">
           <thead>
-            <tr className="bg-slate-100/90 border-b border-slate-200/80 text-[11px] font-semibold text-slate-600 uppercase tracking-wider select-none">
-              <th className="py-3 px-3.5">Origem Flex (V2)</th>
-              <th className="py-3 px-3.5">Destino HTML5 (V3)</th>
-              <th className="py-3 px-3.5 text-center">Status</th>
-              <th className="py-3 px-3.5 text-center">Esforço</th>
-              <th className="py-3 px-3.5">LECOM</th>
-              <th className="py-3 px-3.5">Responsável Dev</th>
-              <th className="py-3 px-3.5">Previsão</th>
-              <th className="py-3 px-3.5">Produção</th>
-              <th className="py-3 px-3.5 text-center w-16">Ações</th>
+            <tr className="bg-[var(--dock-bg)] text-[var(--text-secondary)] text-[11px] font-semibold uppercase tracking-wider select-none border-b border-[var(--border-subtle)]">
+              <th className="py-3.5 px-3.5">Origem Flex (V2)</th>
+              <th className="py-3.5 px-3.5">Destino HTML5 (V3)</th>
+              <th className="py-3.5 px-3.5 text-center">Status</th>
+              <th className="py-3.5 px-3.5 text-center">Esforço</th>
+              <th className="py-3.5 px-3.5">LECOM</th>
+              <th className="py-3.5 px-3.5">Responsável Dev</th>
+              <th className="py-3.5 px-3.5">Previsão</th>
+              <th className="py-3.5 px-3.5">Produção</th>
+              <th className="py-3.5 px-3.5 text-center w-16">Ações</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-[var(--border-subtle)] text-[var(--text-primary)]">
             {paginatedItems.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-16 text-center text-slate-400">
-                  <Database size={32} className="mx-auto mb-2 opacity-30 text-sky-600" />
+                <td colSpan={9} className="py-16 text-center text-[var(--text-muted)]">
+                  <Database size={32} className="mx-auto mb-2 opacity-35 text-[#CCF352]" />
                   <p className="text-xs font-semibold">Nenhuma demanda encontrada com os filtros atuais.</p>
                 </td>
               </tr>
@@ -122,16 +119,16 @@ export function MigracaoTable({
                 return (
                   <tr 
                     key={item.id || idx} 
-                    className="hover:bg-sky-50/40 transition-colors group cursor-pointer"
+                    className="hover:bg-white/5 dark:hover:bg-white/[0.03] transition-colors group cursor-pointer"
                     onClick={() => onSelectMigracao(item)}
                   >
                     {/* Doc Flex Origem */}
                     <td className="py-3 px-3.5 max-w-xs truncate">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-[11px] font-bold text-[#004953] bg-teal-50 px-1.5 py-0.5 rounded border border-teal-100">
+                        <span className="font-mono text-[11px] font-bold text-amber-500 bg-[var(--dock-bg)] px-1.5 py-0.5 rounded border border-[var(--border-subtle)]">
                           #{flexCod}
                         </span>
-                        <span className="font-semibold text-slate-800 group-hover:text-[#004953] transition-colors truncate">
+                        <span className="font-semibold text-[var(--text-primary)] group-hover:text-[#CCF352] transition-colors truncate">
                           {flexNome}
                         </span>
                       </div>
@@ -141,15 +138,15 @@ export function MigracaoTable({
                     <td className="py-3 px-3.5 max-w-xs truncate">
                       {html5Cod ? (
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-[11px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          <span className="font-mono text-[11px] font-bold text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205] bg-[#CCF352]/10 px-1.5 py-0.5 rounded border border-[#CCF352]/30">
                             #{html5Cod}
                           </span>
-                          <span className="text-slate-700 font-medium truncate">
+                          <span className="text-[var(--text-secondary)] font-medium truncate">
                             {html5Nome}
                           </span>
                         </div>
                       ) : (
-                        <span className="text-slate-400 italic text-[11px]">
+                        <span className="text-[var(--text-muted)] italic text-[11px]">
                           Em desenvolvimento
                         </span>
                       )}
@@ -161,27 +158,27 @@ export function MigracaoTable({
                     </td>
 
                     {/* Esforço */}
-                    <td className="py-3 px-3.5 text-center font-mono text-[11px]">
+                    <td className="py-3 px-3.5 text-center font-mono text-[11px] text-[var(--text-secondary)]">
                       {item.complexidade || 'MEDIA'}
                     </td>
 
                     {/* LECOM */}
-                    <td className="py-3 px-3.5 font-mono text-[11px] text-slate-700 whitespace-nowrap">
+                    <td className="py-3 px-3.5 font-mono text-[11px] text-[var(--text-primary)] whitespace-nowrap">
                       {item.lecom || '—'}
                     </td>
 
                     {/* Responsável Dev */}
-                    <td className="py-3 px-3.5 text-slate-700 font-medium whitespace-nowrap">
+                    <td className="py-3 px-3.5 text-[var(--text-secondary)] font-medium whitespace-nowrap">
                       {item.responsavel_dev || item.responsavel || '—'}
                     </td>
 
                     {/* Previsão */}
-                    <td className="py-3 px-3.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                    <td className="py-3 px-3.5 font-mono text-[11px] text-[var(--text-muted)] whitespace-nowrap">
                       {formatDate(item.data_conclusao_prevista)}
                     </td>
 
                     {/* Produção */}
-                    <td className="py-3 px-3.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                    <td className="py-3 px-3.5 font-mono text-[11px] text-[var(--text-muted)] whitespace-nowrap">
                       {formatDate(item.data_conclusao_efetiva)}
                     </td>
 
@@ -192,7 +189,7 @@ export function MigracaoTable({
                           e.stopPropagation();
                           onSelectMigracao(item);
                         }}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-[#004953] hover:bg-teal-50 transition-all cursor-pointer"
+                        className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[#CCF352] hover:bg-white/5 transition-all cursor-pointer"
                         title="Editar Demanda"
                       >
                         <Edit2 size={13} />
@@ -207,7 +204,7 @@ export function MigracaoTable({
       </div>
 
       {/* Paginação */}
-      <div className="p-3.5 border-t border-slate-200/80 bg-slate-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600">
+      <div className="p-3.5 border-t border-[var(--border-subtle)] bg-[var(--dock-bg)]/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[var(--text-secondary)]">
         <div>
           Exibindo <b>{paginatedItems.length}</b> de <b>{filteredItems.length}</b> demandas
         </div>
@@ -217,17 +214,17 @@ export function MigracaoTable({
             <button
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={currentPage === 1}
-              className="px-3 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none text-xs font-semibold text-slate-700 transition-all shadow-2xs cursor-pointer"
+              className="px-3 py-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--card-bg)] hover:bg-[var(--dock-bg)] disabled:opacity-30 disabled:pointer-events-none text-xs font-semibold text-[var(--text-primary)] transition-all shadow-2xs cursor-pointer"
             >
               Anterior
             </button>
-            <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 font-mono font-bold text-slate-800 text-xs">
+            <span className="px-2.5 py-1 rounded-lg bg-[var(--card-bg)] border border-[var(--border-subtle)] font-mono font-bold text-[var(--text-primary)] text-xs">
               {currentPage} / {totalPages}
             </span>
             <button
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               disabled={currentPage === totalPages}
-              className="px-3 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none text-xs font-semibold text-slate-700 transition-all shadow-2xs cursor-pointer"
+              className="px-3 py-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--card-bg)] hover:bg-[var(--dock-bg)] disabled:opacity-30 disabled:pointer-events-none text-xs font-semibold text-[var(--text-primary)] transition-all shadow-2xs cursor-pointer"
             >
               Próxima
             </button>
@@ -237,4 +234,3 @@ export function MigracaoTable({
     </div>
   );
 }
-

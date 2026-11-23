@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { 
-  Search, RefreshCw, Database, Layout, Download, ChevronRight, 
-  ChevronDown, Layers, FileSpreadsheet, ShieldAlert 
+import {
+  Search, RefreshCw, Database, Layout, ChevronRight,
+  ChevronDown, Layers, FileSpreadsheet
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -46,8 +46,8 @@ export function AmbulatoryProfilesView({
   const filteredList = useMemo(() => {
     if (!searchTerm) return masterList;
     const term = searchTerm.toLowerCase();
-    return masterList.filter(p => 
-      p.Nome_Perfil.toLowerCase().includes(term) || 
+    return masterList.filter(p =>
+      p.Nome_Perfil.toLowerCase().includes(term) ||
       p.id.toLowerCase().includes(term) ||
       p.Especialidade.toLowerCase().includes(term)
     );
@@ -72,23 +72,23 @@ export function AmbulatoryProfilesView({
   return (
     <div className="flex flex-col md:flex-row gap-5 min-h-[500px]">
       {/* Master: Lista de Perfis */}
-      <div className="w-full md:w-96 bg-white rounded-xl border border-slate-200/80 shadow-xs flex flex-col shrink-0">
-        <div className="p-4 border-b border-slate-100 flex flex-col gap-3">
+      <div className="w-full md:w-96 sylva-glass rounded-[22px] flex flex-col shrink-0 overflow-hidden">
+        <div className="p-4 border-b border-[var(--border-subtle)] flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
-              <Layers size={14} className="text-sky-600" />
+            <h3 className="text-xs font-bold text-[var(--foreground)] uppercase tracking-wide flex items-center gap-2">
+              <Layers size={14} className="text-[var(--accent-ink)]" />
               Perfis Cadastrados
             </h3>
-            <span className="text-[11px] font-bold text-sky-800 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-100">
+            <span className="text-[11px] font-bold text-[var(--accent-ink)] bg-[var(--accent)] px-2.5 py-0.5 rounded-full border border-[var(--tint-olive-border)] font-mono">
               {filteredList.length}
             </span>
           </div>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
-            <input 
-              type="text" 
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)]" size={13} />
+            <input
+              type="text"
               placeholder="Buscar perfil por nome, id..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 outline-none focus:bg-white focus:border-sky-500 transition-all"
+              className="w-full bg-[var(--card-subtle)] border border-[var(--border)] rounded-full pl-9 pr-3 py-2 text-xs text-[var(--foreground)] placeholder:text-[var(--muted)] outline-none focus:border-[var(--lime)] focus:ring-2 focus:ring-[var(--lime)]/20 transition-all"
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
@@ -99,18 +99,18 @@ export function AmbulatoryProfilesView({
         </div>
 
         {/* Profile list items */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-thin">
+        <div className="flex-1 overflow-y-auto p-2.5 space-y-1 scrollbar-thin">
           {loading ? (
-            <div className="p-6 text-center text-slate-400">
-              <RefreshCw size={20} className="animate-spin mx-auto mb-2 text-sky-600" />
+            <div className="p-6 text-center text-[var(--muted)]">
+              <RefreshCw size={20} className="animate-spin mx-auto mb-2 text-[var(--accent-ink)]" />
               <p className="text-xs font-medium">Carregando perfis...</p>
             </div>
           ) : error ? (
-            <div className="p-4 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg m-2">
+            <div className="p-4 text-xs tone-danger border rounded-xl m-2">
               {error}
             </div>
           ) : paginatedList.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 text-xs">
+            <div className="p-8 text-center text-[var(--muted)] text-xs">
               Nenhum perfil encontrado
             </div>
           ) : (
@@ -118,37 +118,38 @@ export function AmbulatoryProfilesView({
               const isSelected = selectedPerfilId === perfil.id;
               return (
                 <button
+                  type="button"
                   key={perfil.id}
                   onClick={() => setSelectedPerfilId(perfil.id)}
                   className={cn(
-                    "w-full text-left p-3 rounded-lg transition-all flex items-start gap-2.5 border",
+                    "w-full text-left p-3 rounded-2xl transition-all flex items-start gap-2.5 border cursor-pointer",
                     isSelected
-                      ? "bg-sky-50/70 border-sky-300 shadow-2xs"
-                      : "bg-white border-transparent hover:border-slate-200 hover:bg-slate-50"
+                      ? "bg-[var(--accent)] border-[var(--tint-olive-border)] shadow-2xs"
+                      : "bg-transparent border-transparent hover:border-[var(--border)] hover:bg-[var(--card-subtle)]"
                   )}
                 >
                   <div className={cn(
                     "mt-1 w-2 h-2 rounded-full shrink-0",
-                    isSelected ? "bg-sky-600" : "bg-slate-300"
+                    isSelected ? "bg-[var(--lime)] shadow-[0_0_8px_var(--lime)]" : "bg-[var(--border-strong)]"
                   )} />
                   <div className="flex-1 min-w-0">
                     <h4 className={cn(
-                      "text-xs font-bold leading-tight truncate",
-                      isSelected ? "text-sky-950 font-extrabold" : "text-slate-800"
+                      "text-xs font-bold leading-tight truncate normal-case tracking-normal",
+                      isSelected ? "text-[var(--accent-ink)] font-extrabold" : "text-[var(--foreground)]"
                     )}>
                       {perfil.Nome_Perfil}
                     </h4>
-                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                    <p className="text-[10px] text-[var(--muted)] font-mono mt-0.5">
                       ID: {perfil.id}
                     </p>
-                    <div className="flex items-center gap-1.5 mt-1.5">
+                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                       {perfil.Sistema && (
-                        <span className="text-[9px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded font-medium">
+                        <span className="text-[9.5px] px-2 py-0.5 bg-[var(--card-subtle)] text-[var(--foreground-secondary)] rounded-full font-medium border border-[var(--border)]">
                           {perfil.Sistema}
                         </span>
                       )}
                       {perfil.Especialidade && (
-                        <span className="text-[9px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded font-medium">
+                        <span className="text-[9.5px] px-2 py-0.5 bg-[var(--card-subtle)] text-[var(--foreground-secondary)] rounded-full font-medium border border-[var(--border)]">
                           {perfil.Especialidade}
                         </span>
                       )}
@@ -156,7 +157,7 @@ export function AmbulatoryProfilesView({
                   </div>
                   <ChevronRight size={14} className={cn(
                     "shrink-0 mt-1 transition-all",
-                    isSelected ? "text-sky-700 translate-x-0.5" : "text-slate-300"
+                    isSelected ? "text-[var(--accent-ink)] translate-x-0.5" : "text-[var(--muted)]"
                   )} />
                 </button>
               );
@@ -166,21 +167,23 @@ export function AmbulatoryProfilesView({
 
         {/* Pagination bar */}
         {totalPages > 1 && (
-          <div className="p-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+          <div className="p-3 border-t border-[var(--border-subtle)] flex items-center justify-between text-xs text-[var(--foreground-secondary)]">
             <button
+              type="button"
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="px-2.5 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none text-[11px] font-semibold"
+              className="px-3 py-1 rounded-full sylva-pill disabled:opacity-30 disabled:pointer-events-none text-[11px] font-semibold text-[var(--foreground)] cursor-pointer"
             >
               Anterior
             </button>
-            <span className="font-mono text-[11px] font-medium">
+            <span className="font-mono text-[11px] font-bold text-[var(--foreground)]">
               {currentPage} / {totalPages}
             </span>
             <button
+              type="button"
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="px-2.5 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none text-[11px] font-semibold"
+              className="px-3 py-1 rounded-full sylva-pill disabled:opacity-30 disabled:pointer-events-none text-[11px] font-semibold text-[var(--foreground)] cursor-pointer"
             >
               Próximo
             </button>
@@ -189,31 +192,31 @@ export function AmbulatoryProfilesView({
       </div>
 
       {/* Detail: Módulos & Parâmetros */}
-      <div className="flex-1 bg-white rounded-xl border border-slate-200/80 shadow-xs p-6 flex flex-col">
+      <div className="flex-1 sylva-glass rounded-[22px] p-6 flex flex-col">
         {!selectedPerfilId ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-400 py-16">
-            <Database size={40} className="mb-3 opacity-30 text-sky-600" />
+          <div className="flex-1 flex flex-col items-center justify-center text-[var(--muted)] py-16">
+            <Database size={40} className="mb-3 opacity-35 text-[var(--muted)]" />
             <p className="text-xs font-semibold">Selecione um perfil ambulatorial ao lado para visualizar módulos e parâmetros</p>
           </div>
         ) : selectedPerfil ? (
           <div className="space-y-5">
             {/* Profile Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[var(--border-subtle)]">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-100">
+                  <span className="text-xs font-mono font-bold text-[var(--accent-ink)] bg-[var(--accent)] px-2.5 py-0.5 rounded-full border border-[var(--tint-olive-border)]">
                     ID #{selectedPerfil.id}
                   </span>
-                  <span className="text-xs text-slate-500 font-medium">
+                  <span className="text-xs text-[var(--muted)] font-medium">
                     {selectedPerfil.Sistema || 'SIS'}
                   </span>
                 </div>
-                <h2 className="text-xl font-bold text-slate-900 mt-1">
+                <h2 className="text-xl font-bold text-[var(--foreground)] mt-1.5">
                   {selectedPerfil.Nome_Perfil}
                 </h2>
                 {selectedPerfil.Especialidade && (
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Especialidade: <span className="font-semibold text-slate-700">{selectedPerfil.Especialidade}</span>
+                  <p className="text-xs text-[var(--muted)] mt-0.5">
+                    Especialidade: <span className="font-semibold text-[var(--foreground-secondary)]">{selectedPerfil.Especialidade}</span>
                   </p>
                 )}
               </div>
@@ -222,16 +225,16 @@ export function AmbulatoryProfilesView({
                 variant="outline"
                 size="sm"
                 onClick={onExportCSV}
-                className="h-8 text-xs gap-1.5 border-slate-200 hover:bg-slate-50 self-start sm:self-auto"
+                className="h-8 text-xs gap-1.5 self-start sm:self-auto"
               >
-                <FileSpreadsheet size={13} className="text-emerald-600" />
+                <FileSpreadsheet size={13} />
                 <span>Exportar CSV</span>
               </Button>
             </div>
 
             {/* Modules List */}
             <div>
-              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
+              <h3 className="text-[10.5px] font-bold text-[var(--muted)] uppercase tracking-wider mb-3">
                 Módulos do Perfil
               </h3>
 
@@ -245,24 +248,25 @@ export function AmbulatoryProfilesView({
                   {Object.entries(activeModules).map(([modId, modData]: [string, any]) => {
                     const isExpanded = expandedModules[modId];
                     return (
-                      <div key={modId} className="border border-slate-200 rounded-xl overflow-hidden text-xs">
+                      <div key={modId} className="border border-[var(--border)] rounded-2xl overflow-hidden text-xs">
                         <button
+                          type="button"
                           onClick={() => toggleModule(modId)}
-                          className="w-full text-left p-3.5 bg-slate-50/80 hover:bg-slate-100/70 transition-all flex items-center justify-between"
+                          className="w-full text-left p-3.5 bg-[var(--card-subtle)] hover:bg-[var(--card-hover)] transition-all flex items-center justify-between cursor-pointer"
                         >
                           <div className="flex items-center gap-2.5">
-                            <Layout size={15} className="text-sky-600" />
+                            <Layout size={15} className="text-[var(--accent-ink)]" />
                             <div>
-                              <span className="font-bold text-slate-900 block">
+                              <span className="font-bold text-[var(--foreground)] block">
                                 {modData.Titulo || `Módulo ${modData.ModuloId || modId}`}
                               </span>
-                              <span className="text-[10px] text-slate-500 font-mono mt-0.5 block">
+                              <span className="text-[10px] text-[var(--muted)] font-mono mt-0.5 block">
                                 Código: {modData.ModuloId || modId}
                               </span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-semibold text-slate-500">
+                          <div className="flex items-center gap-2 text-[var(--muted)]">
+                            <span className="text-[11px] font-semibold">
                               {modData.Parametros?.length || 0} parâmetros
                             </span>
                             {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -270,21 +274,21 @@ export function AmbulatoryProfilesView({
                         </button>
 
                         {isExpanded && (
-                          <div className="p-4 bg-white border-t border-slate-100 space-y-2">
+                          <div className="p-4 border-t border-[var(--border-subtle)] space-y-2">
                             {modData.Parametros && modData.Parametros.length > 0 ? (
                               <div className="space-y-2">
                                 {modData.Parametros.map((param: any, pIdx: number) => (
-                                  <div key={pIdx} className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/70 text-xs">
-                                    <div className="flex justify-between items-center">
-                                      <span className="font-bold text-slate-800 font-mono text-[11px]">
+                                  <div key={pIdx} className="p-2.5 rounded-xl bg-[var(--card-subtle)] border border-[var(--border)] text-xs">
+                                    <div className="flex justify-between items-center gap-2">
+                                      <span className="font-bold text-[var(--foreground)] font-mono text-[11px]">
                                         {param.Parametro}
                                       </span>
-                                      <span className="font-mono text-sky-800 bg-sky-50 px-2 py-0.5 rounded border border-sky-100 text-[10.5px]">
+                                      <span className="font-mono text-[var(--accent-ink)] bg-[var(--accent)] px-2 py-0.5 rounded-full border border-[var(--tint-olive-border)] text-[10.5px]">
                                         {param.Valor || 'Sem valor'}
                                       </span>
                                     </div>
                                     {param.Descricao && (
-                                      <p className="text-[11px] text-slate-500 mt-1">
+                                      <p className="text-[11px] text-[var(--muted)] mt-1">
                                         {param.Descricao}
                                       </p>
                                     )}
@@ -292,7 +296,7 @@ export function AmbulatoryProfilesView({
                                 ))}
                               </div>
                             ) : (
-                              <p className="text-xs text-slate-400 italic">
+                              <p className="text-xs text-[var(--muted)] italic">
                                 Nenhum parâmetro específico vinculado a este módulo.
                               </p>
                             )}
@@ -303,7 +307,7 @@ export function AmbulatoryProfilesView({
                   })}
                 </div>
               ) : (
-                <div className="py-8 text-center text-slate-400 text-xs">
+                <div className="py-8 text-center text-[var(--muted)] text-xs">
                   Nenhum módulo vinculado encontrado para este perfil.
                 </div>
               )}

@@ -6,55 +6,69 @@ import { cn } from '@/lib/utils';
 interface PageHeaderProps {
   title: string;
   subtitle?: string;
+  kicker?: string;
   icon?: LucideIcon;
   badge?: React.ReactNode | string;
   className?: string;
   action?: React.ReactNode;
 }
 
-export function PageHeader({ 
-  title, 
-  subtitle, 
-  icon: Icon, 
-  badge, 
+export function PageHeader({
+  title,
+  subtitle,
+  kicker,
+  icon: Icon,
+  badge,
   className,
-  action
+  action,
 }: PageHeaderProps) {
   return (
-    <div className={cn("flex flex-col md:flex-row md:items-center justify-between gap-4 w-full", className)}>
+    <div className={cn("flex flex-col md:flex-row md:items-end justify-between gap-4 w-full", className)}>
       <div className="flex flex-col gap-1.5 min-w-0">
-        <div className="flex items-center gap-3.5">
+        {kicker && (
+          <div className="flex items-center">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--accent)] text-[var(--lime)] border border-[var(--tint-olive-border)]">
+              {kicker}
+            </span>
+          </div>
+        )}
+        <div className="flex items-center gap-3">
           {Icon && (
-            <div className="w-10 h-10 rounded-lg bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center shrink-0 shadow-xs">
-              <Icon size={20} strokeWidth={2} />
+            <div className="w-10 h-10 rounded-2xl sylva-pill text-[var(--lime)] flex items-center justify-center shrink-0">
+              <Icon size={19} strokeWidth={2} />
             </div>
           )}
-          <div className="flex flex-wrap items-center gap-3 min-w-0">
-            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight leading-none">
+          <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+            <h1 className="text-2xl md:text-3xl font-bold text-[var(--foreground)] tracking-tight leading-tight relative inline-block pb-1">
               {title}
+              <span className="absolute left-0 bottom-0 h-[3px] w-16 rounded-full bg-[var(--lime)]" />
             </h1>
-            {badge && (
-              typeof badge === 'string' ? (
-                <Badge 
-                  variant="outline" 
-                  className="px-2.5 py-0.5 text-[10px] font-bold tracking-wider rounded-full border-sky-300 bg-sky-50 text-sky-800"
+            {badge &&
+              (typeof badge === 'string' ? (
+                <Badge
+                  variant="outline"
+                  className="px-2.5 py-0.5 text-[10px] font-bold tracking-wider rounded-full border-[var(--border-strong)] bg-[var(--card-subtle)] text-[var(--foreground-secondary)]"
                 >
                   {badge}
                 </Badge>
               ) : (
                 badge
-              )
-            )}
+              ))}
           </div>
         </div>
         {subtitle && (
-          <p className="text-xs md:text-sm text-slate-500 font-normal max-w-3xl leading-relaxed sm:ml-[54px]">
+          <p
+            className={cn(
+              "text-xs md:text-[13px] text-[var(--foreground-secondary)] font-normal max-w-3xl leading-relaxed mt-0.5",
+              Icon ? "sm:pl-[52px]" : ""
+            )}
+          >
             {subtitle}
           </p>
         )}
       </div>
       {action && (
-        <div className="flex items-center gap-2 flex-wrap shrink-0">
+        <div className="flex items-center gap-2.5 flex-wrap shrink-0">
           {action}
         </div>
       )}

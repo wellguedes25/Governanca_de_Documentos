@@ -53,7 +53,7 @@ import { useUI } from '@/context/UIContext';
 import { useRouter } from 'next/navigation';
 import { getToday, get30DaysAgo, getVal } from '@/lib/utils';
 
-// Novos componentes modulares
+// Componentes modulares
 import { DiffText } from '@/components/similaridade/DiffText';
 import { EnhancedMultiSelect } from '@/components/similaridade/EnhancedMultiSelect';
 import { MapeamentosTab } from '@/components/similaridade/MapeamentosTab';
@@ -77,7 +77,6 @@ export default function SimilaridadePage() {
     }
   }, [docVersion, router]);
 
-
   const [activeConnName, setActiveConnName] = useState('');
   const [similarityQuery, setSimilarityQuery] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
@@ -89,7 +88,6 @@ export default function SimilaridadePage() {
   const [hospitals, setHospitals] = useState<{id: number, sigla: string, nome: string}[]>([]);
 
   // Filtros
-
   const [filters, setFilters] = useState({
     documento: '',
     campo: '',
@@ -118,7 +116,6 @@ export default function SimilaridadePage() {
   const [isRunningScript, setIsRunningScript] = useState(false);
   const [scriptLogs, setScriptLogs] = useState<string[]>([]);
   const [scriptModalOpen, setScriptModalOpen] = useState(false);
-  const [filterTipoCopia, setFilterTipoCopia] = useState<'TODOS' | 'CRUZADA' | 'AUTO'>('TODOS');
 
   useEffect(() => {
     checkConnection();
@@ -248,7 +245,6 @@ export default function SimilaridadePage() {
     }
   }
 
-
   async function handleSearch() {
     // Validação de Campos Obrigatórios
     if (!filters.documento || !filters.campo || !filters.dataInicio || !filters.dataFim) {
@@ -267,14 +263,6 @@ export default function SimilaridadePage() {
     setSimilarityData([]);
     setCurrentPage(1);
     
-    // Reset de Filtros Interativos ao realizar nova busca
-    console.log('--- INICIANDO BUSCA DE SIMILARIDADE ---');
-    console.log('Filtros:', filters);
-    console.log('Query SQL:', similarityQuery ? 'Personalizada (Storage)' : 'Padrão (Fallback)');
-
-    setLoading(true);
-    setHasSearched(true);
-    
     // Reset de seleções locais ao buscar novos dados
     setSearchTerm('');
     setFilterAtendimento('');
@@ -282,12 +270,10 @@ export default function SimilaridadePage() {
     setSelectedPrestadores([]);
 
     try {
-      // Montar cláusula de empresa dinamicamente
       const empresaClause = filters.empresa
         ? 'AND ATE.CD_MULTI_EMPRESA = :CD_EMPRESA'
         : '';
 
-      // Usar query dinâmica do Motor SQL se disponível, caso contrário usar fallback
       const query = similarityQuery || `
         SELECT 
             A.CD_ATENDIMENTO as ATENDIMENTO,
@@ -320,7 +306,6 @@ export default function SimilaridadePage() {
             A.CD_ATENDIMENTO DESC, A.DH_FECHAMENTO DESC
       `;
 
-      // Montar params dinamicamente
       const params: Record<string, string> = {
         CD_DOCUMENTO: filters.documento,
         IDENTIFICADOR: filters.campo,
@@ -342,10 +327,8 @@ export default function SimilaridadePage() {
 
       const result = await execRes.json();
       if (execRes.ok) {
-        console.log('Sucesso! Registros encontrados:', result.rows?.length || 0);
         setSimilarityData(result.rows || []);
       } else {
-        console.error('Erro na API:', result.error);
         toast.error(result.error || 'Erro ao consultar similaridade.');
       }
     } catch (err) {
@@ -360,8 +343,6 @@ export default function SimilaridadePage() {
     setCompLoading(true);
     setComparisonTexts(null);
     try {
-      // Otimização de Performance: Ignoramos a View analítica (lenta para registros únicos) 
-      // e fazemos uma busca cirúrgica direta pelos índices do banco.
       const query = `
         WITH BaseDoc AS (
             SELECT 
@@ -451,19 +432,16 @@ export default function SimilaridadePage() {
         FROM BaseDoc B
       `;
 
-      // Extraímos os valores usando o helper robusto
       const cdAtendimento = getVal(doc, 'ATENDIMENTO');
       const docId = getVal(doc, 'DOCUMENTO');
       const fieldId = getVal(doc, 'IDENTIFICADOR');
       let dataHoraIso = getVal(doc, 'DATA_HORA_ISO');
 
-      // Correção: Se a consulta do usuário não retornou DATA_HORA_ISO, fazemos o parse localmente resgatando o Timezone
       if (!dataHoraIso) {
         const rawDate = getVal(doc, 'DATA_HORA');
         if (rawDate) {
           const d = new Date(rawDate);
           const pad = (n: number) => n.toString().padStart(2, '0');
-          // Retorna o horário local do navegador (-3h) que anula o shift UTC do JSON
           dataHoraIso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
         }
       }
@@ -477,7 +455,7 @@ export default function SimilaridadePage() {
             CD_ATENDIMENTO: cdAtendimento,
             CD_DOCUMENTO: docId,
             IDENTIFICADOR: fieldId,
-            DATA_HORA: dataHoraIso || '' // Previne undefined
+            DATA_HORA: dataHoraIso || ''
           }
         }),
       });
@@ -508,14 +486,10 @@ export default function SimilaridadePage() {
     return mapping ? mapping.fields : [];
   }, [filters.documento, docMappings]);
 
-  // --- LÓGICA DE FILTRAGEM EM CASCATA ---
-
-  // 1. Base Filtered Data: Respeita os filtros "duros" do topo (Score Mínimo, Data e Busca Geral)
-  // Isso garante que o Gráfico e os Contadores (parênteses) fiquem sincronizados com a pesquisa.
+  // 1. Base Filtered Data
   const baseFilteredData = useMemo(() => {
     let data = [...(similarityData || [])];
 
-    // Filtro por termo de busca geral
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       data = data.filter(row =>
@@ -523,12 +497,10 @@ export default function SimilaridadePage() {
       );
     }
 
-    // Filtro por Score Mínimo (Top Bar)
     if (filters.minScore > 0) {
       data = data.filter(row => (Number(getVal(row, 'SCORE')) || 0) >= filters.minScore);
     }
 
-    // Filtro por Atendimento específico
     if (filterAtendimento) {
       data = data.filter(row => String(getVal(row, 'ATENDIMENTO') || '').includes(filterAtendimento));
     }
@@ -536,14 +508,13 @@ export default function SimilaridadePage() {
     return data;
   }, [similarityData, searchTerm, filters.minScore, filterAtendimento]);
 
-  // 2. Lógica do Gráfico de Top 10 Prestadores: Agora usa baseFilteredData
+  // 2. Gráfico Top 10 Prestadores
   const chartData = useMemo(() => {
     if (!baseFilteredData || baseFilteredData.length === 0) return [];
 
     const totalRecords = baseFilteredData.length;
-
-    // Agrupar por Prestador e capturar Nome
     const groups: Record<string, { count: number, name: string }> = {};
+
     baseFilteredData.forEach(row => {
       const code = String(getVal(row, 'PRESTADOR') || 'N/A');
       const name = String(getVal(row, 'NOME_PRESTADOR') || code);
@@ -568,12 +539,12 @@ export default function SimilaridadePage() {
         shortLabel: shortName,
         value: data.count,
         percentage: percentage,
-        code: fullLabel // Usa o label completo para sincronizar com o filtro
+        code: fullLabel
       };
     });
   }, [baseFilteredData]);
 
-  // 3. Opções para Filtros (contagem sincronizada com a pesquisa base)
+  // 3. Opções para Filtros
   const filterOptions = useMemo(() => {
     if (!baseFilteredData || baseFilteredData.length === 0) return { unidades: [], prestadores: [] };
 
@@ -596,20 +567,17 @@ export default function SimilaridadePage() {
     };
   }, [baseFilteredData]);
 
-  // 4. Final Filtered Data: Aplica os filtros de Multiseleção ao resultado base
+  // 4. Final Filtered Data
   const filteredData = useMemo(() => {
     let data = [...baseFilteredData];
 
-    // Filtro por Unidade (Multi)
     if (selectedUnidades.length > 0) {
       data = data.filter(row => selectedUnidades.includes(String(getVal(row, 'UNIDADE') || '')));
     }
 
-    // Filtro por Prestador (Multi)
     if (selectedPrestadores.length > 0) {
       data = data.filter(row => {
         const fullPrestador = String(getVal(row, 'PRESTADOR') || '');
-        // Se já vier formatado "ID - NOME", usamos direto. Se não, montamos.
         let pLabel = fullPrestador;
         if (!fullPrestador.includes(' - ')) {
           const pName = String(getVal(row, 'NOME_PRESTADOR') || '');
@@ -622,7 +590,7 @@ export default function SimilaridadePage() {
     return data;
   }, [baseFilteredData, selectedUnidades, selectedPrestadores]);
 
-  // 5. Ticks do Eixo Y (Volume) de 10 em 10
+  // 5. Ticks do Eixo Y
   const yAxisTicks = useMemo(() => {
     if (!chartData || chartData.length === 0) return [0, 10];
     const maxVal = Math.max(...chartData.map(d => d.value), 10);
@@ -637,17 +605,17 @@ export default function SimilaridadePage() {
   const paginatedData = filteredData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return 'bg-rose-100 text-rose-700 border-red-500/50/20';
-    if (score >= 50) return 'bg-amber-100 text-amber-700 border-amber-200';
-    return 'bg-emerald-100 text-emerald-700 border-emerald-500/20';
+    if (score >= 80) return 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30';
+    if (score >= 50) return 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30';
+    return 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 flex flex-col p-4 md:p-8 space-y-6 pb-24">
+    <div className="flex flex-col space-y-5">
       <Toaster position="top-right" reverseOrder={false} />
       
-      {/* 1. Header Padronizado */}
-      <div className="pb-4 border-b border-slate-200/80">
+      {/* 1. Header Padronizado Sylva */}
+      <div className="pb-3 border-b border-[var(--border-subtle)]">
         <PageHeader 
           title="Auditoria de Similaridade NLP"
           subtitle="Detecção de cópia e cola textual, plágio e redundância clínica em prontuários eletrônicos (DBAMV)"
@@ -656,7 +624,7 @@ export default function SimilaridadePage() {
             <Badge 
               variant="outline" 
               suppressHydrationWarning
-              className="text-[10px] font-bold px-2 py-0.5 rounded-full border-sky-300 bg-sky-50 text-sky-800"
+              className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border-[var(--lime)]/30 bg-[var(--lime)]/15 text-[var(--lime-dark)] dark:text-[var(--lime)]"
             >
               Motor {docVersion || 'V3'}
             </Badge>
@@ -664,11 +632,11 @@ export default function SimilaridadePage() {
           action={
             <>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--muted)]" />
                 <input
                   type="text"
                   placeholder="Filtro instantâneo..."
-                  className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 w-52 shadow-2xs transition-all disabled:opacity-50"
+                  className="pl-8 pr-3 py-1.5 bg-[var(--card-bg)]/80 border border-[var(--border-subtle)] rounded-full text-xs text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--lime)] focus:ring-1 focus:ring-[var(--lime)]/20 w-52 shadow-xs transition-all disabled:opacity-50"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   disabled={!hasSearched || loading}
@@ -680,9 +648,9 @@ export default function SimilaridadePage() {
                 size="sm"
                 onClick={handleExportExcel}
                 disabled={!hasSearched || loading || filteredData.length === 0}
-                className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-emerald-700 shadow-2xs cursor-pointer h-9 px-4 disabled:opacity-40"
+                className="gap-2 text-xs font-semibold rounded-full sylva-pill text-[var(--foreground)] hover:text-[var(--lime-dark)] dark:hover:text-[var(--lime)] shadow-xs cursor-pointer h-9 px-4 disabled:opacity-40"
               >
-                <Download className="w-3.5 h-3.5 text-emerald-600" />
+                <Download className="w-3.5 h-3.5 text-[var(--lime-dark)] dark:text-[var(--lime)]" />
                 <span>Exportar Excel</span>
               </Button>
 
@@ -690,7 +658,7 @@ export default function SimilaridadePage() {
                 size="sm"
                 onClick={handleRunAuditScript}
                 disabled={isRunningScript}
-                className="gap-2 text-xs font-semibold rounded-full bg-sky-600 hover:bg-sky-500 text-white shadow-2xs cursor-pointer h-9 px-4 disabled:opacity-40"
+                className="gap-2 text-xs font-bold rounded-full bg-[var(--lime)] text-[var(--lime-ink)] hover:brightness-105 shadow-[0_4px_14px_rgba(204,243,82,0.25)] cursor-pointer h-9 px-4 disabled:opacity-40"
               >
                 <Play className={`w-3.5 h-3.5 ${isRunningScript ? 'animate-spin' : ''}`} />
                 <span>{isRunningScript ? 'Auditando...' : 'Rodar Auditoria NLP'}</span>
@@ -700,7 +668,7 @@ export default function SimilaridadePage() {
                 variant="outline"
                 size="sm"
                 onClick={() => window.print()}
-                className="p-0 w-9 h-9 flex items-center justify-center rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-2xs cursor-pointer"
+                className="p-0 w-9 h-9 flex items-center justify-center rounded-full sylva-pill text-[var(--muted)] hover:text-[var(--foreground)] shadow-xs cursor-pointer"
                 title="Imprimir Relatório"
               >
                 <Printer className="w-3.5 h-3.5" />
@@ -710,14 +678,14 @@ export default function SimilaridadePage() {
         />
       </div>
 
-      {/* Navigation Tabs Pill Style */}
-      <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-lg border border-slate-200/80 self-start">
+      {/* Navigation Tabs Pill Style Sylva Dock */}
+      <div className="sylva-dock p-1 inline-flex items-center gap-1.5 self-start">
         <button
           onClick={() => setActiveTab('consulta')}
-          className={`px-4 py-2 rounded-md text-xs font-semibold transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === 'consulta'
-              ? 'bg-white text-sky-700 shadow-xs font-bold'
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-[var(--lime)] text-[var(--lime-ink)] font-bold shadow-xs'
+              : 'text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
           }`}
         >
           <SearchCode size={14} />
@@ -725,10 +693,10 @@ export default function SimilaridadePage() {
         </button>
         <button
           onClick={() => setActiveTab('mapeamentos')}
-          className={`px-4 py-2 rounded-md text-xs font-semibold transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === 'mapeamentos'
-              ? 'bg-white text-sky-700 shadow-xs font-bold'
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-[var(--lime)] text-[var(--lime-ink)] font-bold shadow-xs'
+              : 'text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
           }`}
         >
           <BookOpen size={14} />
@@ -736,836 +704,839 @@ export default function SimilaridadePage() {
         </button>
       </div>
 
-      <div className={activeTab === 'consulta' ? 'space-y-10 animate-in fade-in duration-300' : 'hidden'}>
-      {/* Painel de Filtros Clinical Precision (Light Box) */}
-      <div className="bg-white border border-slate-200/90 rounded-xl p-5 shadow-xs space-y-4">
-        <div className="flex flex-wrap items-end gap-3.5">
-          {/* Empresa (Hospital) */}
-          {hospitals.length > 0 && (
-            <div className="w-44 space-y-1.5">
-              <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
-                <Building2 size={13} className="text-slate-500" /> Empresa / Unidade
+      <div className={activeTab === 'consulta' ? 'space-y-6 animate-in fade-in duration-300' : 'hidden'}>
+        {/* Painel de Filtros Sylva Bento Card */}
+        <div className="sylva-card border border-[var(--border-subtle)] rounded-2xl p-5 shadow-xs space-y-4">
+          <div className="flex flex-wrap items-end gap-3.5">
+            {/* Empresa (Hospital) */}
+            {hospitals.length > 0 && (
+              <div className="w-44 space-y-1.5">
+                <label className="text-[11px] font-semibold text-[var(--foreground-secondary)] flex items-center gap-1.5">
+                  <Building2 size={13} className="text-[var(--lime-dark)] dark:text-[var(--lime)]" /> Empresa / Unidade
+                </label>
+                <select
+                  className="w-full bg-[var(--canvas-bg)] border border-[var(--border-subtle)] rounded-xl px-3 py-2 text-xs font-medium text-[var(--foreground)] outline-none focus:border-[var(--lime)] transition-all shadow-xs"
+                  value={filters.empresa}
+                  onChange={(e) => setFilters(f => ({ ...f, empresa: e.target.value }))}
+                >
+                  <option value="">Todas as Empresas</option>
+                  {hospitals.map(h => (
+                    <option key={h.id} value={String(h.id)}>{h.sigla} - {h.nome}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Documento (Selector) */}
+            <div className="flex-1 min-w-[260px] space-y-1.5">
+              <label className="text-[11px] font-semibold text-[var(--foreground-secondary)] flex items-center gap-1.5">
+                <ClipboardList size={13} className="text-[var(--lime-dark)] dark:text-[var(--lime)]" /> Documento Alvo *
               </label>
               <select
-                className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-sky-500 focus:bg-white transition-all shadow-2xs"
-                value={filters.empresa}
-                onChange={(e) => setFilters(f => ({ ...f, empresa: e.target.value }))}
+                className={`w-full bg-[var(--canvas-bg)] border rounded-xl px-3 py-2 text-xs font-medium text-[var(--foreground)] outline-none transition-all shadow-xs focus:border-[var(--lime)] ${!filters.documento && hasSearched ? 'border-rose-400' : 'border-[var(--border-subtle)]'}`}
+                value={filters.documento}
+                onChange={(e) => {
+                  const newDoc = e.target.value;
+                  setFilters(f => ({ ...f, documento: newDoc, campo: '' }));
+                }}
               >
-                <option value="">Todas as Empresas</option>
-                {hospitals.map(h => (
-                  <option key={h.id} value={String(h.id)}>{h.sigla} - {h.nome}</option>
+                <option value="">Selecione o Documento Clínico...</option>
+                {docMappings.map(m => (
+                  <option key={m.id} value={m.id}>{m.id} - {m.name}</option>
                 ))}
               </select>
             </div>
-          )}
 
-          {/* Documento (Selector) */}
-          <div className="flex-1 min-w-[260px] space-y-1.5">
-            <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
-              <ClipboardList size={13} className="text-sky-600" /> Documento Alvo *
-            </label>
-            <select
-              className={`w-full bg-slate-50 border rounded-md px-3 py-2 text-xs font-medium text-slate-800 outline-none transition-all shadow-2xs focus:bg-white ${!filters.documento && hasSearched ? 'border-rose-400 bg-white border-slate-200' : 'border-slate-200 focus:border-sky-500'}`}
-              value={filters.documento}
-              onChange={(e) => {
-                const newDoc = e.target.value;
-                setFilters(f => ({ ...f, documento: newDoc, campo: '' }));
-              }}
-            >
-              <option value="">Selecione o Documento Clínico...</option>
-              {docMappings.map(m => (
-                <option key={m.id} value={m.id}>{m.id} - {m.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Identificador (Selector Dependente) */}
-          <div className="flex-1 min-w-[220px] space-y-1.5">
-            <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
-              <Split size={13} className="text-sky-600" /> Campo / Identificador *
-            </label>
-            <select
-              className={`w-full bg-slate-50 border rounded-md px-3 py-2 text-xs font-medium text-slate-800 outline-none transition-all shadow-2xs focus:bg-white ${!filters.campo && hasSearched ? 'border-rose-400 bg-white border-slate-200' : 'border-slate-200 focus:border-sky-500'}`}
-              value={filters.campo}
-              onChange={(e) => setFilters(f => ({ ...f, campo: e.target.value }))}
-              disabled={!filters.documento}
-            >
-              <option value="">{filters.documento ? 'Selecione o Campo Clínico...' : 'Aguardando Documento...'}</option>
-              {fieldOptions.map(f => (
-                <option key={f.id} value={f.id}>{f.name} ({f.id})</option>
-              ))}
-            </select>
-          </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setActiveTab('mapeamentos')}
-            className="h-9 w-9 p-0 rounded-md bg-white border-slate-200 text-slate-600 hover:text-sky-600 hover:border-sky-300"
-            title="Gerenciar Mapeamentos de Documentos"
-          >
-            <SettingsIcon size={16} />
-          </Button>
-
-          {/* Período */}
-          <div className="flex items-center gap-2">
-            <div className="w-32 space-y-1.5">
-              <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
-                <Calendar size={12} className="text-slate-500" /> De
+            {/* Identificador (Selector Dependente) */}
+            <div className="flex-1 min-w-[220px] space-y-1.5">
+              <label className="text-[11px] font-semibold text-[var(--foreground-secondary)] flex items-center gap-1.5">
+                <Split size={13} className="text-[var(--lime-dark)] dark:text-[var(--lime)]" /> Campo / Identificador *
               </label>
-              <input
-                type="date"
-                className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-sky-500 focus:bg-white shadow-2xs"
-                value={filters.dataInicio}
-                onChange={(e) => setFilters(f => ({ ...f, dataInicio: e.target.value }))}
-              />
-            </div>
-            <div className="w-32 space-y-1.5">
-              <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
-                <ArrowRight size={12} className="text-slate-500" /> Até
-              </label>
-              <input
-                type="date"
-                className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-sky-500 focus:bg-white shadow-2xs"
-                value={filters.dataFim}
-                min={filters.dataInicio}
-                onChange={(e) => setFilters(f => ({ ...f, dataFim: e.target.value }))}
-              />
-            </div>
-          </div>
-
-          {/* Sensibilidade */}
-          <div className="w-36 space-y-1.5">
-            <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
-              <ChevronUp size={12} className="text-slate-500" /> Similaridade Mín.
-            </label>
-            <select
-              className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-sky-500 focus:bg-white shadow-2xs"
-              value={filters.minScore}
-              onChange={(e) => setFilters(f => ({ ...f, minScore: Number(e.target.value) }))}
-            >
-              <option value="0">Todos (0% a 100%)</option>
-              <option value="50">A partir de 50%</option>
-              <option value="80">≥ 80% (Crítico / Plágio)</option>
-              <option value="95">≥ 95% (Cópia Integral)</option>
-            </select>
-          </div>
-
-          {/* Botão de Busca */}
-          <Button
-            onClick={handleSearch}
-            disabled={loading}
-            className="h-9 px-5 bg-sky-600 hover:bg-sky-500 text-white rounded-md text-xs font-semibold gap-2 shadow-xs cursor-pointer disabled:opacity-50"
-          >
-            {loading ? <Loader2 size={15} className="animate-spin" /> : <SearchCode size={15} />}
-            <span>Consultar</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* Tabela de Resultados ou Estado Inicial */}
-      {!hasSearched ? (
-        <div className="flex-1 flex flex-col items-center justify-center py-20 border border-dashed border-slate-300 rounded-xl bg-white shadow-2xs">
-          <div className="w-16 h-16 rounded-2xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center mb-4">
-            <ScanEye size={32} />
-          </div>
-          <h3 className="text-base font-bold text-slate-900 tracking-tight mb-1.5">Pronto para Iniciar a Auditoria</h3>
-          <p className="text-xs text-slate-500 font-normal text-center max-w-md leading-relaxed">
-            Selecione o <strong className="text-slate-700">Documento Alvo</strong> e o <strong className="text-slate-700">Identificador do Campo</strong> no painel de filtros acima para extrair e cruzar os registros clínicos auditados.
-          </p>
-        </div>
-      ) : loading ? (
-        <div className="flex-1 space-y-10 animate-in fade-in duration-500">
-          {/* Skeleton KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {[1,2,3,4].map(i => (
-              <div key={i} className="h-32 bg-white border border-slate-200 rounded-xl relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-50/50 to-transparent -translate-x-full animate-shimmer"></div>
-              </div>
-            ))}
-          </div>
-          {/* Skeleton Chart */}
-          <div className="h-[380px] bg-white border border-slate-200 rounded-xl relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-50/50 to-transparent -translate-x-full animate-shimmer"></div>
-          </div>
-          {/* Skeleton Table */}
-          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-4">
-            {[1,2,3,4,5].map(i => (
-              <div key={i} className="h-12 bg-card rounded-md relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-50/50 to-transparent -translate-x-full animate-shimmer"></div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : filteredData.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center py-24 border-2 border-dashed border-red-500/50/20 rounded-md bg-white border-slate-200">
-          <div className="p-8 bg-slate-900/60 rounded-md shadow-none shadow-rose-100 mb-8 border border-rose-100">
-            <Search size={64} className="text-rose-500" />
-          </div>
-          <h3 className="text-base font-bold text-slate-900 mb-1.5">Nenhum Registro</h3>
-          <p className="text-rose-500 font-medium text-center max-w-md">
-            Não encontramos dados para os filtros selecionados. Tente ajustar o <span className="text-red-500 font-bold">período</span> ou a <span className="text-red-500 font-bold">sensibilidade</span>.
-          </p>
-          <button 
-            onClick={() => {
-              setFilters(f => ({ ...f, dataInicio: '2026-01-01', dataFim: getToday() }));
-              setTimeout(handleSearch, 100);
-            }}
-            className="mt-6 px-8 py-3 bg-rose-600 hover:bg-rose-700 text-slate-200 rounded-md text-[10px] font-black uppercase tracking-widest transition-all shadow-none shadow-rose-200 active:scale-95"
-          >
-            Ampliar Período (2026+)
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* KPI 1: Total */}
-            <div className="bg-white border border-slate-200/90 rounded-xl p-5 shadow-2xs shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-1 transition-all group relative overflow-hidden flex flex-col justify-between min-h-[160px]">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-400/10 rounded-md blur-[40px] group-hover:bg-sky-500/20 transition-colors"></div>
-              <div className="flex justify-between items-start z-10">
-                <p className="text-[11px] font-semibold text-slate-600">Dataset Total</p>
-                <div className="p-2.5 bg-blue-50/80 text-sky-400 rounded-[14px] group-hover:bg-sky-600 text-slate-200 transition-colors duration-500 shadow-none">
-                  <ClipboardList size={20} strokeWidth={2.5} />
-                </div>
-              </div>
-              <div className="z-10 mt-4">
-                <h3 className="text-2xl font-bold text-slate-900 tracking-tight">{similarityData.length}</h3>
-                <p className="text-[10px] font-bold text-slate-400 mt-1 flex items-center gap-1.5">
-                  <Database size={10} /> Analisados na base Oracle
-                </p>
-              </div>
-            </div>
-
-            {/* KPI 2: Média */}
-            <div className="bg-white border border-slate-200/90 rounded-xl p-5 shadow-2xs shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-1 transition-all group relative overflow-hidden flex flex-col justify-between min-h-[160px]">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/10 rounded-md blur-[40px] group-hover:bg-amber-500/20 transition-colors"></div>
-              <div className="flex justify-between items-start z-10">
-                <p className="text-[11px] font-semibold text-slate-600">Média de Risco</p>
-                <div className="p-2.5 bg-amber-50/80 text-amber-600 rounded-[14px] group-hover:bg-amber-500 text-slate-200 transition-colors duration-500 shadow-none">
-                  <AlertTriangle size={20} strokeWidth={2.5} />
-                </div>
-              </div>
-              <div className="z-10 mt-4">
-                <h3 className="text-2xl font-bold text-slate-900 tracking-tight">
-                  {(similarityData.reduce((acc, r) => acc + (Number(getVal(r, 'SCORE')) || 0), 0) / (similarityData.length || 1)).toFixed(1)}<span className="text-2xl text-slate-400 ml-1">%</span>
-                </h3>
-                <p className="text-[10px] font-bold text-slate-400 mt-1 flex items-center gap-1.5">
-                  <ChartIcon size={10} className="text-amber-500" /> Score médio da seleção
-                </p>
-              </div>
-            </div>
-
-            {/* KPI 3: Críticos */}
-            <div className={`bg-white border border-slate-200/90 rounded-xl p-5 shadow-2xs shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:-translate-y-1 transition-all group relative overflow-hidden flex flex-col justify-between min-h-[160px] ${similarityData.filter(r => Number(getVal(r, 'SCORE')) >= 80).length > 0 ? "shadow-rose-100/50 border-rose-100" : "hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)]"}`}>
-              <div className="absolute top-0 right-0 w-32 h-32 bg-rose-400/10 rounded-md blur-[40px] group-hover:bg-rose-500/20 transition-colors"></div>
-              <div className="flex justify-between items-start z-10">
-                <p className="text-[11px] font-semibold text-slate-600">Docs Críticos</p>
-                <div className={`p-2.5 rounded-[14px] shadow-none transition-colors duration-500 ${similarityData.filter(r => Number(getVal(r, 'SCORE')) >= 80).length > 0 ? 'bg-rose-500 text-slate-200 animate-pulse' : 'bg-red-500/10 text-rose-500 group-hover:bg-rose-500 text-slate-200'}`}>
-                  <ScanEye size={20} strokeWidth={2.5} />
-                </div>
-              </div>
-              <div className="z-10 mt-4">
-                <h3 className={`text-4xl font-black tracking-tighter ${similarityData.filter(r => Number(getVal(r, 'SCORE')) >= 80).length > 0 ? 'text-red-500' : 'text-slate-200'}`}>
-                  {similarityData.filter(r => Number(getVal(r, 'SCORE')) >= 80).length}
-                </h3>
-                <p className="text-[10px] font-bold text-slate-400 mt-1 flex items-center gap-1.5">
-                  <AlertTriangle size={10} className="text-rose-500" /> Acima de 80% similaridade
-                </p>
-              </div>
-            </div>
-
-            {/* KPI 4: Filtrados */}
-            <div className="bg-white border border-slate-200/90 rounded-xl p-5 shadow-2xs shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-1 transition-all group relative overflow-hidden flex flex-col justify-between min-h-[160px]">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-400/10 rounded-md blur-[40px] group-hover:bg-emerald-500/20 transition-colors"></div>
-              <div className="flex justify-between items-start z-10">
-                <p className="text-[11px] font-semibold text-slate-600">Seleção Ativa</p>
-                <div className="p-2.5 bg-emerald-50/80 text-emerald-600 rounded-[14px] group-hover:bg-emerald-500 text-slate-200 transition-colors duration-500 shadow-none">
-                  <ShieldCheck size={20} strokeWidth={2.5} />
-                </div>
-              </div>
-              <div className="z-10 mt-4">
-                <h3 className="text-2xl font-bold text-slate-900 tracking-tight">{filteredData.length}</h3>
-                <p className="text-[10px] font-bold text-slate-400 mt-1 flex items-center gap-1.5">
-                  <Filter size={10} /> Volume após filtros em cascata
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-slate-900/60 p-8 rounded-xl border border-slate-800 shadow-none relative overflow-hidden h-[380px] flex flex-col group">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-sky-500/5 blur-[80px] rounded-md -translate-y-1/2 translate-x-1/2"></div>
-            
-            <div className="flex justify-between items-center mb-8 relative z-10">
-              <div>
-                <h4 className="text-xl font-black text-slate-200 uppercase italic tracking-tighter flex items-center gap-3">
-                  <ChartIcon size={22} className="text-sky-400" /> 
-                  Top 10 Prestadores por Volume
-                </h4>
-                <div className="flex items-center gap-2 mt-1">
-                  <div className="h-1.5 w-1.5 rounded-md bg-emerald-500"></div>
-                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">Distribuição de Similaridade por CRM/Registro</p>
-                </div>
-              </div>
-              
-              {selectedPrestadores.length > 0 && (
-                <button
-                  onClick={() => setSelectedPrestadores([])}
-                  className="px-5 py-2.5 bg-card text-slate-200 rounded-md text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-black transition-all shadow-none active:scale-95 group/reset"
-                >
-                  <RefreshCw size={14} className="group-hover/reset:rotate-180 transition-transform duration-500" /> 
-                  Limpar Seleção
-                </button>
-              )}
-            </div>
-            
-            <div className="flex-1 w-full relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                  <XAxis
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    interval={0}
-                    tick={(props) => {
-                      const { x, y, payload } = props;
-                      const item = chartData.find(d => d.name === payload.value);
-                      return (
-                        <g transform={`translate(${x},${y})`}>
-                          <text x={0} y={20} textAnchor="middle" fill="#94a3b8" style={{ fontSize: '9px', fontWeight: '900', letterSpacing: '0.1em' }}>
-                            {payload.value}
-                          </text>
-                          <text x={0} y={35} textAnchor="middle" fill="#0ea5e9" style={{ fontSize: '11px', fontWeight: '900' }}>
-                            {item?.percentage}%
-                          </text>
-                        </g>
-                      );
-                    }}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    ticks={yAxisTicks}
-                    tick={{ fill: '#cbd5e1', fontSize: 10, fontWeight: 900 }}
-                  />
-                  <Tooltip
-                    cursor={{ fill: 'rgba(59, 130, 246, 0.05)', radius: 8 }}
-                    position={{ y: 330 }}
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 p-5 shadow-none rounded-md animate-in zoom-in-95 duration-200 min-w-[260px]">
-                            <div className="flex items-center gap-3 mb-4 pb-4 border-b border-slate-800">
-                                <div className="p-2 bg-sky-600 rounded-md">
-                                  <Stethoscope size={16} className="text-slate-200" />
-                                </div>
-                                <div className="overflow-hidden">
-                                  <p className="text-slate-200 text-[11px] font-black uppercase tracking-widest truncate">{data.fullName}</p>
-                                  <p className="text-slate-400 text-[8px] font-bold uppercase tracking-widest mt-0.5">Prestador Clínico</p>
-                                </div>
-                            </div>
-                            <div className="space-y-3">
-                              <div className="flex justify-between items-center">
-                                  <span className="text-slate-400 text-[9px] font-black uppercase tracking-widest">Volume de Docs</span>
-                                  <p className="text-slate-200 text-[18px] font-black italic">{data.value} <small className="text-[10px] opacity-40 italic">UN</small></p>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                  <span className="text-slate-400 text-[9px] font-black uppercase tracking-widest">Similaridade</span>
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-12 h-1.5 bg-slate-900/60 rounded-md overflow-hidden">
-                                      <div className="h-full bg-sky-500" style={{ width: `${data.percentage}%` }}></div>
-                                    </div>
-                                    <p className="text-sky-400 text-[18px] font-black">{data.percentage}%</p>
-                                  </div>
-                              </div>
-                            </div>
-                            <div className="mt-4 pt-4 border-t border-slate-800 text-center">
-                              <p className="text-slate-400 text-[8px] font-black uppercase tracking-widest animate-pulse italic">Clique para isolar prestador</p>
-                            </div>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Bar
-                    dataKey="value"
-                    radius={[6, 6, 6, 6]}
-                    barSize={16}
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    onClick={(data: any) => {
-                      if (data?.code) {
-                        const code = data.code as string;
-                        setSelectedPrestadores(prev =>
-                          prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code]
-                        );
-                      }
-                    }}
-                    className="cursor-pointer"
-                  >
-                    {chartData.map((entry, index) => {
-                      const isSelected = selectedPrestadores.includes(entry.code);
-                      return (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={isSelected ? '#2563eb' : (index === 0 ? '#ef4444' : index < 3 ? '#f59e0b' : '#3b82f6')}
-                          className="transition-all duration-500 hover:fill-blue-400"
-                        />
-                      );
-                    })}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Filtros Horizontais Pro Max (Dynamic Toolbar) */}
-          <div className="bg-card rounded-md p-5 text-slate-200 shadow-none relative overflow-visible border-b-4 border-blue-600">
-            <div className="flex flex-col lg:flex-row items-end gap-6 relative z-10">
-
-              <div className="flex items-center gap-3 pr-6 border-r border-slate-800">
-                <div className="p-2.5 bg-sky-600 text-slate-200 rounded-md shadow-none">
-                  <ListFilter size={20} />
-                </div>
-                <div>
-                  <h5 className="text-[12px] font-black uppercase tracking-[0.2em] text-slate-200 italic">Filtros Dinâmicos</h5>
-                  <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">Refinamento Instantâneo</p>
-                </div>
-              </div>
-
-              {/* Atendimento */}
-              <div className="flex-1 w-full lg:w-48 space-y-1.5">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                  <Search size={10} /> Atendimento
-                </label>
-                <div className="relative group">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-400 transition-colors" size={14} />
-                  <input
-                    type="text"
-                    placeholder="Filtrar atendimento..."
-                    value={filterAtendimento}
-                    onChange={(e) => setFilterAtendimento(e.target.value)}
-                    className="w-full bg-slate-900/60 border-2 border-slate-800 rounded-md pl-9 pr-3 py-1.5 text-[11px] font-bold text-slate-200 text-slate-400 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 transition-all"
-                  />
-                </div>
-              </div>
-
-              {/* Custom Selects Horizontais */}
-              <EnhancedMultiSelect
-                label="Prestadores"
-                icon={Stethoscope}
-                options={filterOptions.prestadores}
-                value={selectedPrestadores}
-                onChange={setSelectedPrestadores}
-                placeholder="Filtrar por nome..."
-              />
-
-              <EnhancedMultiSelect
-                label="Unidades"
-                icon={Building2}
-                options={filterOptions.unidades}
-                value={selectedUnidades}
-                onChange={setSelectedUnidades}
-                placeholder="Filtrar unidade..."
-              />
-
-              {/* Botão de Reset Integrado */}
-              <button
-                onClick={() => {
-                  setFilterAtendimento('');
-                  setSelectedUnidades([]);
-                  setSelectedPrestadores([]);
-                }}
-                className="h-[38px] px-6 bg-slate-900/60 hover:bg-rose-900 border-2 border-slate-800 rounded-md text-[10px] font-black uppercase tracking-widest transition-all text-slate-400 text-slate-200 flex items-center justify-center gap-2 group whitespace-nowrap"
-                title="Resetar todos os filtros"
+              <select
+                className={`w-full bg-[var(--canvas-bg)] border rounded-xl px-3 py-2 text-xs font-medium text-[var(--foreground)] outline-none transition-all shadow-xs focus:border-[var(--lime)] ${!filters.campo && hasSearched ? 'border-rose-400' : 'border-[var(--border-subtle)]'}`}
+                value={filters.campo}
+                onChange={(e) => setFilters(f => ({ ...f, campo: e.target.value }))}
+                disabled={!filters.documento}
               >
-                <RefreshCw size={14} className="group-hover:rotate-180 transition-transform duration-500" />
-                <span>Limpar</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Tabela de Resultados Final */}
-          <div className="bg-white rounded-xl border border-slate-200/90 flex flex-col shadow-2xs overflow-hidden shadow-none relative">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-sky-500 via-cyan-500 to-emerald-500"></div>
-            <div className="flex-1 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200">
-              <table className="w-full text-left border-collapse table-auto min-w-max">
-                <thead>
-                  <tr className="bg-slate-50/80 border-b border-slate-200">
-                    <th className="px-8 py-5 text-[11px] font-semibold text-slate-600 text-center">Atendimento</th>
-                    <th className="px-8 py-5 text-[11px] font-semibold text-slate-600">Registro Clínico</th>
-                    <th className="px-8 py-5 text-[11px] font-semibold text-slate-600">Empresa</th>
-                    <th className="px-8 py-5 text-[11px] font-semibold text-slate-600">Data e Hora</th>
-                    <th className="px-8 py-5 text-[11px] font-semibold text-slate-600 text-center">Prestador</th>
-                    <th className="px-8 py-5 text-[11px] font-semibold text-slate-600">Localização</th>
-                    <th className="px-8 py-5 text-[11px] font-semibold text-slate-600 text-center">Similaridade</th>
-                    <th className="px-8 py-5 text-[11px] font-semibold text-slate-600 text-center">Auditoria</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={8} className="py-32 text-center">
-                        <div className="flex flex-col items-center gap-6">
-                          <div className="relative">
-                            <div className="w-16 h-16 border-4 border-slate-800 border-t-[var(--primary)] rounded-md animate-spin"></div>
-                            <ScanEye className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[var(--primary)]" size={24} />
-                          </div>
-                          <div className="space-y-1">
-                            <span className="text-[12px] font-black uppercase tracking-[0.4em] text-slate-200 block">Processando Similaridade</span>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Isolando padrões de texto via NLP Oracle...</span>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : paginatedData.length > 0 ? (
-                    paginatedData.map((row, idx) => {
-                      const score = Number(getVal(row, 'SCORE')) || 0;
-                      return (
-                        <tr key={idx} className="bg-slate-900/60 transition-all group/tr">
-                          <td className="px-4 py-3 text-[12px] font-black text-center text-slate-400 font-mono group-hover/text-slate-200 transition-colors">{getVal(row, 'ATENDIMENTO')}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-slate-900/60 rounded-md flex items-center justify-center text-slate-400 group-hover/tr:bg-sky-500/10 group-hover/tr:text-sky-400 transition-all">
-                                <FileText size={18} />
-                              </div>
-                              <div className="flex flex-col">
-                                <span className="text-[12px] font-black text-slate-900 font-semibold text-xs leading-none mb-1">{getVal(row, 'NOME_DOCUMENTO')}</span>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter bg-slate-900/60 px-1.5 py-0.5 rounded">ID: {getVal(row, 'DOCUMENTO')}</span>
-                                  <span className="text-[9px] font-bold text-sky-400 uppercase tracking-tighter bg-sky-500/10 px-1.5 py-0.5 rounded italic">{getVal(row, 'IDENTIFICADOR')}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <Building2 size={12} className="text-slate-400 opacity-40" />
-                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{getVal(row, 'NOME_EMPRESA') || getVal(row, 'CD_EMPRESA') || '—'}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2 text-slate-400">
-                              <Calendar size={12} className="opacity-40" />
-                              <span className="text-[11px] font-bold">
-                                {(() => {
-                                  const iso = getVal(row, 'DATA_HORA_ISO');
-                                  const raw = getVal(row, 'DATA_HORA');
-                                  const d = iso ? new Date(iso.replace(' ', 'T')) : new Date(raw);
-                                  return isNaN(d.getTime()) ? 'Data Inválida' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-                                })()}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                             <div className="inline-flex items-center justify-center w-10 h-10 rounded-md bg-slate-900/60 border-2 border-white shadow-none overflow-hidden group-hover/tr:border-blue-200 transition-all" title={getVal(row, 'PRESTADOR')}>
-                               <User size={18} className="text-slate-400 group-hover/tr:text-sky-400" />
-                             </div>
-                             <p className="text-[9px] font-black text-slate-400 mt-1 uppercase italic tracking-tighter group-hover/text-slate-400">{getVal(row, 'PRESTADOR')}</p>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-col gap-1">
-                              <div className="flex items-center gap-1.5">
-                                <div className="w-1.5 h-1.5 rounded-md bg-slate-400"></div>
-                                <span className="text-[11px] font-black text-slate-200 uppercase italic tracking-tighter">{getVal(row, 'LEITO') || 'N/A'}</span>
-                              </div>
-                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.1em]">{getVal(row, 'UNIDADE') || 'SETOR EXTERNO'}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <div className="flex flex-col items-center gap-1">
-                              <div className="w-full max-w-[80px] h-1.5 bg-slate-900/60 rounded-md overflow-hidden">
-                                <div className={`h-full transition-all duration-1000 ${score >= 80 ? 'bg-rose-500' : score >= 50 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${score}%` }}></div>
-                              </div>
-                              <span className={`text-[12px] font-black italic tracking-tighter ${score >= 80 ? 'text-red-500' : score >= 50 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                                {score.toFixed(1)}%
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={() => {
-                                setComparingDoc(row);
-                                fetchComparison(row);
-                              }}
-                              className="w-10 h-10 flex items-center justify-center bg-card text-slate-200 rounded-md hover:bg-black hover:-translate-y-1 active:translate-y-0 transition-all shadow-none shadow-sm group/btn-audit"
-                              title="Audit NLP Lado a Lado"
-                            >
-                              <Split size={20} className="group-hover/btn-audit:rotate-12 transition-transform" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={7} className="py-48 text-center bg-slate-900/60">
-                        <div className="flex flex-col items-center justify-center">
-                          <div className="p-8 bg-slate-900/60 rounded-md shadow-none mb-6 relative overflow-hidden">
-                            <div className="absolute inset-0 bg-gradient-to-br from-slate-50 to-white"></div>
-                            <XCircle size={64} className="text-slate-200 relative z-10" />
-                          </div>
-                          <h3 className="text-xl font-black text-slate-200 uppercase italic tracking-tighter">Vácuo de Similaridade</h3>
-                          <p className="text-sm text-slate-400 font-medium max-w-xs mt-3 leading-relaxed">
-                            Não encontramos registros que correspondam aos filtros aplicados nesta janela de tempo.
-                          </p>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                <option value="">{filters.documento ? 'Selecione o Campo Clínico...' : 'Aguardando Documento...'}</option>
+                {fieldOptions.map(f => (
+                  <option key={f.id} value={f.id}>{f.name} ({f.id})</option>
+                ))}
+              </select>
             </div>
 
-            {/* Paginação Premium */}
-            <div className="bg-slate-900/60 border-t border-slate-800 px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-6 bg-sky-600 rounded-md"></div>
-                  <span className="text-[11px] font-black text-slate-200 uppercase tracking-widest italic">
-                    {filteredData.length} <span className="text-slate-400">Matches Analisados</span>
-                  </span>
-                </div>
-                <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-card rounded-md border border-slate-800">
-                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Página {currentPage} de {totalPages || 1}</p>
-                </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setActiveTab('mapeamentos')}
+              className="h-9 w-9 p-0 rounded-xl sylva-pill text-[var(--muted)] hover:text-[var(--foreground)] cursor-pointer"
+              title="Gerenciar Mapeamentos de Documentos"
+            >
+              <SettingsIcon size={16} />
+            </Button>
+
+            {/* Período */}
+            <div className="flex items-center gap-2">
+              <div className="w-32 space-y-1.5">
+                <label className="text-[11px] font-semibold text-[var(--foreground-secondary)] flex items-center gap-1">
+                  <Calendar size={12} className="text-[var(--muted)]" /> De
+                </label>
+                <input
+                  type="date"
+                  className="w-full bg-[var(--canvas-bg)] border border-[var(--border-subtle)] rounded-xl px-2.5 py-1.5 text-xs text-[var(--foreground)] outline-none focus:border-[var(--lime)] shadow-xs"
+                  value={filters.dataInicio}
+                  onChange={(e) => setFilters(f => ({ ...f, dataInicio: e.target.value }))}
+                />
               </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(1)}
-                  className="w-10 h-10 flex items-center justify-center bg-slate-900/60 border-2 border-slate-800 rounded-md text-slate-400 disabled:opacity-30 hover:border-sky-500 hover:text-sky-400 transition-all shadow-none"
-                >
-                  <ChevronFirst size={18} />
-                </button>
-                <button
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  className="w-10 h-10 flex items-center justify-center bg-slate-900/60 border-2 border-slate-800 rounded-md text-slate-400 disabled:opacity-30 hover:border-sky-500 hover:text-sky-400 transition-all shadow-none"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                
-                <div className="flex items-center gap-1 px-4">
-                  {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                    let pageNum;
-                    if (totalPages <= 5) pageNum = i + 1;
-                    else if (currentPage <= 3) pageNum = i + 1;
-                    else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
-                    else pageNum = currentPage - 2 + i;
-
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`w-10 h-10 rounded-md text-xs font-black transition-all ${currentPage === pageNum ? 'bg-sky-600 text-slate-200 shadow-none shadow-blue-200' : 'bg-card text-slate-400 bg-slate-900/60'}`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <button
-                  disabled={currentPage === totalPages || totalPages === 0}
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  className="w-10 h-10 flex items-center justify-center bg-slate-900/60 border-2 border-slate-800 rounded-md text-slate-400 disabled:opacity-30 hover:border-sky-500 hover:text-sky-400 transition-all shadow-none"
-                >
-                  <ChevronRight size={18} />
-                </button>
-                <button
-                  disabled={currentPage === totalPages || totalPages === 0}
-                  onClick={() => setCurrentPage(totalPages)}
-                  className="w-10 h-10 flex items-center justify-center bg-slate-900/60 border-2 border-slate-800 rounded-md text-slate-400 disabled:opacity-30 hover:border-sky-500 hover:text-sky-400 transition-all shadow-none"
-                >
-                  <ChevronLast size={18} />
-                </button>
+              <div className="w-32 space-y-1.5">
+                <label className="text-[11px] font-semibold text-[var(--foreground-secondary)] flex items-center gap-1">
+                  <ArrowRight size={12} className="text-[var(--muted)]" /> Até
+                </label>
+                <input
+                  type="date"
+                  className="w-full bg-[var(--canvas-bg)] border border-[var(--border-subtle)] rounded-xl px-2.5 py-1.5 text-xs text-[var(--foreground)] outline-none focus:border-[var(--lime)] shadow-xs"
+                  value={filters.dataFim}
+                  min={filters.dataInicio}
+                  onChange={(e) => setFilters(f => ({ ...f, dataFim: e.target.value }))}
+                />
               </div>
             </div>
+
+            {/* Sensibilidade */}
+            <div className="w-36 space-y-1.5">
+              <label className="text-[11px] font-semibold text-[var(--foreground-secondary)] flex items-center gap-1">
+                <ChevronUp size={12} className="text-[var(--muted)]" /> Similaridade Mín.
+              </label>
+              <select
+                className="w-full bg-[var(--canvas-bg)] border border-[var(--border-subtle)] rounded-xl px-2.5 py-1.5 text-xs text-[var(--foreground)] outline-none focus:border-[var(--lime)] shadow-xs"
+                value={filters.minScore}
+                onChange={(e) => setFilters(f => ({ ...f, minScore: Number(e.target.value) }))}
+              >
+                <option value="0">Todos (0% a 100%)</option>
+                <option value="50">A partir de 50%</option>
+                <option value="80">≥ 80% (Crítico / Plágio)</option>
+                <option value="95">≥ 95% (Cópia Integral)</option>
+              </select>
+            </div>
+
+            {/* Botão de Busca */}
+            <Button
+              onClick={handleSearch}
+              disabled={loading}
+              className="h-9 px-5 bg-[var(--lime)] text-[var(--lime-ink)] hover:brightness-105 rounded-xl text-xs font-bold gap-2 shadow-[0_4px_14px_rgba(204,243,82,0.25)] cursor-pointer disabled:opacity-50"
+            >
+              {loading ? <Loader2 size={15} className="animate-spin" /> : <SearchCode size={15} />}
+              <span>Consultar</span>
+            </Button>
           </div>
         </div>
-      )}
 
-      {/* Drawer de Comparação Slide-over Side-by-Side */}
-      {comparingDoc && (
-        <div className="fixed inset-0 z-[100] flex justify-end">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setComparingDoc(null)}></div>
-          
-          <div className="relative w-full max-w-6xl bg-slate-900/60 h-full shadow-none flex flex-col animate-in slide-in-from-right duration-500 ease-out">
-            <header className="px-8 py-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/60 backdrop-blur-md">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-card text-slate-200 rounded-md shadow-none shadow-sm">
-                  <ScanEye size={24} />
+        {/* Estado Inicial ou Carregando */}
+        {!hasSearched ? (
+          <div className="flex-1 flex flex-col items-center justify-center py-20 border border-dashed border-[var(--border-subtle)] rounded-2xl bg-[var(--card-bg)]/40 shadow-xs">
+            <div className="w-16 h-16 rounded-2xl bg-[var(--lime)]/15 text-[var(--lime-dark)] dark:text-[var(--lime)] border border-[var(--lime)]/30 flex items-center justify-center mb-4">
+              <ScanEye size={32} />
+            </div>
+            <h3 className="text-base font-bold text-[var(--foreground)] tracking-tight mb-1.5">Pronto para Iniciar a Auditoria</h3>
+            <p className="text-xs text-[var(--foreground-secondary)] font-normal text-center max-w-md leading-relaxed">
+              Selecione o <strong className="text-[var(--foreground)]">Documento Alvo</strong> e o <strong className="text-[var(--foreground)]">Identificador do Campo</strong> no painel de filtros acima para extrair e cruzar os registros clínicos auditados.
+            </p>
+          </div>
+        ) : loading ? (
+          <div className="flex-1 space-y-6 animate-in fade-in duration-500">
+            {/* Skeleton KPIs */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+              {[1,2,3,4].map(i => (
+                <div key={i} className="h-32 sylva-card border border-[var(--border-subtle)] rounded-2xl relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--card-bg)] to-transparent -translate-x-full animate-shimmer"></div>
                 </div>
-                <div>
-                  <h2 className="text-2xl font-black text-slate-200 tracking-tighter uppercase italic flex items-center gap-3">
-                    Auditoria NLP
-                  </h2>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                    Doc: {getVal(comparingDoc, 'DOCUMENTO')} | <b className="text-[var(--primary)]">{(Number(getVal(comparingDoc, 'SCORE')) || 0).toFixed(1)}% SIMILAR</b>
+              ))}
+            </div>
+            {/* Skeleton Chart */}
+            <div className="h-[380px] sylva-card border border-[var(--border-subtle)] rounded-2xl relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--card-bg)] to-transparent -translate-x-full animate-shimmer"></div>
+            </div>
+            {/* Skeleton Table */}
+            <div className="sylva-card border border-[var(--border-subtle)] rounded-2xl p-6 space-y-4">
+              {[1,2,3,4,5].map(i => (
+                <div key={i} className="h-12 bg-[var(--canvas-bg)] rounded-xl relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--card-bg)] to-transparent -translate-x-full animate-shimmer"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : filteredData.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center py-20 border border-dashed border-rose-500/30 rounded-2xl bg-[var(--card-bg)]/40 shadow-xs">
+            <div className="p-6 bg-rose-500/10 rounded-2xl mb-6 border border-rose-500/20">
+              <Search size={44} className="text-rose-500" />
+            </div>
+            <h3 className="text-base font-bold text-[var(--foreground)] mb-1.5">Nenhum Registro Encontrado</h3>
+            <p className="text-xs text-[var(--foreground-secondary)] font-medium text-center max-w-md">
+              Não encontramos dados para os filtros selecionados. Tente ajustar o período ou a sensibilidade de similaridade.
+            </p>
+            <button 
+              onClick={() => {
+                setFilters(f => ({ ...f, dataInicio: '2026-01-01', dataFim: getToday() }));
+                setTimeout(handleSearch, 100);
+              }}
+              className="mt-6 px-6 py-2.5 bg-[var(--lime)] text-[var(--lime-ink)] font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer hover:brightness-105"
+            >
+              Ampliar Período (2026+)
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {/* Bento Grid: 4 KPIs Tinted Glass Sylva */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+              {/* KPI 1: Dataset Total (Olive Tint) */}
+              <div 
+                className="sylva-card rounded-2xl p-5 shadow-xs hover:-translate-y-0.5 transition-all relative overflow-hidden flex flex-col justify-between min-h-[145px]"
+                style={{ background: 'var(--tint-olive)' }}
+              >
+                <div className="flex justify-between items-start z-10">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--foreground-secondary)]">Dataset Total</p>
+                  <div className="p-2.5 bg-[var(--card-bg)]/80 text-[var(--lime-dark)] dark:text-[var(--lime)] border border-[var(--border-subtle)] rounded-xl shadow-xs">
+                    <ClipboardList size={18} strokeWidth={2.2} />
+                  </div>
+                </div>
+                <div className="z-10 mt-4">
+                  <h3 className="text-2xl font-bold text-[var(--foreground)] tracking-tight font-mono">
+                    {similarityData.length}
+                  </h3>
+                  <p className="text-[11px] font-medium text-[var(--muted)] mt-1 flex items-center gap-1.5">
+                    <Database size={11} /> Analisados na base Oracle
                   </p>
                 </div>
               </div>
-              <button onClick={() => setComparingDoc(null)} className="p-2 -card rounded-md transition-colors text-slate-400">
-                <X size={24} />
-              </button>
-            </header>
 
-            <div className="flex-1 overflow-hidden flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-slate-100">
-              {/* Texto Anterior */}
-              <div className="flex-1 flex flex-col h-1/2 md:h-full bg-slate-900/60">
-                <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Documento Anterior (Original)</span>
-                    {comparisonTexts?.dataAnterior && (
-                      <span className="text-[9px] font-bold text-slate-400 mt-0.5 opacity-80 flex items-center gap-2">
-                        <span>{comparisonTexts.dataAnterior} {comparisonTexts.cdAnterior && `| DOC: ${comparisonTexts.cdAnterior}`}</span>
-                        {comparisonTexts.regAnterior && (
-                          <a
-                            href={`${reportUrl}${comparisonTexts.regAnterior}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="-card -accent text-slate-400 px-2 py-0.5 rounded flex items-center gap-1 transition-colors"
-                          >
-                            <Printer size={10} /> PDF
-                          </a>
-                        )}
-                      </span>
-                    )}
+              {/* KPI 2: Média (Mocha Tint) */}
+              <div 
+                className="sylva-card rounded-2xl p-5 shadow-xs hover:-translate-y-0.5 transition-all relative overflow-hidden flex flex-col justify-between min-h-[145px]"
+                style={{ background: 'var(--tint-mocha)' }}
+              >
+                <div className="flex justify-between items-start z-10">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--foreground-secondary)]">Média de Risco</p>
+                  <div className="p-2.5 bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 rounded-xl shadow-xs">
+                    <AlertTriangle size={18} strokeWidth={2.2} />
                   </div>
-                  <div className="px-2 py-1 -card text-slate-400 rounded text-[9px] font-black tracking-widest">ORIGINAL</div>
                 </div>
-                <div className="flex-1 p-6 overflow-y-auto font-serif text-slate-400 leading-relaxed text-sm">
-                  {compLoading ? (
-                    <div className="h-full flex flex-col items-center justify-center space-y-4">
-                      <Loader2 className="animate-spin text-slate-400" size={32} />
-                    </div>
-                  ) : (
-                    <div className="whitespace-pre-wrap">
-                      <DiffText
-                        oldText={comparisonTexts?.anterior}
-                        newText={comparisonTexts?.atual}
-                        type="previous"
-                        score={Number(getVal(comparingDoc, 'SCORE')) || 0}
-                      />
-                    </div>
-                  )}
+                <div className="z-10 mt-4">
+                  <h3 className="text-2xl font-bold text-[var(--foreground)] tracking-tight font-mono">
+                    {(similarityData.reduce((acc, r) => acc + (Number(getVal(r, 'SCORE')) || 0), 0) / (similarityData.length || 1)).toFixed(1)}
+                    <span className="text-lg text-[var(--muted)] ml-0.5">%</span>
+                  </h3>
+                  <p className="text-[11px] font-medium text-[var(--muted)] mt-1 flex items-center gap-1.5">
+                    <ChartIcon size={11} className="text-amber-500" /> Score médio da seleção
+                  </p>
                 </div>
               </div>
 
-              {/* Divisor Visual central para telas grandes */}
-              <div className="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-900/60 border border-slate-800 p-2.5 rounded-md shadow-none z-10 text-[var(--primary)]">
-                <Split size={18} strokeWidth={2.5} />
-              </div>
-
-              {/* Texto Atual */}
-              <div className="flex-1 flex flex-col h-1/2 md:h-full bg-slate-900/60">
-                <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-[var(--primary)] uppercase tracking-widest">Documento Atual (Auditoria)</span>
-                    {comparisonTexts?.dataAtual && (
-                      <span className="text-[9px] font-bold text-[var(--primary)] mt-0.5 opacity-80 flex items-center gap-2">
-                        <span>{comparisonTexts.dataAtual} {comparisonTexts.cdAtual && `| DOC: ${comparisonTexts.cdAtual}`}</span>
-                        {comparisonTexts.regAtual && (
-                          <a
-                            href={`${reportUrl}${comparisonTexts.regAtual}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="bg-[var(--primary)]/10 hover:bg-[var(--primary)]/20 text-[var(--primary)] px-2 py-0.5 rounded flex items-center gap-1 transition-colors"
-                          >
-                            <Printer size={10} /> PDF
-                          </a>
-                        )}
-                      </span>
-                    )}
-                  </div>
-                  <div className={`px-2 py-1 rounded text-[9px] font-black border tracking-widest ${getScoreColor(Number(getVal(comparingDoc, 'SCORE')) || 0)}`}>
-                    {(Number(getVal(comparingDoc, 'SCORE')) || 0).toFixed(1)}% SIMILAR
+              {/* KPI 3: Críticos (Slate Tint) */}
+              <div 
+                className="sylva-card rounded-2xl p-5 shadow-xs hover:-translate-y-0.5 transition-all relative overflow-hidden flex flex-col justify-between min-h-[145px]"
+                style={{ background: 'var(--tint-slate)' }}
+              >
+                <div className="flex justify-between items-start z-10">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--foreground-secondary)]">Docs Críticos</p>
+                  <div className={`p-2.5 rounded-xl transition-colors shadow-xs ${similarityData.filter(r => Number(getVal(r, 'SCORE')) >= 80).length > 0 ? 'bg-rose-500 text-white animate-pulse' : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30'}`}>
+                    <ScanEye size={18} strokeWidth={2.2} />
                   </div>
                 </div>
-                <div className="flex-1 p-6 overflow-y-auto font-serif text-slate-200 leading-relaxed text-sm">
-                  {compLoading ? (
-                    <div className="h-full flex flex-col items-center justify-center space-y-4">
-                      <Loader2 className="animate-spin text-[var(--primary)]/50" size={32} />
-                    </div>
-                  ) : (
-                    <div className="whitespace-pre-wrap">
-                      <DiffText
-                        oldText={comparisonTexts?.anterior}
-                        newText={comparisonTexts?.atual}
-                        type="current"
-                        score={Number(getVal(comparingDoc, 'SCORE')) || 0}
-                      />
-                    </div>
-                  )}
+                <div className="z-10 mt-4">
+                  <h3 className={`text-2xl font-bold tracking-tight font-mono ${similarityData.filter(r => Number(getVal(r, 'SCORE')) >= 80).length > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-[var(--foreground)]'}`}>
+                    {similarityData.filter(r => Number(getVal(r, 'SCORE')) >= 80).length}
+                  </h3>
+                  <p className="text-[11px] font-medium text-[var(--muted)] mt-1 flex items-center gap-1.5">
+                    <AlertTriangle size={11} className="text-rose-500" /> Acima de 80% similaridade
+                  </p>
+                </div>
+              </div>
+
+              {/* KPI 4: Filtrados (Frosted Sylva Glass) */}
+              <div className="sylva-glass bg-[var(--card-bg)]/80 border border-[var(--border-subtle)] rounded-2xl p-5 shadow-xs hover:-translate-y-0.5 transition-all relative overflow-hidden flex flex-col justify-between min-h-[145px]">
+                <div className="flex justify-between items-start z-10">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--foreground-secondary)]">Seleção Ativa</p>
+                  <div className="p-2.5 bg-[var(--lime)]/15 text-[var(--lime-dark)] dark:text-[var(--lime)] border border-[var(--lime)]/30 rounded-xl shadow-xs">
+                    <ShieldCheck size={18} strokeWidth={2.2} />
+                  </div>
+                </div>
+                <div className="z-10 mt-4">
+                  <h3 className="text-2xl font-bold text-[var(--foreground)] tracking-tight font-mono">{filteredData.length}</h3>
+                  <p className="text-[11px] font-medium text-[var(--muted)] mt-1 flex items-center gap-1.5">
+                    <Filter size={11} className="text-[var(--lime-dark)] dark:text-[var(--lime)]" /> Volume após filtros em cascata
+                  </p>
                 </div>
               </div>
             </div>
 
-            <footer className="px-8 py-5 bg-card border-t border-slate-800 flex items-center justify-between">
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2">
-                  <Building2 size={14} className="text-slate-400" />
-                  <span className="text-[11px] font-black text-slate-200">{getVal(comparingDoc, 'LEITO')} | {getVal(comparingDoc, 'UNIDADE')}</span>
+            {/* Gráfico Top 10 Prestadores: Sylva Card Bento */}
+            <div className="sylva-card p-6 rounded-2xl border border-[var(--border-subtle)] shadow-xs relative overflow-hidden h-[380px] flex flex-col group">
+              <div className="flex justify-between items-center mb-6 relative z-10">
+                <div>
+                  <h4 className="text-base font-bold text-[var(--foreground)] tracking-tight flex items-center gap-2.5">
+                    <ChartIcon size={20} className="text-[var(--lime-dark)] dark:text-[var(--lime)]" /> 
+                    Top 10 Prestadores por Volume
+                  </h4>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="h-1.5 w-1.5 rounded-full bg-[var(--lime)]"></div>
+                    <p className="text-[11px] text-[var(--muted)] font-medium">Distribuição de Similaridade por CRM/Registro</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Stethoscope size={14} className="text-slate-400" />
-                  <span className="text-[11px] font-black text-slate-200">{getVal(comparingDoc, 'PRESTADOR')}</span>
+                
+                {selectedPrestadores.length > 0 && (
+                  <button
+                    onClick={() => setSelectedPrestadores([])}
+                    className="px-3.5 py-1.5 sylva-pill text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer group/reset text-[var(--foreground)] hover:text-[var(--lime-dark)] dark:hover:text-[var(--lime)]"
+                  >
+                    <RefreshCw size={13} className="group-hover/reset:rotate-180 transition-transform duration-500" /> 
+                    Limpar Seleção ({selectedPrestadores.length})
+                  </button>
+                )}
+              </div>
+              
+              <div className="flex-1 w-full relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" strokeOpacity={0.4} vertical={false} />
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      interval={0}
+                      tick={(props) => {
+                        const { x, y, payload } = props;
+                        const item = chartData.find(d => d.name === payload.value);
+                        return (
+                          <g transform={`translate(${x},${y})`}>
+                            <text x={0} y={20} textAnchor="middle" fill="var(--muted)" style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.08em' }}>
+                              {payload.value}
+                            </text>
+                            <text x={0} y={35} textAnchor="middle" fill="var(--foreground)" style={{ fontSize: '11px', fontWeight: '800' }}>
+                              {item?.percentage}%
+                            </text>
+                          </g>
+                        );
+                      }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      ticks={yAxisTicks}
+                      tick={{ fill: 'var(--muted)', fontSize: 10, fontWeight: 700 }}
+                    />
+                    <Tooltip
+                      cursor={{ fill: 'var(--card-bg)', opacity: 0.4, radius: 8 }}
+                      position={{ y: 280 }}
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-[var(--dock-bg)] border border-[var(--border-subtle)] p-4 shadow-2xl rounded-2xl backdrop-blur-xl animate-in zoom-in-95 duration-200 min-w-[260px]">
+                              <div className="flex items-center gap-3 mb-3 pb-3 border-b border-[var(--border-subtle)]">
+                                  <div className="p-2 bg-[var(--lime)] text-[var(--lime-ink)] rounded-xl font-bold">
+                                    <Stethoscope size={15} />
+                                  </div>
+                                  <div className="overflow-hidden">
+                                    <p className="text-[var(--foreground)] text-xs font-bold truncate">{data.fullName}</p>
+                                    <p className="text-[var(--muted)] text-[10px] font-medium mt-0.5">Prestador Clínico</p>
+                                  </div>
+                              </div>
+                              <div className="space-y-2.5">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[var(--foreground-secondary)] text-[11px] font-semibold">Volume de Docs</span>
+                                    <p className="text-[var(--foreground)] text-base font-bold font-mono">{data.value} <small className="text-[10px] text-[var(--muted)] font-sans">UN</small></p>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[var(--foreground-secondary)] text-[11px] font-semibold">Participação</span>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-12 h-1.5 bg-[var(--border-subtle)] rounded-full overflow-hidden">
+                                        <div className="h-full bg-[var(--lime)]" style={{ width: `${data.percentage}%` }}></div>
+                                      </div>
+                                      <p className="text-[var(--lime-dark)] dark:text-[var(--lime)] text-base font-bold font-mono">{data.percentage}%</p>
+                                    </div>
+                                </div>
+                              </div>
+                              <div className="mt-3 pt-2.5 border-t border-[var(--border-subtle)] text-center">
+                                <p className="text-[var(--muted)] text-[10px] font-medium">Clique na barra para isolar o prestador</p>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Bar
+                      dataKey="value"
+                      radius={[6, 6, 6, 6]}
+                      barSize={16}
+                      onClick={(data: any) => {
+                        if (data?.code) {
+                          const code = data.code as string;
+                          setSelectedPrestadores(prev =>
+                            prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code]
+                          );
+                        }
+                      }}
+                      className="cursor-pointer"
+                    >
+                      {chartData.map((entry, index) => {
+                        const isSelected = selectedPrestadores.includes(entry.code);
+                        return (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={isSelected ? '#CCF352' : (index === 0 ? '#f43f5e' : index < 3 ? '#f59e0b' : '#10b981')}
+                            className="transition-all duration-300 hover:opacity-80"
+                          />
+                        );
+                      })}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Filtros Horizontais (Dynamic Toolbar) */}
+            <div className="sylva-card rounded-2xl p-5 border border-[var(--border-subtle)] border-l-4 border-l-[var(--lime)] shadow-xs relative overflow-visible">
+              <div className="flex flex-col lg:flex-row items-end gap-5 relative z-10">
+                <div className="flex items-center gap-3 pr-5 border-r border-[var(--border-subtle)]">
+                  <div className="p-2.5 bg-[var(--lime)]/15 text-[var(--lime-dark)] dark:text-[var(--lime)] border border-[var(--lime)]/30 rounded-xl">
+                    <ListFilter size={18} />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-bold text-[var(--foreground)]">Filtros Dinâmicos</h5>
+                    <p className="text-[11px] text-[var(--muted)] font-medium mt-0.5">Refinamento Instantâneo</p>
+                  </div>
+                </div>
+
+                {/* Atendimento */}
+                <div className="flex-1 w-full lg:w-48 space-y-1.5">
+                  <label className="text-[11px] font-semibold text-[var(--foreground-secondary)] flex items-center gap-1.5">
+                    <Search size={12} className="text-[var(--lime-dark)] dark:text-[var(--lime)]" /> Atendimento
+                  </label>
+                  <div className="relative group">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)] group-focus-within:text-[var(--lime-dark)] dark:group-focus-within:text-[var(--lime)] transition-colors" size={14} />
+                    <input
+                      type="text"
+                      placeholder="Filtrar atendimento..."
+                      value={filterAtendimento}
+                      onChange={(e) => setFilterAtendimento(e.target.value)}
+                      className="w-full bg-[var(--canvas-bg)] border border-[var(--border-subtle)] rounded-xl pl-9 pr-3 py-2 text-xs font-medium text-[var(--foreground)] placeholder:text-[var(--muted)] outline-none focus:border-[var(--lime)] focus:ring-1 focus:ring-[var(--lime)]/20 transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Custom Selects Horizontais */}
+                <EnhancedMultiSelect
+                  label="Prestadores"
+                  icon={Stethoscope}
+                  options={filterOptions.prestadores}
+                  value={selectedPrestadores}
+                  onChange={setSelectedPrestadores}
+                  placeholder="Filtrar por nome..."
+                />
+
+                <EnhancedMultiSelect
+                  label="Unidades"
+                  icon={Building2}
+                  options={filterOptions.unidades}
+                  value={selectedUnidades}
+                  onChange={setSelectedUnidades}
+                  placeholder="Filtrar unidade..."
+                />
+
+                {/* Botão de Reset Integrado */}
+                <button
+                  onClick={() => {
+                    setFilterAtendimento('');
+                    setSelectedUnidades([]);
+                    setSelectedPrestadores([]);
+                  }}
+                  className="h-[38px] px-4 sylva-pill rounded-xl text-xs font-semibold transition-all text-[var(--foreground-secondary)] hover:text-rose-500 hover:border-rose-500/30 flex items-center justify-center gap-2 group whitespace-nowrap cursor-pointer shadow-xs"
+                  title="Resetar todos os filtros"
+                >
+                  <RefreshCw size={13} className="group-hover:rotate-180 transition-transform duration-500" />
+                  <span>Limpar</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Tabela de Resultados Final */}
+            <div className="sylva-card rounded-2xl border border-[var(--border-subtle)] flex flex-col shadow-xs overflow-hidden relative">
+              <div className="flex-1 overflow-x-auto scrollbar-thin">
+                <table className="w-full text-left border-collapse table-auto min-w-max">
+                  <thead>
+                    <tr className="bg-[var(--dock-bg)] text-[var(--foreground-secondary)] border-b border-[var(--border-subtle)]">
+                      <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-center">Atendimento</th>
+                      <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider">Registro Clínico</th>
+                      <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider">Empresa</th>
+                      <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider">Data e Hora</th>
+                      <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-center">Prestador</th>
+                      <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider">Localização</th>
+                      <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-center">Similaridade</th>
+                      <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-center">Auditoria</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border-subtle)]/50">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={8} className="py-24 text-center bg-[var(--card-bg)]">
+                          <div className="flex flex-col items-center gap-4">
+                            <div className="relative">
+                              <div className="w-14 h-14 border-4 border-[var(--border-subtle)] border-t-[var(--lime)] rounded-full animate-spin"></div>
+                              <ScanEye className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[var(--lime-dark)] dark:text-[var(--lime)]" size={22} />
+                            </div>
+                            <div className="space-y-1">
+                              <span className="text-xs font-bold uppercase tracking-widest text-[var(--foreground)] block">Processando Similaridade</span>
+                              <span className="text-[11px] font-medium text-[var(--muted)] block">Isolando padrões de texto via NLP Oracle...</span>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : paginatedData.length > 0 ? (
+                      paginatedData.map((row, idx) => {
+                        const score = Number(getVal(row, 'SCORE')) || 0;
+                        return (
+                          <tr key={idx} className="hover:bg-[var(--hover-bg)] transition-colors group/tr">
+                            <td className="px-4 py-3.5 text-xs font-bold text-center text-[var(--foreground)] font-mono">{getVal(row, 'ATENDIMENTO')}</td>
+                            <td className="px-4 py-3.5">
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 bg-[var(--lime)]/15 text-[var(--lime-dark)] dark:text-[var(--lime)] border border-[var(--lime)]/30 rounded-xl flex items-center justify-center shrink-0">
+                                  <FileText size={16} />
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="text-xs font-semibold text-[var(--foreground)] leading-tight mb-1">{getVal(row, 'NOME_DOCUMENTO')}</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] font-semibold text-[var(--muted)] bg-[var(--canvas-bg)] border border-[var(--border-subtle)] px-2 py-0.5 rounded-md font-mono">ID: {getVal(row, 'DOCUMENTO')}</span>
+                                    <span className="text-[10px] font-semibold text-[var(--lime-dark)] dark:text-[var(--lime)] bg-[var(--lime)]/10 px-2 py-0.5 rounded-md font-mono">{getVal(row, 'IDENTIFICADOR')}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <div className="flex items-center gap-1.5">
+                                <Building2 size={13} className="text-[var(--muted)]" />
+                                <span className="text-[11px] font-semibold text-[var(--foreground-secondary)]">{getVal(row, 'NOME_EMPRESA') || getVal(row, 'CD_EMPRESA') || '—'}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)]">
+                                <Calendar size={13} className="text-[var(--muted)]" />
+                                <span className="text-[11px] font-medium font-mono">
+                                  {(() => {
+                                    const iso = getVal(row, 'DATA_HORA_ISO');
+                                    const raw = getVal(row, 'DATA_HORA');
+                                    const d = iso ? new Date(iso.replace(' ', 'T')) : new Date(raw);
+                                    return isNaN(d.getTime()) ? 'Data Inválida' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                                  })()}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3.5 text-center">
+                               <div className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-[var(--canvas-bg)] border border-[var(--border-subtle)] text-[var(--foreground-secondary)] group-hover/tr:border-[var(--lime)] group-hover/tr:text-[var(--lime-dark)] dark:group-hover/tr:text-[var(--lime)] transition-all" title={getVal(row, 'PRESTADOR')}>
+                                 <User size={16} />
+                               </div>
+                               <p className="text-[10px] font-bold text-[var(--foreground-secondary)] mt-1 font-mono">{getVal(row, 'PRESTADOR')}</p>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <div className="flex flex-col gap-0.5">
+                                <div className="flex items-center gap-1.5">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--lime)]"></div>
+                                  <span className="text-xs font-bold text-[var(--foreground)]">{getVal(row, 'LEITO') || 'N/A'}</span>
+                                </div>
+                                <span className="text-[10px] font-medium text-[var(--muted)]">{getVal(row, 'UNIDADE') || 'SETOR EXTERNO'}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3.5 text-center">
+                              <div className="flex flex-col items-center gap-1">
+                                <div className="w-full max-w-[80px] h-1.5 bg-[var(--border-subtle)] rounded-full overflow-hidden">
+                                  <div className={`h-full transition-all duration-1000 ${score >= 80 ? 'bg-rose-500' : score >= 50 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${score}%` }}></div>
+                                </div>
+                                <span className={`text-xs font-bold font-mono ${score >= 80 ? 'text-rose-600 dark:text-rose-400' : score >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                  {score.toFixed(1)}%
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3.5 text-center">
+                              <button
+                                onClick={() => {
+                                  setComparingDoc(row);
+                                  fetchComparison(row);
+                                }}
+                                className="w-9 h-9 inline-flex items-center justify-center sylva-pill text-[var(--foreground)] hover:bg-[var(--lime)] hover:text-[var(--lime-ink)] rounded-xl transition-all cursor-pointer group/btn-audit shadow-xs"
+                                title="Audit NLP Lado a Lado"
+                              >
+                                <Split size={17} className="group-hover/btn-audit:rotate-12 transition-transform" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={8} className="py-24 text-center bg-[var(--card-bg)]">
+                          <div className="flex flex-col items-center justify-center">
+                            <div className="p-6 bg-[var(--canvas-bg)] rounded-2xl mb-4 border border-[var(--border-subtle)]">
+                              <XCircle size={40} className="text-[var(--muted)]" />
+                            </div>
+                            <h3 className="text-sm font-bold text-[var(--foreground)]">Sem Resultados no Refinamento</h3>
+                            <p className="text-xs text-[var(--muted)] font-medium max-w-xs mt-1.5 leading-relaxed">
+                              Não encontramos registros que correspondam aos filtros aplicados nesta janela de tempo.
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Paginação Sylva Dock */}
+              <div className="bg-[var(--dock-bg)] border-t border-[var(--border-subtle)] px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-1.5 h-5 bg-[var(--lime)] rounded-full"></div>
+                    <span className="text-xs font-bold text-[var(--foreground)]">
+                      {filteredData.length} <span className="text-[var(--muted)] font-medium">Matches Analisados</span>
+                    </span>
+                  </div>
+                  <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-[var(--card-bg)] rounded-xl border border-[var(--border-subtle)]">
+                     <p className="text-[11px] font-semibold text-[var(--foreground-secondary)]">Página {currentPage} de {totalPages || 1}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(1)}
+                    className="w-9 h-9 flex items-center justify-center sylva-pill rounded-xl text-[var(--foreground-secondary)] disabled:opacity-35 hover:text-[var(--foreground)] transition-all cursor-pointer"
+                  >
+                    <ChevronFirst size={16} />
+                  </button>
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    className="w-9 h-9 flex items-center justify-center sylva-pill rounded-xl text-[var(--foreground-secondary)] disabled:opacity-35 hover:text-[var(--foreground)] transition-all cursor-pointer"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  
+                  <div className="flex items-center gap-1 px-2">
+                    {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) pageNum = i + 1;
+                      else if (currentPage <= 3) pageNum = i + 1;
+                      else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+                      else pageNum = currentPage - 2 + i;
+
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`w-9 h-9 rounded-xl text-xs font-bold transition-all cursor-pointer ${currentPage === pageNum ? 'bg-[var(--lime)] text-[var(--lime-ink)] shadow-xs' : 'sylva-pill text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'}`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    disabled={currentPage === totalPages || totalPages === 0}
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    className="w-9 h-9 flex items-center justify-center sylva-pill rounded-xl text-[var(--foreground-secondary)] disabled:opacity-35 hover:text-[var(--foreground)] transition-all cursor-pointer"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                  <button
+                    disabled={currentPage === totalPages || totalPages === 0}
+                    onClick={() => setCurrentPage(totalPages)}
+                    className="w-9 h-9 flex items-center justify-center sylva-pill rounded-xl text-[var(--foreground-secondary)] disabled:opacity-35 hover:text-[var(--foreground)] transition-all cursor-pointer"
+                  >
+                    <ChevronLast size={16} />
+                  </button>
                 </div>
               </div>
-              <button
-                onClick={() => window.print()}
-                className="flex items-center gap-2 px-6 py-2.5 bg-card text-slate-200 rounded-md text-[10px] font-black uppercase tracking-widest hover:bg-black hover:shadow-none hover:-translate-y-0.5 transition-all"
-              >
-                <Printer size={16} /> Imprimir Laudo
-              </button>
-            </footer>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
+        {/* Drawer de Comparação Slide-over Side-by-Side Sylva */}
+        {comparingDoc && (
+          <div className="fixed inset-0 z-[100] flex justify-end">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setComparingDoc(null)}></div>
+            
+            <div className="relative w-full max-w-6xl bg-[var(--canvas-bg)] h-full shadow-2xl border-l border-[var(--border-subtle)] flex flex-col animate-in slide-in-from-right duration-500 ease-out">
+              <header className="px-6 py-5 border-b border-[var(--border-subtle)] flex items-center justify-between bg-[var(--card-bg)]/80 backdrop-blur-md">
+                <div className="flex items-center gap-3.5">
+                  <div className="p-2.5 bg-[var(--lime)]/15 text-[var(--lime-dark)] dark:text-[var(--lime)] border border-[var(--lime)]/30 rounded-xl">
+                    <ScanEye size={22} />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tight flex items-center gap-2">
+                      Auditoria NLP Lado a Lado
+                    </h2>
+                    <p className="text-xs text-[var(--muted)] font-medium mt-0.5">
+                      Doc: {getVal(comparingDoc, 'DOCUMENTO')} | <b className="text-[var(--lime-dark)] dark:text-[var(--lime)]">{(Number(getVal(comparingDoc, 'SCORE')) || 0).toFixed(1)}% SIMILAR</b>
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setComparingDoc(null)} className="p-2 sylva-pill rounded-xl transition-colors text-[var(--muted)] hover:text-[var(--foreground)] cursor-pointer">
+                  <X size={20} />
+                </button>
+              </header>
+
+              <div className="flex-1 overflow-hidden flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-[var(--border-subtle)] relative">
+                {/* Texto Anterior */}
+                <div className="flex-1 flex flex-col h-1/2 md:h-full bg-[var(--canvas-bg)]">
+                  <div className="px-6 py-4 border-b border-[var(--border-subtle)] bg-[var(--card-bg)] flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-[var(--foreground)]">Documento Anterior (Original)</span>
+                      {comparisonTexts?.dataAnterior && (
+                        <span className="text-[11px] font-medium text-[var(--muted)] mt-0.5 flex items-center gap-2">
+                          <span>{comparisonTexts.dataAnterior} {comparisonTexts.cdAnterior && `| DOC: ${comparisonTexts.cdAnterior}`}</span>
+                          {comparisonTexts.regAnterior && (
+                            <a
+                              href={`${reportUrl}${comparisonTexts.regAnterior}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="bg-[var(--card-bg)] hover:bg-[var(--lime)] text-[var(--foreground)] hover:text-[var(--lime-ink)] border border-[var(--border-subtle)] px-2.5 py-0.5 rounded-full flex items-center gap-1 transition-colors font-semibold text-[10px]"
+                            >
+                              <Printer size={10} /> PDF
+                            </a>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                    <div className="px-2.5 py-0.5 bg-[var(--card-bg)] text-[var(--muted)] border border-[var(--border-subtle)] rounded-full text-[10px] font-bold tracking-wide">ORIGINAL</div>
+                  </div>
+                  <div className="flex-1 p-6 overflow-y-auto font-serif text-[var(--foreground)] leading-relaxed text-sm scrollbar-thin">
+                    {compLoading ? (
+                      <div className="h-full flex flex-col items-center justify-center space-y-4">
+                        <Loader2 className="animate-spin text-[var(--lime)]" size={32} />
+                      </div>
+                    ) : (
+                      <div className="whitespace-pre-wrap">
+                        <DiffText
+                          oldText={comparisonTexts?.anterior}
+                          newText={comparisonTexts?.atual}
+                          type="previous"
+                          score={Number(getVal(comparingDoc, 'SCORE')) || 0}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Divisor Visual central para telas grandes */}
+                <div className="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[var(--dock-bg)] border border-[var(--border-subtle)] p-2.5 rounded-xl shadow-md z-10 text-[var(--lime-dark)] dark:text-[var(--lime)]">
+                  <Split size={18} strokeWidth={2.5} />
+                </div>
+
+                {/* Texto Atual */}
+                <div className="flex-1 flex flex-col h-1/2 md:h-full bg-[var(--canvas-bg)]">
+                  <div className="px-6 py-4 border-b border-[var(--border-subtle)] bg-[var(--card-bg)] flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-[var(--lime-dark)] dark:text-[var(--lime)]">Documento Atual (Auditoria)</span>
+                      {comparisonTexts?.dataAtual && (
+                        <span className="text-[11px] font-medium text-[var(--muted)] mt-0.5 flex items-center gap-2">
+                          <span>{comparisonTexts.dataAtual} {comparisonTexts.cdAtual && `| DOC: ${comparisonTexts.cdAtual}`}</span>
+                          {comparisonTexts.regAtual && (
+                            <a
+                              href={`${reportUrl}${comparisonTexts.regAtual}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="bg-[var(--card-bg)] hover:bg-[var(--lime)] text-[var(--foreground)] hover:text-[var(--lime-ink)] border border-[var(--border-subtle)] px-2.5 py-0.5 rounded-full flex items-center gap-1 transition-colors font-semibold text-[10px]"
+                            >
+                              <Printer size={10} /> PDF
+                            </a>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                    <div className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border tracking-wide ${getScoreColor(Number(getVal(comparingDoc, 'SCORE')) || 0)}`}>
+                      {(Number(getVal(comparingDoc, 'SCORE')) || 0).toFixed(1)}% SIMILAR
+                    </div>
+                  </div>
+                  <div className="flex-1 p-6 overflow-y-auto font-serif text-[var(--foreground)] leading-relaxed text-sm scrollbar-thin">
+                    {compLoading ? (
+                      <div className="h-full flex flex-col items-center justify-center space-y-4">
+                        <Loader2 className="animate-spin text-[var(--lime)]" size={32} />
+                      </div>
+                    ) : (
+                      <div className="whitespace-pre-wrap">
+                        <DiffText
+                          oldText={comparisonTexts?.anterior}
+                          newText={comparisonTexts?.atual}
+                          type="current"
+                          score={Number(getVal(comparingDoc, 'SCORE')) || 0}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <footer className="px-6 py-4 bg-[var(--dock-bg)] border-t border-[var(--border-subtle)] flex items-center justify-between">
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-2">
+                    <Building2 size={14} className="text-[var(--lime-dark)] dark:text-[var(--lime)]" />
+                    <span className="text-xs font-semibold text-[var(--foreground)]">{getVal(comparingDoc, 'LEITO')} | {getVal(comparingDoc, 'UNIDADE')}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Stethoscope size={14} className="text-[var(--lime-dark)] dark:text-[var(--lime)]" />
+                    <span className="text-xs font-semibold text-[var(--foreground)]">{getVal(comparingDoc, 'PRESTADOR')}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-2 px-5 py-2 bg-[var(--lime)] text-[var(--lime-ink)] font-bold rounded-xl text-xs transition-all cursor-pointer shadow-[0_4px_14px_rgba(204,243,82,0.25)] hover:brightness-105"
+                >
+                  <Printer size={15} /> Imprimir Laudo
+                </button>
+              </footer>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal de Acompanhamento do Script Python */}
       {scriptModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
-            <header className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="sylva-card bg-[var(--dock-bg)] border border-[var(--border-subtle)] rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            <header className="px-6 py-4 border-b border-[var(--border-subtle)] flex items-center justify-between bg-[var(--card-bg)]">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-sky-500/10 text-sky-400 rounded-lg">
+                <div className="p-2 bg-[var(--lime)]/15 text-[var(--lime-dark)] dark:text-[var(--lime)] border border-[var(--lime)]/30 rounded-xl">
                   <Play size={18} className={isRunningScript ? "animate-spin" : ""} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-white">Motor de Auditoria NLP (Python)</h3>
-                  <p className="text-xs text-slate-400">Processamento assíncrono de similaridade e cópia/cola</p>
+                  <h3 className="text-sm font-semibold text-[var(--foreground)]">Motor de Auditoria NLP (Python)</h3>
+                  <p className="text-xs text-[var(--muted)]">Processamento assíncrono de similaridade e cópia/cola</p>
                 </div>
               </div>
               <button
                 onClick={() => setScriptModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+                className="p-1.5 text-[var(--muted)] hover:text-[var(--foreground)] rounded-lg hover:bg-[var(--card-bg)] transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
             </header>
 
-            <div className="p-6 bg-slate-950 font-mono text-xs text-slate-300 overflow-y-auto flex-1 space-y-1 scrollbar-thin scrollbar-thumb-slate-800">
+            <div className="p-6 bg-black/60 font-mono text-xs text-[var(--foreground)] overflow-y-auto flex-1 space-y-1 scrollbar-thin">
               {scriptLogs.map((log, i) => (
-                <div key={i} className={log.includes('[ERRO]') || log.includes('[ERROR]') ? 'text-rose-400' : log.includes('[SUCESSO]') || log.includes('[FINISH]') ? 'text-emerald-400 font-bold' : log.includes('[PROGRESS]') ? 'text-sky-400 font-bold' : 'text-slate-400'}>
+                <div key={i} className={log.includes('[ERRO]') || log.includes('[ERROR]') ? 'text-rose-400' : log.includes('[SUCESSO]') || log.includes('[FINISH]') ? 'text-[var(--lime)] font-bold' : log.includes('[PROGRESS]') ? 'text-emerald-300 font-bold' : 'text-slate-300'}>
                   {log}
                 </div>
               ))}
               {isRunningScript && (
-                <div className="flex items-center gap-2 text-sky-400 pt-2 animate-pulse">
+                <div className="flex items-center gap-2 text-[var(--lime)] pt-2 animate-pulse">
                   <Loader2 size={14} className="animate-spin" />
                   <span>Processando registros clínicos via Oracle...</span>
                 </div>
               )}
             </div>
 
-            <footer className="px-6 py-3.5 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between">
-              <span className="text-xs text-slate-500">
+            <footer className="px-6 py-3.5 border-t border-[var(--border-subtle)] bg-[var(--card-bg)] flex items-center justify-between">
+              <span className="text-xs text-[var(--muted)]">
                 {isRunningScript ? 'Execução em andamento. Não feche a conexão.' : 'Processo concluído.'}
               </span>
               <button
@@ -1575,7 +1546,7 @@ export default function SimilaridadePage() {
                     handleSearch();
                   }
                 }}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-md text-xs font-semibold transition-colors"
+                className="px-4 py-2 bg-[var(--lime)] text-[var(--lime-ink)] font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer hover:brightness-105"
               >
                 {isRunningScript ? 'Ocultar' : 'Fechar e Atualizar'}
               </button>
@@ -1585,7 +1556,7 @@ export default function SimilaridadePage() {
       )}
 
       {/* Aba de Mapeamentos */}
-      <div className={activeTab === 'mapeamentos' ? 'mt-8 animate-in fade-in duration-300' : 'hidden'}>
+      <div className={activeTab === 'mapeamentos' ? 'mt-4 animate-in fade-in duration-300' : 'hidden'}>
         <MapeamentosTab docMappings={docMappings} onSave={handleSaveMappings} />
       </div>
     </div>

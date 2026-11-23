@@ -1,9 +1,9 @@
 "use client";
 
 import React from 'react';
-import { 
-  ChevronUp, ChevronDown, Info, 
-  Database, Layers, Check, X
+import {
+  ChevronUp, ChevronDown, Info,
+  Database, Layers
 } from 'lucide-react';
 import { cn, formatDateTime, isDateLike } from '@/lib/utils';
 
@@ -11,11 +11,9 @@ interface DocumentosTableProps {
   columns: string[];
   data: any[];
   loading: boolean;
-  density: 'compact' | 'normal';
   sortConfig: { key: string; direction: 'asc' | 'desc' | null };
   onSort: (col: string) => void;
-  onOpenDrawer: (code: string) => void;
-  onOpenProfiles: (code: string, name?: string) => void;
+  onOpenModal: (code: string, name?: string, initialTab?: 'specs' | 'profiles') => void;
   activeHospitals: { id: number; sigla: string }[];
   selectedHospitals: string[];
   currentPage: number;
@@ -30,11 +28,9 @@ export function DocumentosTable({
   columns,
   data,
   loading,
-  density,
   sortConfig,
   onSort,
-  onOpenDrawer,
-  onOpenProfiles,
+  onOpenModal,
   activeHospitals,
   selectedHospitals,
   currentPage,
@@ -56,56 +52,60 @@ export function DocumentosTable({
     return selectedHospitals.includes(col.toUpperCase());
   });
 
-  // Padronização tipográfica e de espaçamento conforme a densidade
-  const rowPadding = density === 'compact' ? 'py-1.5 px-3' : 'py-2.5 px-3.5';
-  const headerPadding = density === 'compact' ? 'py-2 px-3' : 'py-3 px-3.5';
-  const fontSize = density === 'compact' ? 'text-[11px]' : 'text-xs';
-  const dateFontSize = density === 'compact' ? 'text-[10px]' : 'text-[11px]';
+  // Padronização fixa no modo compacto
+  const rowPadding = 'py-1.5 px-3';
+  const headerPadding = 'py-2.5 px-3';
+  const fontSize = 'text-[11px]';
+  const dateFontSize = 'text-[10px]';
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col">
+    <div className="sylva-glass rounded-[24px] overflow-hidden flex flex-col">
       {/* Table Container with Horizontal Scroll */}
       <div className="relative overflow-x-auto scrollbar-thin max-w-full">
         <table className={cn("w-full border-collapse text-left", fontSize)}>
-          {/* Header Padronizado */}
+          {/* Header Sylva */}
           <thead>
-            <tr className="bg-slate-100/90 border-b border-slate-200/80 text-[11px] font-semibold uppercase tracking-wider text-slate-600 select-none">
+            <tr className="border-b border-[var(--border)] text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)] select-none">
               {/* Sticky Col 1: CÓDIGO */}
-              <th 
+              <th
                 className={cn(
-                  "sticky left-0 z-20 bg-slate-100/95 backdrop-blur-xs border-r border-slate-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)] min-w-[90px]",
+                  "sticky left-0 z-20 bg-[var(--surface-sticky)] border-r border-[var(--border)] min-w-[90px] relative",
                   headerPadding
                 )}
                 onClick={() => onSort('CÓDIGO')}
               >
                 <div className="flex items-center justify-between cursor-pointer group">
-                  <span className="group-hover:text-[#004953] transition-colors">CÓDIGO</span>
+                  <span className="group-hover:text-[var(--foreground)] transition-colors">CÓDIGO</span>
                   {sortConfig.key === 'CÓDIGO' && (
-                    sortConfig.direction === 'asc' ? <ChevronUp size={13} className="text-[#004953]" /> : <ChevronDown size={13} className="text-[#004953]" />
+                    sortConfig.direction === 'asc'
+                      ? <ChevronUp size={13} className="text-[var(--accent-ink)]" />
+                      : <ChevronDown size={13} className="text-[var(--accent-ink)]" />
                   )}
                 </div>
-                <div 
-                  className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-sky-400"
+                <div
+                  className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--lime)]/50"
                   onMouseDown={(e) => onResizeStart('CÓDIGO', e)}
                 />
               </th>
 
               {/* Sticky Col 2: NOME */}
-              <th 
+              <th
                 className={cn(
-                  "sticky left-[90px] z-20 bg-slate-100/95 backdrop-blur-xs border-r border-slate-200/80 shadow-[3px_0_5px_-2px_rgba(0,0,0,0.08)] min-w-[280px] max-w-[380px]",
+                  "sticky left-[90px] z-20 bg-[var(--surface-sticky)] border-r border-[var(--border)] shadow-[6px_0_12px_-8px_rgba(0,0,0,0.35)] min-w-[280px] max-w-[380px] relative",
                   headerPadding
                 )}
                 onClick={() => onSort('NOME')}
               >
                 <div className="flex items-center justify-between cursor-pointer group">
-                  <span className="group-hover:text-[#004953] transition-colors">DOCUMENTO CLÍNICO</span>
+                  <span className="group-hover:text-[var(--foreground)] transition-colors">DOCUMENTO CLÍNICO</span>
                   {sortConfig.key === 'NOME' && (
-                    sortConfig.direction === 'asc' ? <ChevronUp size={13} className="text-[#004953]" /> : <ChevronDown size={13} className="text-[#004953]" />
+                    sortConfig.direction === 'asc'
+                      ? <ChevronUp size={13} className="text-[var(--accent-ink)]" />
+                      : <ChevronDown size={13} className="text-[var(--accent-ink)]" />
                   )}
                 </div>
-                <div 
-                  className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-sky-400"
+                <div
+                  className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--lime)]/50"
                   onMouseDown={(e) => onResizeStart('NOME', e)}
                 />
               </th>
@@ -121,25 +121,24 @@ export function DocumentosTable({
                     key={col}
                     style={width ? { width: `${width}px`, minWidth: `${width}px` } : undefined}
                     className={cn(
-                      "border-r border-slate-200/70 whitespace-nowrap text-center relative",
+                      "whitespace-nowrap text-center relative bg-[var(--surface-sticky)] border-r border-[var(--border)]",
                       headerPadding,
-                      isHospital ? "bg-slate-50/70 text-slate-800 font-bold font-mono" : "bg-slate-100/90 text-slate-600 font-semibold"
+                      isHospital && "font-mono"
                     )}
                     onClick={() => onSort(col)}
                   >
                     <div className="flex items-center justify-center gap-1 cursor-pointer group">
-                      <span className={cn(
-                        "group-hover:text-[#004953] transition-colors",
-                        isHospital && "text-slate-900 font-bold"
-                      )}>
+                      <span className="group-hover:text-[var(--foreground)] transition-colors">
                         {col}
                       </span>
                       {isSorted && (
-                        sortConfig.direction === 'asc' ? <ChevronUp size={13} className="text-[#004953]" /> : <ChevronDown size={13} className="text-[#004953]" />
+                        sortConfig.direction === 'asc'
+                          ? <ChevronUp size={13} className="text-[var(--accent-ink)]" />
+                          : <ChevronDown size={13} className="text-[var(--accent-ink)]" />
                       )}
                     </div>
-                    <div 
-                      className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-sky-400"
+                    <div
+                      className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--lime)]/50"
                       onMouseDown={(e) => onResizeStart(col, e)}
                     />
                   </th>
@@ -147,25 +146,25 @@ export function DocumentosTable({
               })}
 
               {/* Action Column */}
-              <th className={cn("text-center text-slate-600 w-24 whitespace-nowrap", headerPadding)}>
+              <th className={cn("text-center bg-[var(--surface-sticky)] w-24 whitespace-nowrap", headerPadding)}>
                 AÇÕES
               </th>
             </tr>
           </thead>
 
           {/* Body Padronizado */}
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-[var(--border-subtle)]">
             {loading ? (
               Array.from({ length: 10 }).map((_, idx) => (
                 <tr key={idx} className="animate-pulse">
-                  <td className={cn("sticky left-0 bg-white border-r border-slate-200", rowPadding)}>
+                  <td className={cn("sticky left-0 bg-[var(--surface-sticky)] border-r border-[var(--border)]", rowPadding)}>
                     <div className="skeleton h-4 w-12" />
                   </td>
-                  <td className={cn("sticky left-[90px] bg-white border-r border-slate-200", rowPadding)}>
+                  <td className={cn("sticky left-[90px] bg-[var(--surface-sticky)] border-r border-[var(--border)]", rowPadding)}>
                     <div className="skeleton h-4 w-48" />
                   </td>
                   {displayedColumns.filter(c => c !== 'CÓDIGO' && c !== 'NOME').map(c => (
-                    <td key={c} className={cn("border-r border-slate-100", rowPadding)}>
+                    <td key={c} className={cn("border-r border-[var(--border-subtle)]", rowPadding)}>
                       <div className="skeleton h-4 w-12 mx-auto" />
                     </td>
                   ))}
@@ -176,8 +175,8 @@ export function DocumentosTable({
               ))
             ) : data.length === 0 ? (
               <tr>
-                <td colSpan={displayedColumns.length + 1} className="py-16 text-center text-slate-400">
-                  <Database size={36} className="mx-auto mb-2 opacity-30 text-sky-600" />
+                <td colSpan={displayedColumns.length + 1} className="py-16 text-center text-[var(--muted)]">
+                  <Database size={36} className="mx-auto mb-2 opacity-35 text-[var(--muted)]" />
                   <p className="text-xs font-semibold">Nenhum documento clínico encontrado com os filtros atuais</p>
                 </td>
               </tr>
@@ -187,38 +186,33 @@ export function DocumentosTable({
                 const docName = String(row['DOCUMENTO CLÍNICO'] || row['NOME'] || row['DS_DOCUMENTO'] || 'Sem Nome');
 
                 return (
-                  <tr 
+                  <tr
                     key={docId || rIdx}
-                    className={cn(
-                      "group transition-colors border-b border-slate-100 hover:bg-sky-50/40",
-                      rIdx % 2 === 0 ? "bg-white" : "bg-slate-50/30"
-                    )}
+                    className="group border-b border-[var(--border-subtle)] hover:bg-[var(--card-subtle)] transition-colors"
                   >
-                    {/* Sticky Col 1: CÓDIGO - Abre gaveta inferior de perfis */}
-                    <td 
+                    {/* Sticky Col 1: CÓDIGO - Abre Modal na aba Perfis */}
+                    <td
                       className={cn(
-                        "sticky left-0 z-10 border-r border-slate-200/80 font-mono font-bold text-[#004953] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)] cursor-pointer group-hover:underline",
-                        rowPadding,
-                        rIdx % 2 === 0 ? "bg-white group-hover:bg-sky-50/70" : "bg-slate-50/40 group-hover:bg-sky-50/70"
+                        "sticky left-0 z-10 border-r border-[var(--border)] bg-[var(--surface-sticky)] group-hover:bg-[var(--surface-sticky-hover)] cursor-pointer transition-colors",
+                        rowPadding
                       )}
-                      onClick={() => onOpenProfiles(docId, docName)}
-                      title="Clique para abrir Gaveta Inferior de Perfis Ambulatoriais"
+                      onClick={() => onOpenModal(docId, docName, 'profiles')}
+                      title="Clique para inspecionar Perfis Ambulatoriais deste documento"
                     >
-                      <div className="flex items-center gap-1.5">
-                        <Layers size={12} className="text-[#004953]/70 group-hover:text-[#004953] shrink-0" />
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-mono font-bold bg-[var(--card-subtle)] border border-[var(--border)] text-[var(--foreground-secondary)] group-hover:text-[var(--accent-ink)] group-hover:border-[var(--tint-olive-border)] transition-colors">
+                        <Layers size={11} className="shrink-0" />
                         <span>#{docId}</span>
-                      </div>
+                      </span>
                     </td>
 
-                    {/* Sticky Col 2: NOME - Abre gaveta inferior de perfis */}
-                    <td 
+                    {/* Sticky Col 2: NOME - Abre Modal nos Detalhes */}
+                    <td
                       className={cn(
-                        "sticky left-[90px] z-10 border-r border-slate-200/80 font-medium text-slate-800 shadow-[3px_0_5px_-2px_rgba(0,0,0,0.08)] cursor-pointer truncate max-w-[380px] group-hover:text-[#004953]",
-                        rowPadding,
-                        rIdx % 2 === 0 ? "bg-white group-hover:bg-sky-50/70" : "bg-slate-50/40 group-hover:bg-sky-50/70"
+                        "sticky left-[90px] z-10 border-r border-[var(--border)] bg-[var(--surface-sticky)] group-hover:bg-[var(--surface-sticky-hover)] shadow-[6px_0_12px_-8px_rgba(0,0,0,0.35)] font-medium text-[var(--foreground)] group-hover:text-[var(--accent-ink)] cursor-pointer truncate max-w-[380px] transition-colors",
+                        rowPadding
                       )}
-                      onClick={() => onOpenProfiles(docId, docName)}
-                      title={`${docName} - Clique para abrir Perfis Ambulatoriais`}
+                      onClick={() => onOpenModal(docId, docName, 'specs')}
+                      title={`${docName} - Clique para abrir Detalhes e Metadados`}
                     >
                       {docName}
                     </td>
@@ -231,41 +225,39 @@ export function DocumentosTable({
                       const hasUsage = !isNaN(numVal) && numVal > 0;
 
                       return (
-                        <td 
+                        <td
                           key={col}
                           className={cn(
-                            "border-r border-slate-100 text-center font-mono tabular-nums whitespace-nowrap",
+                            "border-r border-[var(--border-subtle)] text-center font-mono tabular-nums whitespace-nowrap",
                             rowPadding
                           )}
                         >
                           {isHospital ? (
                             hasUsage ? (
-                              <span 
-                                className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-2xs mx-auto"
+                              <span
+                                className="inline-block w-2.5 h-2.5 rounded-full bg-[var(--lime)] shadow-[0_0_10px_var(--lime)]"
                                 title={`Em uso em ${col}`}
-                              >
-                                <Check size={12} strokeWidth={2.5} />
-                              </span>
+                              />
                             ) : (
-                              <span 
-                                className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-50 text-slate-300 border border-slate-200/70 shadow-2xs mx-auto"
+                              <span
+                                className="inline-block w-2 h-2 rounded-full border border-[var(--border-strong)]"
                                 title={`Sem uso em ${col}`}
-                              >
-                                <X size={12} strokeWidth={2} />
-                              </span>
+                              />
                             )
                           ) : (
-                            <span className="text-slate-700">
+                            <span>
                               {isDateLike(val, col) ? (
-                                <span className={cn("font-mono text-slate-600 font-medium whitespace-nowrap", dateFontSize)}>
+                                <span className={cn("font-mono text-[var(--muted)] font-medium whitespace-nowrap", dateFontSize)}>
                                   {formatDateTime(val)}
                                 </span>
                               ) : (
                                 val !== undefined && val !== null ? (
-                                  <span className="font-semibold text-slate-800 font-mono">
+                                  <span className="font-semibold text-[var(--foreground)] font-mono tabular-nums">
                                     {typeof val === 'number' ? val.toLocaleString('pt-BR') : String(val)}
                                   </span>
-                                ) : '—'
+                                ) : (
+                                  <span className="text-[var(--muted)]">—</span>
+                                )
                               )}
                             </span>
                           )}
@@ -273,23 +265,25 @@ export function DocumentosTable({
                       );
                     })}
 
-                    {/* Action Cell com 2 botões padronizados */}
+                    {/* Action Cell com 2 atalhos diretos para o Modal Unificado */}
                     <td className={cn("text-center whitespace-nowrap", rowPadding)}>
                       <div className="flex items-center justify-center gap-1">
-                        {/* Botão 1: Abrir Gaveta Inferior de Perfis */}
                         <button
-                          onClick={() => onOpenProfiles(docId, docName)}
+                          type="button"
+                          aria-label="Abrir Perfis Ambulatoriais deste Documento"
+                          onClick={() => onOpenModal(docId, docName, 'profiles')}
                           title="Abrir Perfis Ambulatoriais deste Documento"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-[#004953] hover:bg-teal-50 transition-all cursor-pointer"
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] opacity-60 group-hover:opacity-100 transition-all cursor-pointer"
                         >
                           <Layers size={14} />
                         </button>
 
-                        {/* Botão 2: Abrir Gaveta Lateral de Metadados / Regras */}
                         <button
-                          onClick={() => onOpenDrawer(docId)}
-                          title="Inspecionar Metadados e Regras SQL"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-sky-700 hover:bg-sky-50 transition-all cursor-pointer"
+                          type="button"
+                          aria-label="Inspecionar Metadados, Regras e Campos"
+                          onClick={() => onOpenModal(docId, docName, 'specs')}
+                          title="Inspecionar Metadados, Regras e Campos"
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] opacity-60 group-hover:opacity-100 transition-all cursor-pointer"
                         >
                           <Info size={14} />
                         </button>
@@ -304,27 +298,32 @@ export function DocumentosTable({
       </div>
 
       {/* Pagination Footer Padronizado */}
-      <div className="p-3.5 border-t border-slate-200/80 bg-slate-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600">
+      <div className="px-4 py-3 border-t border-[var(--border)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[var(--foreground-secondary)]">
         <div className="flex items-center gap-2">
-          <span>Exibindo <b>{data.length}</b> de <b>{totalFiltered}</b> documentos</span>
+          <span>
+            Exibindo <b className="text-[var(--foreground)]">{data.length}</b> de{' '}
+            <b className="text-[var(--foreground)]">{totalFiltered}</b> documentos
+          </span>
         </div>
 
         {totalPages > 1 && (
           <div className="flex items-center gap-1.5 self-center sm:self-auto">
             <button
+              type="button"
               onClick={() => onPageChange(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
-              className="px-3 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none text-xs font-semibold text-slate-700 transition-all shadow-2xs cursor-pointer"
+              className="h-8 px-3.5 rounded-full sylva-pill text-xs font-semibold text-[var(--foreground)] disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
             >
               Anterior
             </button>
-            <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 font-mono font-bold text-slate-800 text-xs">
+            <span className="px-3 py-1 rounded-full bg-[var(--card-subtle)] border border-[var(--border)] font-mono font-bold text-[var(--foreground)] text-xs">
               {currentPage} / {totalPages}
             </span>
             <button
+              type="button"
               onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
-              className="px-3 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none text-xs font-semibold text-slate-700 transition-all shadow-2xs cursor-pointer"
+              className="h-8 px-3.5 rounded-full sylva-pill text-xs font-semibold text-[var(--foreground)] disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
             >
               Próxima
             </button>

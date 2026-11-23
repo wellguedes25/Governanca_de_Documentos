@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Settings, Database, Plus, Trash2, Edit2, Check, FlaskConical, AlertTriangle } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { useUI } from '@/context/UIContext';
 
 interface DbConnection {
   id: string;
@@ -13,6 +14,7 @@ interface DbConnection {
 }
 
 export default function ConfigConexoesPage() {
+  const { confirmAction } = useUI();
   const [connections, setConnections] = useState<DbConnection[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<DbConnection>>({
@@ -76,7 +78,14 @@ export default function ConfigConexoesPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Tem certeza que deseja excluir esta conexão?')) return;
+    const confirmed = await confirmAction({
+      title: 'Excluir Conexão Oracle',
+      description: 'Tem certeza que deseja excluir esta conexão salva?',
+      confirmLabel: 'Excluir Conexão',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     
     try {
       const res = await fetch('/api/connections', {
@@ -129,9 +138,9 @@ export default function ConfigConexoesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 flex flex-col p-4 md:p-8 space-y-6 pb-24">
+    <div className="flex flex-col space-y-5">
       {/* 1. Header Padronizado */}
-      <div className="pb-4 border-b border-slate-200/80">
+      <div className="pb-3 border-b border-[#E0ECE9]">
         <PageHeader 
           title="Infraestrutura Oracle"
           subtitle="Gerenciamento de instâncias e conectividade thick-mode para ambientes DBAMV"
@@ -146,22 +155,22 @@ export default function ConfigConexoesPage() {
         />
       </div>
 
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs max-w-3xl">
+      <div className="bg-white border border-[#E0ECE9] rounded-2xl p-6 shadow-2xs max-w-3xl">
         <h4 className="text-[11px] font-bold text-slate-700 mb-3 uppercase tracking-wider flex items-center gap-2">
-          <Database size={14} className="text-sky-600" />
+          <Database size={14} className="text-[#074E52]" />
           Oracle Client Path (Thick Mode)
         </h4>
         <div className="flex gap-2">
           <input 
             type="text" 
             placeholder="Ex: C:\instantclient_23_0"
-            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs text-slate-800 outline-none focus:border-sky-500 focus:bg-white transition-all font-mono"
+            className="flex-1 bg-[#F7FAF9] border border-[#D5E4E0] rounded-xl px-4 py-2 text-xs text-[#0F2426] placeholder:text-slate-400 outline-none focus:border-[#074E52] focus:bg-white transition-all font-mono"
             value={clientPath}
             onChange={e => setClientPath(e.target.value)}
           />
           <button 
             onClick={handleSaveClientPath}
-            className="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-5 py-2 rounded-xl transition-all cursor-pointer shadow-2xs"
+            className="bg-[#074E52] hover:bg-[#053A3D] text-white text-xs font-semibold px-5 py-2 rounded-xl transition-all cursor-pointer shadow-2xs"
           >
             Configurar
           </button>
@@ -172,73 +181,73 @@ export default function ConfigConexoesPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Form para Nova Conexão */}
-        <div className="bg-background rounded-none p-8 h-fit border border-border shadow-none relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-1 h-full bg-[var(--primary)]"></div>
-          <h3 className="text-lg font-black text-foreground mb-8 flex items-center gap-3 uppercase italic tracking-tighter border-b -border pb-4">
-            <Plus size={20} className="text-[var(--primary)]" />
+        <div className="bg-white rounded-2xl p-6 h-fit border border-[#E0ECE9] shadow-2xs relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-[#074E52]"></div>
+          <h3 className="text-base font-bold text-[#0F2426] mb-5 flex items-center gap-2.5 tracking-tight border-b border-[#E0ECE9] pb-3.5">
+            <Plus size={18} className="text-[#074E52]" />
             {formData.id ? 'Modificar Registro' : 'Novo Ambiente'}
           </h3>
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div>
-              <label className="text-[9px] text-muted uppercase font-black tracking-[0.2em] block mb-1.5">Nome do Ambiente</label>
+              <label className="text-[11px] text-slate-600 font-semibold block mb-1.5">Nome do Ambiente</label>
               <input 
                 type="text" 
                 placeholder="PRODUÇÃO / HOMOLOG"
                 autoComplete="off"
-                className="w-full bg-card border border-border rounded-none px-4 py-2.5 text-[11px] font-bold text-foreground focus:border-[var(--primary)] outline-none transition-all -muted"
+                className="w-full bg-[#F7FAF9] border border-[#D5E4E0] rounded-xl px-3.5 py-2.5 text-xs font-medium text-[#0F2426] placeholder:text-slate-400 focus:border-[#074E52] focus:bg-white outline-none transition-all"
                 value={formData.name}
                 onChange={e => setFormData({...formData, name: e.target.value})}
               />
             </div>
             <div>
-              <label className="text-[9px] text-muted uppercase font-black tracking-[0.2em] block mb-1.5">DB User</label>
+              <label className="text-[11px] text-slate-600 font-semibold block mb-1.5">DB User</label>
               <input 
                 type="text" 
                 placeholder="System / Dbamv"
                 autoComplete="off"
-                className="w-full bg-card border border-border rounded-none px-4 py-2.5 text-[11px] font-bold text-foreground focus:border-[var(--primary)] outline-none transition-all -muted font-mono"
+                className="w-full bg-[#F7FAF9] border border-[#D5E4E0] rounded-xl px-3.5 py-2.5 text-xs font-medium text-[#0F2426] placeholder:text-slate-400 focus:border-[#074E52] focus:bg-white outline-none transition-all font-mono"
                 value={formData.user}
                 onChange={e => setFormData({...formData, user: e.target.value})}
               />
             </div>
             <div>
-              <label className="text-[9px] text-muted uppercase font-black tracking-[0.2em] block mb-1.5">Password</label>
+              <label className="text-[11px] text-slate-600 font-semibold block mb-1.5">Password</label>
               <input 
                 type="password" 
                 placeholder="••••••••"
                 autoComplete="new-password"
-                className="w-full bg-card border border-border rounded-none px-4 py-2.5 text-[11px] font-bold text-foreground focus:border-[var(--primary)] outline-none transition-all -muted"
+                className="w-full bg-[#F7FAF9] border border-[#D5E4E0] rounded-xl px-3.5 py-2.5 text-xs font-medium text-[#0F2426] placeholder:text-slate-400 focus:border-[#074E52] focus:bg-white outline-none transition-all"
                 value={formData.password}
                 onChange={e => setFormData({...formData, password: e.target.value})}
               />
             </div>
             <div>
-              <label className="text-[9px] text-muted uppercase font-black tracking-[0.2em] block mb-1.5">Connect String (Oracle Service)</label>
+              <label className="text-[11px] text-slate-600 font-semibold block mb-1.5">Connect String (Oracle Service)</label>
               <input 
                 type="text" 
                 placeholder="host:port/service_name"
                 autoComplete="off"
-                className="w-full bg-card border border-border rounded-none px-4 py-2.5 text-[11px] font-bold text-foreground focus:border-[var(--primary)] outline-none transition-all -muted font-mono"
+                className="w-full bg-[#F7FAF9] border border-[#D5E4E0] rounded-xl px-3.5 py-2.5 text-xs font-medium text-[#0F2426] placeholder:text-slate-400 focus:border-[#074E52] focus:bg-white outline-none transition-all font-mono"
                 value={formData.connectString}
                 onChange={e => setFormData({...formData, connectString: e.target.value})}
               />
             </div>
-            <div className="flex gap-2 pt-4">
+            <div className="flex gap-2 pt-3">
               <button 
                 onClick={handleSave}
                 disabled={loading}
-                className="flex-1 bg-[var(--primary)] hover:brightness-110 text-foreground text-[10px] font-black uppercase tracking-widest py-3 rounded-none transition-all shadow-none shadow-[var(--primary)]/20 disabled:opacity-50"
+                className="flex-1 bg-[#074E52] hover:bg-[#053A3D] text-white text-xs font-semibold py-2.5 rounded-xl transition-all shadow-2xs cursor-pointer disabled:opacity-50"
               >
                 {loading ? 'Processando...' : formData.id ? 'Salvar Alterações' : 'Registrar Conexão'}
               </button>
               {formData.id && (
                 <button 
                   onClick={() => setFormData({ name: '', user: '', password: '', connectString: '' })}
-                  className="-background -card text-muted px-4 py-3 rounded-none transition-all font-bold text-[10px] uppercase"
+                  className="bg-[#F3F7F6] hover:bg-slate-200 text-slate-600 px-4 py-2.5 rounded-xl border border-[#D5E4E0] transition-all font-semibold text-xs cursor-pointer"
                 >
-                  X
+                  Cancelar
                 </button>
               )}
             </div>
@@ -248,58 +257,64 @@ export default function ConfigConexoesPage() {
         {/* Lista de Conexões */}
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between mb-2 px-1">
-             <span className="text-[10px] font-black text-muted uppercase tracking-[0.2em]">Ambientes Mapeados</span>
-             <span className="text-[10px] font-bold text-muted">{connections.length} Instância(s)</span>
+             <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Ambientes Mapeados</span>
+             <span className="text-xs font-semibold text-slate-500">{connections.length} Instância(s)</span>
           </div>
           
           {connections.length === 0 ? (
-            <div className="bg-card rounded-none p-16 text-center border-2 border-dashed border-border">
-              <p className="text-muted font-bold uppercase text-[10px] tracking-widest italic">Nenhuma infraestrutura detectada.</p>
+            <div className="bg-white rounded-2xl p-12 text-center border-2 border-dashed border-[#CBE5DF]">
+              <p className="text-slate-500 font-semibold text-xs">Nenhuma infraestrutura detectada.</p>
             </div>
           ) : (
             connections.map(conn => (
               <div 
                 key={conn.id} 
-                className={`bg-background rounded-none p-6 border-l-4 transition-all shadow-none ${
-                  activeId === conn.id ? 'border-[var(--primary)] shadow-none' : 'border-border'
+                className={`bg-white rounded-2xl p-5 border border-l-4 transition-all shadow-2xs ${
+                  activeId === conn.id
+                    ? 'border-[#E0ECE9] border-l-[#074E52]'
+                    : 'border-[#E0ECE9] border-l-[#CBE5DF] hover:border-[#074E52]/40'
                 }`}
               >
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center space-x-6">
-                    <div className={`w-14 h-14 rounded-none flex items-center justify-center transition-colors border ${activeId === conn.id ? 'bg-[var(--primary)]/10 text-[var(--primary)] border-[var(--primary)]/20' : 'bg-card text-muted border-border'}`}>
-                        <Database size={24} />
+                <div className="flex flex-wrap justify-between items-center gap-4">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors border shrink-0 ${activeId === conn.id ? 'bg-[#E6F4F1] text-[#074E52] border-[#CBE5DF]' : 'bg-[#F3F7F6] text-slate-500 border-[#E0ECE9]'}`}>
+                        <Database size={22} />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-3">
-                        <h4 className="text-lg font-black text-foreground uppercase tracking-tighter italic">{conn.name}</h4>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <h4 className="text-base font-bold text-[#0F2426] tracking-tight normal-case">{conn.name}</h4>
                         {activeId === conn.id ? (
-                          <span className="text-[9px] bg-emerald-500 text-foreground px-2 py-0.5 rounded-none font-black tracking-widest uppercase">Target Ativo</span>
+                          <span className="text-[10px] bg-emerald-600 text-white px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                            <Check size={11} /> Target Ativo
+                          </span>
                         ) : (
-                          <span className="text-[9px] -background text-muted px-2 py-0.5 rounded-none font-black tracking-widest uppercase">Standby</span>
+                          <span className="text-[10px] bg-[#F3F7F6] text-slate-600 border border-[#E0ECE9] px-2.5 py-0.5 rounded-full font-semibold">
+                            Standby
+                          </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-muted font-mono mt-0.5 font-bold uppercase">{conn.user}@<span className="text-muted">{conn.connectString}</span></p>
+                      <p className="text-xs text-slate-600 font-mono mt-1 truncate">{conn.user}@<span className="text-slate-500">{conn.connectString}</span></p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center gap-2">
                     <button 
                       onClick={() => testConn(conn.id)}
                       title="Testar Latência"
-                      className="p-3 text-muted hover:text-[var(--primary)] -background rounded-none transition-all border border-transparent -border"
+                      className="p-2.5 text-slate-500 hover:text-[#074E52] hover:bg-[#E6F4F1] rounded-xl transition-all border border-transparent hover:border-[#CBE5DF] cursor-pointer"
                     >
-                      <FlaskConical size={18} />
+                      <FlaskConical size={17} />
                     </button>
                     <button 
                       onClick={() => setFormData(conn)}
                       title="Modificar"
-                      className="p-3 text-muted -foreground -background rounded-none transition-all border border-transparent -border"
+                      className="p-2.5 text-slate-500 hover:text-[#074E52] hover:bg-[#E6F4F1] rounded-xl transition-all border border-transparent hover:border-[#CBE5DF] cursor-pointer"
                     >
-                      <Edit2 size={18} />
+                      <Edit2 size={17} />
                     </button>
                     {!formData.id && activeId !== conn.id && (
                       <button 
                         onClick={() => setActive(conn.id)}
-                        className="px-6 py-2.5 bg-card -background text-foreground text-[10px] font-black rounded-none transition-all uppercase tracking-widest"
+                        className="px-4 py-2 bg-[#E6F4F1] hover:bg-[#074E52] text-[#074E52] hover:text-white border border-[#CBE5DF] text-xs font-semibold rounded-xl transition-all cursor-pointer"
                       >
                          Ativar
                       </button>
@@ -307,9 +322,9 @@ export default function ConfigConexoesPage() {
                     <button 
                       onClick={() => handleDelete(conn.id)}
                       title="Eliminar"
-                      className="p-3 -muted hover:text-red-500 hover:bg-red-500/10 rounded-none transition-all"
+                      className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all border border-transparent hover:border-rose-200 cursor-pointer"
                     >
-                      <Trash2 size={18} />
+                      <Trash2 size={17} />
                     </button>
                   </div>
                 </div>

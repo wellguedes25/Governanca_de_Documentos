@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   ReactFlow,
   Background,
@@ -33,17 +34,28 @@ const nodeTypes = {
 };
 
 function LineageFlowContent() {
-  const { docVersion } = useUI();
+  const searchParams = useSearchParams();
+  const urlFocusRaw = searchParams.get('focus') || '';
+  const urlFocusNum = /^\d+$/.test(urlFocusRaw) ? Number(urlFocusRaw) : null;
+
+  const { docVersion, theme, getCached, setCached } = useUI();
+  const isDark = theme !== 'light';
   const { fitView } = useReactFlow();
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [loading, setLoading] = useState(true);
+  const [prevUrlFocus, setPrevUrlFocus] = useState<number | null>(null);
   const [focusDocId, setFocusDocId] = useState<number | null>(null);
   const [availableDocs, setAvailableDocs] = useState<{ id: number; title: string; totalLinks: number }[]>([]);
+
+  if (urlFocusNum !== null && urlFocusNum !== prevUrlFocus) {
+    setPrevUrlFocus(urlFocusNum);
+    setFocusDocId(urlFocusNum);
+  }
   
-  // Dados brutos da API para cruzamento nos drawers (ref evita re-criação cíclica de callbacks)
-  const [rawApiNodes, setRawApiNodes] = useState<LineageDocNodeData[]>([]);
+  // Dados brutos da API para cruzamento nos drawers
+  const [, setRawApiNodes] = useState<LineageDocNodeData[]>([]);
   const rawDataRef = useRef<{ nodes: LineageDocNodeData[]; edges: ExecutiveEdgeData[] }>({ nodes: [], edges: [] });
   const [summary, setSummary] = useState({ totalDocs: 0, totalEdges: 0, totalFieldsLinked: 0 });
 
@@ -112,8 +124,83 @@ function LineageFlowContent() {
     setDrawerOpen(true);
   }, []);
 
-  // Consulta à API com validação estrita e suporte a Modo Foco
-  const fetchLineage = useCallback(async (targetFocusId: number | null) => {
+  // Consulta à API com validação estrita, cache multinível e suporte a Modo Foco
+  const fetchLineage = useCallback(async (targetFocusId: number | null, force = false) => {
+    const cacheKey = `lineage_${targetFocusId || 'global'}_${docVersion || 'V3'}`;
+    
+    // 1. Tenta cache em memória / sessionStorage
+    if (!force) {
+      const cached = getCached<{ nodes: LineageDocNodeData[]; edges: ExecutiveEdgeData[]; availableDocs: any[]; summary: any }>(cacheKey);
+      if (cached) {
+        rawDataRef.current = { nodes: cached.nodes || [], edges: cached.edges || [] };
+        setRawApiNodes(cached.nodes || []);
+        setAvailableDocs(cached.availableDocs || []);
+        setSummary(cached.summary || { totalDocs: 0, totalEdges: 0, totalFieldsLinked: 0 });
+
+        const flowNodes: Node[] = (cached.nodes || []).map((n) => ({
+          id: n.id,
+          type: 'documentNode',
+          data: {
+            ...n,
+            onInspect: (docId: number) => handleInspectNode(docId, cached.nodes, cached.edges),
+            onFocus: (docId: number) => setFocusDocId(docId)
+          },
+          position: { x: 0, y: 0 }
+        }));
+
+        const flowEdges: Edge[] = (cached.edges || []).map((e) => {
+          const strokeColor = e.isBroken ? '#f43f5e' : e.isHybridV2 ? '#f59e0b' : '#CCF352';
+          const labelFill = e.isBroken ? '#f43f5e' : e.isHybridV2 ? '#f59e0b' : isDark ? '#CCF352' : '#3f5205';
+
+          return {
+            id: e.id,
+            source: `doc_${e.sourceDocId}`,
+            target: `doc_${e.targetDocId}`,
+            sourceHandle: 'doc_source',
+            targetHandle: 'doc_target',
+            animated: true,
+            type: 'smoothstep',
+            label: e.label,
+            labelStyle: {
+              fontSize: 10.5,
+              fontWeight: 700,
+              fill: labelFill
+            },
+            labelBgStyle: {
+              fill: isDark ? '#141312' : '#ffffff',
+              fillOpacity: 0.95,
+              stroke: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+              strokeWidth: 1,
+              rx: 6,
+              ry: 6
+            },
+            labelBgPadding: [6, 4] as [number, number],
+            style: {
+              stroke: strokeColor,
+              strokeWidth: 2.2,
+              ...(e.isBroken ? { strokeDasharray: '6 4' } : {})
+            },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: strokeColor,
+              width: 14,
+              height: 14
+            },
+            data: e as unknown as Record<string, unknown>
+          };
+        });
+
+        const layouted = getLayoutedElements(flowNodes, flowEdges, 'LR');
+        setNodes(layouted.nodes);
+        setEdges(layouted.edges);
+        setLoading(false);
+        setTimeout(() => {
+          fitView({ padding: 0.25, duration: 400 });
+        }, 100);
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -130,6 +217,14 @@ function LineageFlowContent() {
 
       const apiNodes: LineageDocNodeData[] = data.nodes || [];
       const apiEdges: ExecutiveEdgeData[] = data.edges || [];
+
+      // Salva no cache do cliente
+      setCached(cacheKey, {
+        nodes: apiNodes,
+        edges: apiEdges,
+        availableDocs: data.availableDocs || [],
+        summary: data.summary || { totalDocs: 0, totalEdges: 0, totalFieldsLinked: 0 }
+      });
 
       rawDataRef.current = { nodes: apiNodes, edges: apiEdges };
       setRawApiNodes(apiNodes);
@@ -151,15 +246,15 @@ function LineageFlowContent() {
       // Mapeia arestas executivas consolidadas
       const flowEdges: Edge[] = apiEdges.map((e) => {
         const strokeColor = e.isBroken
-          ? '#e11d48'
+          ? '#f43f5e'
           : e.isHybridV2
-            ? '#d97706'
-            : '#0284c7';
+            ? '#f59e0b'
+            : '#CCF352';
         const labelFill = e.isBroken
-          ? '#be123c'
+          ? '#f43f5e'
           : e.isHybridV2
-            ? '#b45309'
-            : '#0369a1';
+            ? '#f59e0b'
+            : isDark ? '#CCF352' : '#3f5205';
 
         return {
           id: e.id,
@@ -176,8 +271,10 @@ function LineageFlowContent() {
             fill: labelFill
           },
           labelBgStyle: {
-            fill: '#ffffff',
+            fill: isDark ? '#141312' : '#ffffff',
             fillOpacity: 0.95,
+            stroke: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+            strokeWidth: 1,
             rx: 6,
             ry: 6
           },
@@ -214,7 +311,7 @@ function LineageFlowContent() {
     } finally {
       setLoading(false);
     }
-  }, [fitView, handleInspectNode, setNodes, setEdges]);
+  }, [fitView, handleInspectNode, setNodes, setEdges, isDark, docVersion, getCached, setCached]);
 
   // Carrega inicialmente
   useEffect(() => {
@@ -240,8 +337,8 @@ function LineageFlowContent() {
     const edgeData = edge.data as unknown as ExecutiveEdgeData | undefined;
     if (!edgeData) return;
 
-    const sourceDoc = rawApiNodes.find((n) => String(n.docId) === String(edgeData.sourceDocId));
-    const targetDoc = rawApiNodes.find((n) => String(n.docId) === String(edgeData.targetDocId));
+    const sourceDoc = rawDataRef.current.nodes.find((n) => String(n.docId) === String(edgeData.sourceDocId));
+    const targetDoc = rawDataRef.current.nodes.find((n) => String(n.docId) === String(edgeData.targetDocId));
 
     setSelectedNodeDetails(null);
     setSelectedEdgeDetails({
@@ -259,9 +356,9 @@ function LineageFlowContent() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 flex flex-col p-4 md:p-8 space-y-4 pb-12">
+    <div className="flex flex-col space-y-4">
       {/* 1. Header Padronizado */}
-      <div className="pb-4 border-b border-slate-200/80">
+      <div className="pb-3 border-b border-[var(--border-subtle)]">
         <PageHeader 
           title="Grafo Global de Linhagem & Dependências"
           subtitle="Rastreamento em tempo real do fluxo de dados e transferências entre documentos clínicos (Oracle DBAMV)"
@@ -270,22 +367,27 @@ function LineageFlowContent() {
             <Badge 
               variant="outline" 
               suppressHydrationWarning
-              className="text-[10px] font-bold px-2 py-0.5 rounded-full border-sky-300 bg-sky-50 text-sky-800"
+              className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border-[#CCF352]/30 bg-[#CCF352]/10 text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205]"
             >
               Motor {docVersion || 'V3'}
             </Badge>
           }
           action={
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-3 bg-white px-3.5 py-1.5 rounded-full border border-slate-200 text-xs shadow-2xs">
+              <div className="flex items-center gap-3 bg-[var(--dock-bg)] px-3.5 py-1.5 rounded-full border border-[var(--border-subtle)] text-xs shadow-2xs backdrop-blur-md">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-sky-600 shadow-2xs" />
-                  <span className="font-semibold text-slate-700 text-[11px]">Fluxo SQL Consolidado</span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#CCF352] shadow-2xs" />
+                  <span className="font-semibold text-[var(--text-primary)] text-[11px]">Fluxo SQL V3</span>
                 </div>
-                <div className="w-px h-3 bg-slate-200" />
-                <div className="flex items-center gap-1.5 text-slate-500 text-[11px]">
-                  <Info size={13} className="text-slate-400" />
-                  <span>Clique no fluxo para inspecionar o SQL</span>
+                <div className="w-px h-3 bg-[var(--border-subtle)]" />
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-2xs" />
+                  <span className="font-semibold text-amber-500 text-[11px]">Legado V2</span>
+                </div>
+                <div className="w-px h-3 bg-[var(--border-subtle)]" />
+                <div className="flex items-center gap-1.5 text-[var(--text-muted)] text-[11px]">
+                  <Info size={13} className="text-[#CCF352]" />
+                  <span>Clique no fluxo para inspecionar</span>
                 </div>
               </div>
             </div>
@@ -307,23 +409,23 @@ function LineageFlowContent() {
 
       {/* 3. Main Flow Canvas */}
       <div 
-        className="w-full bg-white rounded-2xl border border-slate-200/90 shadow-xs relative overflow-hidden"
-        style={{ height: 'calc(100vh - 250px)', minHeight: '560px' }}
+        className="w-full sylva-canvas bg-[var(--canvas-bg)] rounded-2xl border border-[var(--border-subtle)] shadow-xs relative overflow-hidden backdrop-blur-md"
+        style={{ height: 'calc(100vh - 220px)', minHeight: '560px' }}
       >
         {loading ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-500">
-            <Loader2 className="animate-spin text-sky-600" size={36} />
+          <div className="flex flex-col items-center justify-center h-full gap-3 text-[var(--text-muted)]">
+            <Loader2 className="animate-spin text-[#CCF352]" size={36} />
             <p className="text-xs font-semibold">Mapeando linhagem executiva de metadados...</p>
           </div>
         ) : nodes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400 p-6 text-center">
-            <p className="text-sm font-semibold text-slate-700">Nenhum vínculo de dependência encontrado para o filtro atual.</p>
-            <p className="text-xs text-slate-500 max-w-md">
+          <div className="flex flex-col items-center justify-center h-full gap-3 text-[var(--text-muted)] p-6 text-center">
+            <p className="text-sm font-semibold text-[var(--text-primary)]">Nenhum vínculo de dependência encontrado para o filtro atual.</p>
+            <p className="text-xs text-[var(--text-muted)] max-w-md">
               Tente selecionar outro documento de foco ou retorne para a visão global.
             </p>
             <button
               onClick={() => handleSelectFocus(null)}
-              className="mt-1 px-4 py-2 rounded-full bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+              className="mt-1 px-4 py-2 rounded-full bg-[#CCF352] hover:bg-[#b8dd3e] text-[#141312] text-xs font-bold shadow-2xs transition-all cursor-pointer"
             >
               Exibir Grafo Global
             </button>
@@ -349,18 +451,19 @@ function LineageFlowContent() {
                 variant={BackgroundVariant.Dots} 
                 gap={24} 
                 size={1.2} 
-                color="#cbd5e1"
+                color={isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.08)"}
               />
-              <Controls className="!bg-white !border !border-slate-200 !rounded-xl !shadow-xs" />
+              <Controls className="!bg-[var(--dock-bg)] !border !border-[var(--border-subtle)] !text-[var(--text-primary)] !rounded-xl !shadow-lg backdrop-blur-md [&>button]:!bg-transparent [&>button]:!border-b [&>button]:!border-[var(--border-subtle)] [&>button]:!text-[var(--text-primary)] [&>button:hover]:!bg-white/10" />
               <MiniMap 
                 nodeColor={(n) => {
                   const nodeData = n.data as Partial<LineageDocNodeData> | undefined;
-                  if (nodeData?.isBroken) return '#e11d48';
-                  if (nodeData?.isLegacyV2) return '#d97706';
-                  if (nodeData?.isFocus) return '#0284c7';
-                  return '#94a3b8';
+                  if (nodeData?.isBroken) return '#f43f5e';
+                  if (nodeData?.isLegacyV2) return '#f59e0b';
+                  if (nodeData?.isFocus) return '#CCF352';
+                  return isDark ? '#333' : '#94a3b8';
                 }}
-                className="!bg-white !border !border-slate-200 !rounded-xl !shadow-xs overflow-hidden"
+                maskColor={isDark ? 'rgba(0, 0, 0, 0.65)' : 'rgba(240, 238, 233, 0.65)'}
+                className="!bg-[var(--dock-bg)] !border !border-[var(--border-subtle)] !rounded-2xl !shadow-lg overflow-hidden backdrop-blur-md"
                 zoomable
                 pannable
               />
@@ -387,8 +490,10 @@ function LineageFlowContent() {
 
 export default function LineagePage() {
   return (
-    <ReactFlowProvider>
-      <LineageFlowContent />
-    </ReactFlowProvider>
+    <Suspense fallback={<div className="py-12 text-center text-xs text-slate-500">Carregando grafo de linhagem...</div>}>
+      <ReactFlowProvider>
+        <LineageFlowContent />
+      </ReactFlowProvider>
+    </Suspense>
   );
 }

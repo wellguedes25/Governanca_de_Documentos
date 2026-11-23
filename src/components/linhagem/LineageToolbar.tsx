@@ -1,11 +1,7 @@
 "use client";
 
 import React from 'react';
-import { 
-  Sparkles, Layers, Link2, Search, RotateCcw, 
-  Maximize2, Database, SlidersHorizontal, ArrowRight, X,
-  Globe2, ArrowRightLeft, Eye
-} from 'lucide-react';
+import { Sparkles, RotateCcw, X, Globe2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface LineageToolbarProps {
@@ -29,14 +25,12 @@ export function LineageToolbar({
   onResetLayout,
   loading
 }: LineageToolbarProps) {
-  const focusedDocObj = focusDocId ? availableDocs.find(d => d.id === focusDocId) : null;
-
   return (
-    <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+    <div className="sylva-dock bg-[var(--dock-bg)]/80 border border-[var(--border-subtle)] rounded-2xl p-3.5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 backdrop-blur-md">
       {/* Controles da Esquerda */}
       <div className="flex items-center gap-2.5 flex-wrap">
         {/* Toggle Modo Foco vs Modo Global */}
-        <div className="flex items-center bg-slate-100 p-0.5 rounded-full border border-slate-200 text-xs font-semibold">
+        <div className="flex items-center bg-[var(--card-bg)] p-1 rounded-full border border-[var(--border-subtle)] text-xs font-semibold">
           <button
             type="button"
             onClick={() => {
@@ -47,11 +41,11 @@ export function LineageToolbar({
             className={cn(
               "px-3 py-1 rounded-full transition-all flex items-center gap-1.5 cursor-pointer text-xs",
               focusDocId !== null
-                ? "bg-white text-sky-800 shadow-2xs border border-slate-200/70 font-bold"
-                : "text-slate-500 hover:text-slate-800"
+                ? "bg-[#CCF352] text-[#141312] shadow-2xs font-bold"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             )}
           >
-            <Sparkles size={12} className="text-sky-600" />
+            <Sparkles size={12} className={focusDocId !== null ? "text-[#141312]" : "text-[#CCF352]"} />
             <span>Modo Foco</span>
           </button>
 
@@ -61,11 +55,11 @@ export function LineageToolbar({
             className={cn(
               "px-3 py-1 rounded-full transition-all flex items-center gap-1.5 cursor-pointer text-xs",
               focusDocId === null
-                ? "bg-white text-slate-900 shadow-2xs border border-slate-200/70 font-bold"
-                : "text-slate-500 hover:text-slate-800"
+                ? "bg-[#CCF352] text-[#141312] shadow-2xs font-bold"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             )}
           >
-            <Globe2 size={12} className="text-emerald-600" />
+            <Globe2 size={12} className={focusDocId === null ? "text-[#141312]" : "text-[#CCF352]"} />
             <span>Visão Global</span>
           </button>
         </div>
@@ -75,7 +69,7 @@ export function LineageToolbar({
           <select
             value={focusDocId || ''}
             onChange={(e) => onSelectFocusDoc(e.target.value ? Number(e.target.value) : null)}
-            className="text-xs bg-slate-50 hover:bg-white border border-slate-200 rounded-full pl-3 pr-8 py-1.5 font-medium text-slate-800 focus:outline-none focus:border-sky-500 shadow-2xs cursor-pointer max-w-[280px] md:max-w-[340px] truncate transition-colors"
+            className="text-xs bg-[var(--card-bg)] hover:bg-[var(--dock-bg)] border border-[var(--border-subtle)] rounded-full pl-3 pr-8 py-1.5 font-medium text-[var(--text-primary)] focus:outline-none focus:border-[#CCF352] shadow-2xs cursor-pointer max-w-[280px] md:max-w-[340px] truncate transition-colors"
           >
             <option value="">Todos os Documentos Conectados (Global)</option>
             {availableDocs.map((doc) => (
@@ -88,12 +82,12 @@ export function LineageToolbar({
 
         {/* Tag de Foco Ativo com Botão Limpar */}
         {focusDocId && (
-          <span className="px-3 py-1 rounded-full font-bold text-[11px] bg-sky-50 text-sky-800 border border-sky-200 flex items-center gap-1.5 shadow-2xs">
+          <span className="px-3 py-1 rounded-full font-bold text-[11px] bg-[#CCF352]/10 text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205] border border-[#CCF352]/30 flex items-center gap-1.5 shadow-2xs">
             <span>Foco: <b>Doc {focusDocId}</b></span>
             <button 
               type="button" 
               onClick={() => onSelectFocusDoc(null)} 
-              className="hover:text-sky-950 rounded-full p-0.5 hover:bg-sky-100 transition-colors cursor-pointer"
+              className="hover:text-[var(--text-primary)] rounded-full p-0.5 hover:bg-white/10 transition-colors cursor-pointer"
               title="Voltar para Visão Global"
             >
               <X size={12} />
@@ -105,17 +99,17 @@ export function LineageToolbar({
       {/* Estatísticas e Ações da Direita */}
       <div className="flex items-center gap-2.5 flex-wrap justify-between md:justify-end">
         {/* Contadores da Sessão */}
-        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700">
+        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--card-bg)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-secondary)]">
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <b>{totalDocs}</b> {totalDocs === 1 ? 'Doc' : 'Docs'}
+            <span className="w-2 h-2 rounded-full bg-[#CCF352] animate-pulse" />
+            <b className="text-[var(--text-primary)]">{totalDocs}</b> {totalDocs === 1 ? 'Doc' : 'Docs'}
           </span>
-          <span className="text-slate-300">•</span>
+          <span className="text-[var(--text-muted)] opacity-40">•</span>
           <span>
-            <b>{totalEdges}</b> {totalEdges === 1 ? 'Fluxo' : 'Fluxos'}
+            <b className="text-[var(--text-primary)]">{totalEdges}</b> {totalEdges === 1 ? 'Fluxo' : 'Fluxos'}
           </span>
-          <span className="text-slate-300">•</span>
-          <span className="text-sky-700 font-bold">
+          <span className="text-[var(--text-muted)] opacity-40">•</span>
+          <span className="text-[#CCF352] font-bold">
             <b>{totalFieldsLinked}</b> Metadados
           </span>
         </div>
@@ -125,10 +119,10 @@ export function LineageToolbar({
           type="button"
           onClick={onResetLayout}
           disabled={loading}
-          className="py-1 px-3.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-full transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+          className="py-1 px-3.5 text-xs font-semibold text-[var(--text-primary)] bg-[var(--card-bg)] hover:bg-[var(--dock-bg)] border border-[var(--border-subtle)] hover:border-[#CCF352]/40 rounded-full transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
           title="Reorganizar Nós e Centralizar Câmera"
         >
-          <RotateCcw size={13} className={cn("text-sky-600", loading && "animate-spin")} />
+          <RotateCcw size={13} className={cn("text-[#CCF352]", loading && "animate-spin")} />
           <span>Centralizar</span>
         </button>
       </div>

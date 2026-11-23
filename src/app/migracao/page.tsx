@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { 
-  ArrowLeftRight, RotateCw, Plus, FileSpreadsheet, 
-  Printer, AlertTriangle, Layers, Building2 
+  ArrowLeftRight, RotateCw, Plus, AlertTriangle
 } from 'lucide-react';
 import { useUI } from '@/context/UIContext';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -25,6 +25,16 @@ import { MigracaoDrawer } from '@/components/migracao/MigracaoDrawer';
 import toast from 'react-hot-toast';
 
 export default function MigracaoPage() {
+  return (
+    <Suspense fallback={<div className="py-12 text-center text-xs text-slate-500">Carregando governança de migração...</div>}>
+      <MigracaoContent />
+    </Suspense>
+  );
+}
+
+function MigracaoContent() {
+  const searchParams = useSearchParams();
+  const urlSearch = searchParams.get('search') || '';
   const { docVersion } = useUI();
   const resolvedVersion = docVersion || 'V3';
 
@@ -48,9 +58,15 @@ export default function MigracaoPage() {
 
   // Filtros da Visão
   const [activeTab, setActiveTab] = useState<'quadro' | 'backlog' | 'tabela'>('quadro');
+  const [prevUrlSearch, setPrevUrlSearch] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filtroResponsavel, setFiltroResponsavel] = useState('TODOS');
   const [apenasMinhas, setApenasMinhas] = useState(false);
+
+  if (urlSearch && urlSearch !== prevUrlSearch) {
+    setPrevUrlSearch(urlSearch);
+    setSearchTerm(urlSearch);
+  }
 
   // Estados do Drawer de Detalhe da Demanda
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -197,19 +213,20 @@ export default function MigracaoPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 flex flex-col p-4 md:p-8 space-y-6 pb-24">
+    <div className="flex flex-col space-y-5">
       
       {/* 1. Header Padronizado */}
-      <div className="pb-4 border-b border-slate-200/80">
+      <div className="pb-3 border-b border-[var(--border-subtle)]">
         <PageHeader 
-          title="Governança de Migração"
+          kicker="PEP MV • TRANSIÇÃO TECNOLÓGICA"
+          title="Governança de Migração de Documentos"
           subtitle="Painel executivo e técnico para controle de paridade funcional, esteira ágil de etapas V2 Flex ➔ V3 Editor"
           icon={ArrowLeftRight}
           badge={
             <Badge 
               variant="outline" 
               suppressHydrationWarning
-              className="text-[10px] font-bold px-2 py-0.5 rounded-full border-sky-300 bg-sky-50 text-sky-800"
+              className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border-[#CCF352]/30 bg-[#CCF352]/10 text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205]"
             >
               Motor {resolvedVersion}
             </Badge>
@@ -221,16 +238,16 @@ export default function MigracaoPage() {
                 size="sm"
                 onClick={() => fetchData(true)}
                 disabled={loading}
-                className="gap-2 text-xs font-semibold rounded-full bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-2xs cursor-pointer h-9 px-4"
+                className="gap-2 text-xs font-semibold rounded-full bg-[var(--dock-bg)] hover:bg-[var(--card-bg)] border-[var(--border-subtle)] text-[var(--text-primary)] shadow-2xs cursor-pointer h-9 px-4"
               >
-                <RotateCw className={`w-3.5 h-3.5 text-sky-600 ${loading ? 'animate-spin' : ''}`} />
+                <RotateCw className={`w-3.5 h-3.5 text-[#CCF352] ${loading ? 'animate-spin' : ''}`} />
                 <span>Sincronizar</span>
               </Button>
 
               <Button
                 size="sm"
                 onClick={handleNovaDemanda}
-                className="gap-2 text-xs font-semibold rounded-full bg-[#004953] hover:bg-[#003b44] text-white shadow-2xs cursor-pointer h-9 px-4"
+                className="gap-2 text-xs font-bold rounded-full bg-[#CCF352] hover:bg-[#b8dd3e] text-[#141312] shadow-2xs cursor-pointer h-9 px-4 transition-all"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Nova Demanda</span>

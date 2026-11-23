@@ -72,18 +72,18 @@ export function LineageDetailsDrawer({
       : 'empty';
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[560px] md:w-[640px] bg-white border-l border-slate-200/90 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+    <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[560px] md:w-[640px] sylva-glass bg-[var(--card-bg)] border-l border-[var(--border-subtle)] shadow-2xl flex flex-col animate-in slide-in-from-right duration-300 text-[var(--text-primary)]">
       {/* Header do Drawer */}
-      <div className="p-4 md:p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
+      <div className="p-4 md:p-5 border-b border-[var(--border-subtle)] flex items-center justify-between bg-[var(--dock-bg)]/80">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className={cn(
               "px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider",
               edgeDetails?.isBroken || nodeDetails?.isBroken
-                ? "bg-rose-50 text-rose-800 border-rose-200"
+                ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
                 : edgeDetails?.isHybridV2 || nodeDetails?.isLegacyV2
-                  ? "bg-amber-50 text-amber-800 border-amber-200"
-                  : "bg-sky-50 text-sky-800 border-sky-200"
+                  ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                  : "bg-[#CCF352]/10 text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205] border-[#CCF352]/30"
             )}>
               {edgeDetails
                 ? edgeDetails.isBroken
@@ -96,7 +96,7 @@ export function LineageDetailsDrawer({
                   : 'Metadados Clínicos'}
             </span>
           </div>
-          <h3 className="font-bold text-slate-900 text-sm md:text-base leading-tight">
+          <h3 className="font-bold text-[var(--text-primary)] text-sm md:text-base leading-tight">
             {edgeDetails ? 'Detalhamento de Fluxo e Dependência' : 'Dossiê do Documento Clínico'}
           </h3>
         </div>
@@ -104,7 +104,7 @@ export function LineageDetailsDrawer({
         <button
           type="button"
           onClick={onClose}
-          className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition-colors cursor-pointer"
+          className="p-1.5 rounded-full text-[var(--text-muted)] hover:text-[#CCF352] hover:bg-white/5 transition-colors cursor-pointer"
         >
           <X size={18} />
         </button>
@@ -185,15 +185,15 @@ function LineageDrawerBody({
               <div className="flex items-center gap-2">
                 <div className={cn(
                   "flex-1 p-2.5 rounded-xl bg-white border shadow-2xs space-y-1",
-                  edgeDetails.isBroken ? "border-rose-200 bg-rose-50/40" : "border-slate-200"
+                  edgeDetails.isBroken ? "border-rose-200 bg-rose-50/40" : "border-[#E0ECE9]"
                 )}>
                   <span className={cn(
                     "font-mono text-[10px] font-bold block",
-                    edgeDetails.isBroken ? "text-rose-700" : edgeDetails.isHybridV2 ? "text-amber-700" : "text-sky-700"
+                    edgeDetails.isBroken ? "text-rose-700" : edgeDetails.isHybridV2 ? "text-amber-700" : "text-[#074E52]"
                   )}>
                     DOC {edgeDetails.sourceDocId}
                   </span>
-                  <p className="font-bold text-slate-800 text-xs line-clamp-2" title={edgeDetails.sourceDocTitle}>
+                  <p className="font-bold text-[#0F2426] text-xs line-clamp-2" title={edgeDetails.sourceDocTitle}>
                     {edgeDetails.sourceDocTitle || `Documento ${edgeDetails.sourceDocId}`}
                   </p>
                 </div>
@@ -202,16 +202,16 @@ function LineageDrawerBody({
                   "p-2 rounded-full border shrink-0",
                   edgeDetails.isBroken
                     ? "bg-rose-50 text-rose-600 border-rose-200"
-                    : "bg-sky-50 text-sky-600 border-sky-100"
+                    : "bg-[#E6F4F1] text-[#074E52] border-[#CBE5DF]"
                 )}>
                   <ArrowRight size={16} />
                 </div>
 
-                <div className="flex-1 p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
-                  <span className="font-mono text-[10px] font-bold text-sky-700 block">
+                <div className="flex-1 p-2.5 rounded-xl bg-white border border-[#E0ECE9] shadow-2xs space-y-1">
+                  <span className="font-mono text-[10px] font-bold text-[#074E52] block">
                     DOC {edgeDetails.targetDocId}
                   </span>
-                  <p className="font-bold text-slate-800 text-xs line-clamp-2" title={edgeDetails.targetDocTitle}>
+                  <p className="font-bold text-[#0F2426] text-xs line-clamp-2" title={edgeDetails.targetDocTitle}>
                     {edgeDetails.targetDocTitle || `Documento ${edgeDetails.targetDocId}`}
                   </p>
                 </div>
@@ -221,8 +221,8 @@ function LineageDrawerBody({
             {/* Lista de Campos Mapeados */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                  <Layers size={14} className="text-sky-600" />
+                <h4 className="font-bold text-[#0F2426] text-xs uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers size={14} className="text-[#074E52]" />
                   Mapeamento Estrito de Campos ({edgeDetails.fieldsMap.length})
                 </h4>
                 <span className="text-[11px] text-slate-400 font-medium">
@@ -247,8 +247,8 @@ function LineageDrawerBody({
                             ? "bg-rose-50/70 border-rose-300 ring-1 ring-rose-200"
                             : "bg-rose-50/30 border-rose-200 hover:bg-rose-50/60"
                           : isSelected
-                            ? "bg-sky-50/50 border-sky-300 ring-1 ring-sky-200"
-                            : "bg-white border-slate-200/80 hover:bg-slate-50 hover:border-slate-300"
+                            ? "bg-[#E6F4F1]/60 border-[#074E52]/50 ring-1 ring-[#074E52]/15"
+                            : "bg-white border-[#E0ECE9] hover:bg-[#F7FAF9] hover:border-[#CBE5DF]"
                       )}
                     >
                       <div className="flex items-start justify-between gap-2 text-xs">
@@ -271,7 +271,7 @@ function LineageDrawerBody({
                           <p className="font-semibold text-slate-800 text-xs truncate" title={f.targetName}>
                             {f.targetName}
                           </p>
-                          <code className="text-[10px] font-mono font-bold text-sky-800 block">
+                          <code className="text-[10px] font-mono font-bold text-[#074E52] block">
                             {f.targetTag}
                           </code>
                         </div>
@@ -327,10 +327,10 @@ function LineageDrawerBody({
 
                       {/* Snippet SQL Expandido se Selecionado */}
                       {isSelected && (
-                        <div className="pt-2 border-t border-slate-200/70 space-y-2 animate-in fade-in duration-200">
+                        <div className="pt-2 border-t border-[#E0ECE9] space-y-2 animate-in fade-in duration-200">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
-                              <Code2 size={12} className="text-sky-600" />
+                              <Code2 size={12} className="text-[#074E52]" />
                               Script SQL Executado (Propriedade 4)
                             </span>
                             <button
@@ -339,14 +339,14 @@ function LineageDrawerBody({
                                 e.stopPropagation();
                                 handleCopySql(f.script);
                               }}
-                              className="px-2 py-0.5 rounded text-[10px] font-semibold bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 flex items-center gap-1 transition-colors cursor-pointer"
+                              className="px-2 py-0.5 rounded text-[10px] font-semibold bg-white hover:bg-[#F3F7F6] border border-[#D5E4E0] text-[#074E52] flex items-center gap-1 transition-colors cursor-pointer"
                             >
                               {copied ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
                               <span>{copied ? 'Copiado!' : 'Copiar'}</span>
                             </button>
                           </div>
 
-                          <pre className="p-3 rounded-xl bg-slate-900 text-sky-200 font-mono text-[10.5px] leading-relaxed overflow-x-auto max-h-56 scrollbar-thin select-all">
+                          <pre className="p-3 rounded-xl bg-[#09181A] border border-[#16383B] text-emerald-200 font-mono text-[10.5px] leading-relaxed overflow-x-auto max-h-56 scrollbar-thin select-all">
                             {f.script}
                           </pre>
                         </div>
@@ -375,7 +375,7 @@ function LineageDrawerBody({
                     "font-mono font-bold border px-2 py-0.5 rounded-full",
                     nodeDetails.isBroken
                       ? "text-rose-800 bg-rose-100 border-rose-200"
-                      : "text-sky-800 bg-sky-50 border-sky-200"
+                      : "text-[#074E52] bg-[#E6F4F1] border-[#CBE5DF]"
                   )}>
                     DOC {nodeDetails.docId}
                   </span>
@@ -415,17 +415,17 @@ function LineageDrawerBody({
 
               {onFocusDoc && (
                 <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onFocusDoc(nodeDetails.docId);
-                      onClose();
-                    }}
-                    className="w-full py-2 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
-                  >
-                    <Search size={13} />
-                    <span>Definir como Foco Principal do Grafo</span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onFocusDoc(nodeDetails.docId);
+                        onClose();
+                      }}
+                      className="w-full py-2 px-3 rounded-xl bg-[#074E52] hover:bg-[#053A3D] text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
+                    >
+                      <Search size={13} />
+                      <span>Definir como Foco Principal do Grafo</span>
+                    </button>
                 </div>
               )}
             </div>
@@ -489,7 +489,7 @@ function LineageDrawerBody({
                                 <span>{copied ? 'Copiado!' : 'Copiar'}</span>
                               </button>
                             </div>
-                            <pre className="p-3 rounded-xl bg-slate-900 text-sky-200 font-mono text-[10.5px] leading-relaxed overflow-x-auto max-h-48 scrollbar-thin select-all">
+                            <pre className="p-3 rounded-xl bg-[#09181A] border border-[#16383B] text-emerald-200 font-mono text-[10.5px] leading-relaxed overflow-x-auto max-h-48 scrollbar-thin select-all">
                               {sf.script}
                             </pre>
                           </div>
@@ -522,7 +522,7 @@ function LineageDrawerBody({
                         "w-full text-left p-3 rounded-xl bg-white border flex items-center justify-between text-xs transition-all cursor-pointer",
                         e.isBroken
                           ? "border-rose-200 bg-rose-50/40 hover:border-rose-300"
-                          : "border-slate-200 hover:border-sky-300 hover:bg-sky-50/30"
+                          : "border-[#E0ECE9] hover:border-[#074E52]/40 hover:bg-[#F3F7F6]/70"
                       )}
                     >
                       <div className="min-w-0 pr-2">
@@ -532,11 +532,11 @@ function LineageDrawerBody({
                         )}>
                           DOC {e.sourceDocId} {e.isBroken ? '• QUEBRADO' : e.isHybridV2 ? '• V2' : ''}
                         </span>
-                        <p className="font-bold text-slate-800 text-xs truncate" title={e.sourceDocTitle}>
+                        <p className="font-bold text-[#0F2426] text-xs truncate" title={e.sourceDocTitle}>
                           {e.sourceDocTitle || `Documento ${e.sourceDocId}`}
                         </p>
                       </div>
-                      <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-bold text-[10.5px] shrink-0">
+                      <span className="px-2.5 py-1 rounded-full bg-[#F3F7F6] border border-[#E0ECE9] text-slate-700 font-bold text-[10.5px] shrink-0">
                         {e.totalFields} {e.totalFields === 1 ? 'campo' : 'campos'}
                       </span>
                     </button>
@@ -547,12 +547,12 @@ function LineageDrawerBody({
 
             {/* Documentos Alimentados (Downstream) */}
             <div className="space-y-2">
-              <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                <ArrowUpRight size={14} className="text-sky-600" />
+              <h4 className="font-bold text-[#0F2426] text-xs uppercase tracking-wider flex items-center gap-1.5">
+                <ArrowUpRight size={14} className="text-[#074E52]" />
                 Destinos de Dados (Downstream - {nodeDetails.downstreamEdges.length})
               </h4>
               {nodeDetails.downstreamEdges.length === 0 ? (
-                <p className="text-xs text-slate-400 italic p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-xs text-slate-400 italic p-3 rounded-xl bg-[#F7FAF9] border border-[#E0ECE9]">
                   Nenhum documento posterior identificado consumindo dados deste layout.
                 </p>
               ) : (
@@ -562,17 +562,17 @@ function LineageDrawerBody({
                       type="button"
                       key={e.id}
                       onClick={() => onSelectEdge && onSelectEdge(e)}
-                      className="w-full text-left p-3 rounded-xl bg-white border border-slate-200 flex items-center justify-between text-xs hover:border-sky-300 hover:bg-sky-50/30 transition-all cursor-pointer"
+                      className="w-full text-left p-3 rounded-xl bg-white border border-[#E0ECE9] flex items-center justify-between text-xs hover:border-[#074E52]/40 hover:bg-[#F3F7F6]/70 transition-all cursor-pointer"
                     >
                       <div className="min-w-0 pr-2">
                         <span className="font-mono text-[10px] font-bold text-slate-500 block">
                           DOC {e.targetDocId}
                         </span>
-                        <p className="font-bold text-slate-800 text-xs truncate" title={e.targetDocTitle}>
+                        <p className="font-bold text-[#0F2426] text-xs truncate" title={e.targetDocTitle}>
                           {e.targetDocTitle || `Documento ${e.targetDocId}`}
                         </p>
                       </div>
-                      <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-bold text-[10.5px] shrink-0">
+                      <span className="px-2.5 py-1 rounded-full bg-[#F3F7F6] border border-[#E0ECE9] text-slate-700 font-bold text-[10.5px] shrink-0">
                         {e.totalFields} {e.totalFields === 1 ? 'campo' : 'campos'}
                       </span>
                     </button>

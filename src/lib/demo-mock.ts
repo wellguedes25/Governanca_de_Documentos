@@ -1,20 +1,42 @@
-import type { DbConnection, HospitalMapping } from './storage';
+import type { DbConnection, DocMapping, HospitalMapping } from './storage';
+import type { BiArtifact, BiCatalogDocOption } from '@/types/bi-dependencies.types';
+import type { DocumentoFlexItem, DocumentoMigracao } from '@/types/migracao.types';
 
 export const DEMO_CONNECTION_ID = 'demo-sandbox';
 
 export const DEMO_CONNECTION: DbConnection = {
   id: DEMO_CONNECTION_ID,
   name: 'DEMONSTRAÇÃO (SANDBOX)',
-  user: 'DEMO_MV',
+  user: 'DEMO_SANDBOX',
   password: '',
-  connectString: 'DEMO://SANDBOX.GOVERDOC.LOCAL/DBAMV',
+  connectString: 'DEMO://SANDBOX.GOVERDOC.LOCAL/PEP_DEMO',
 };
 
+// 2 empresas 100% fictícias exclusivas do modo demonstração
 export const DEFAULT_DEMO_HOSPITALS: HospitalMapping[] = [
-  { id: 1, sigla: 'HCA', nome: 'HOSPITAL CENTRAL ALFA (DEMO)', ativo: true },
-  { id: 2, sigla: 'HSB', nome: 'HOSPITAL SANTA BEATRIZ (DEMO)', ativo: true },
-  { id: 3, sigla: 'HMI', nome: 'HOSPITAL MATERNO INFANTIL (DEMO)', ativo: true },
-  { id: 4, sigla: 'UPA', nome: 'UNIDADE PRONTO ATENDIMENTO SUL (DEMO)', ativo: true },
+  { id: 901, sigla: 'HVA', nome: 'HOSPITAL VALE DA AURORA (FICTÍCIO)', ativo: true },
+  { id: 902, sigla: 'HSM', nome: 'HOSPITAL SERRA DO MAR (FICTÍCIO)', ativo: true },
+];
+
+export const DEMO_AUDIT_DOC_ID = '9001,9002,9008';
+export const DEMO_REPORT_BASE_URL = 'https://sandbox.goverdoc.local/report?regId=';
+
+export const DEMO_DOC_MAPPINGS: DocMapping[] = [
+  {
+    id: '9001',
+    name: 'Ficha de Avaliação Clínica Geral Aurora (Demo)',
+    fields: [{ id: 'REGISTRO_CLINICO', name: 'Registro Clínico Principal' }],
+  },
+  {
+    id: '9002',
+    name: 'Boletim de Acompanhamento Diário Integrado (Demo)',
+    fields: [{ id: 'REGISTRO_CLINICO', name: 'Registro Clínico Principal' }],
+  },
+  {
+    id: '9008',
+    name: 'Guia de Transição Intersetorial Sandbox (Demo)',
+    fields: [{ id: 'REGISTRO_CLINICO', name: 'Registro Clínico Principal' }],
+  },
 ];
 
 export function isDemoConnection(conn?: Partial<DbConnection> | null): boolean {
@@ -34,7 +56,7 @@ interface DemoDocDef {
   total90d: number;
   lastUsedHoursAgo: number;
   idle?: boolean;
-  weights: number[]; // relative distribution across hospitals
+  weights: [number, number]; // HVA, HSM
   fields: Array<{
     cdCampo: number;
     cdMetadado: number;
@@ -65,529 +87,602 @@ interface DemoDocDef {
   }>;
 }
 
+// 10 documentos 100% fictícios (códigos 9001..9010)
 const DEMO_DOCS: DemoDocDef[] = [
   {
-    id: 382,
-    name: 'EVOLUCAO MEDICA DIARIA',
-    identifier: 'DOC_EVOLUCAO_MEDICA',
-    version: 10,
-    engines: ['V3', 'V2'],
-    total90d: 34280,
-    lastUsedHoursAgo: 0.2,
-    weights: [0.38, 0.27, 0.2, 0.15],
-    fields: [
-      { cdCampo: 38201, cdMetadado: 9001, tag: 'ALERGIA_RESUMO', name: 'Resumo de Alergias (Herdado)', visualType: 'Caixa de Texto', rulesCount: 2 },
-      { cdCampo: 38202, cdMetadado: 9002, tag: 'SINAIS_VITAIS_ULT', name: 'Últimos Sinais Vitais', visualType: 'Grade Dinâmica', rulesCount: 1 },
-      { cdCampo: 38203, cdMetadado: 9003, tag: 'BALANCO_24H', name: 'Balanço Hídrico 24h', visualType: 'Numérico Calculado', rulesCount: 1 },
-      { cdCampo: 38204, cdMetadado: 9004, tag: 'EVOLUCAO', name: 'Texto da Evolução Clínica', visualType: 'Editor Rico', rulesCount: 3 },
-      { cdCampo: 38205, cdMetadado: 9005, tag: 'CONDUTA_DIA', name: 'Conduta Médica do Dia', visualType: 'Editor Rico', rulesCount: 1 },
-    ],
-    rules: [
-      {
-        cdRegra: 7001,
-        numOrdem: 1,
-        dsRegra: 'REG_ALERTA_SEPSE_MEWS',
-        ativa: 1,
-        tipoRegra: 'ALERTA',
-        dsAlerta: 'Atenção: sinais de alerta clínico compatíveis com protocolo de sepse. Avaliar pacote 1h.',
-        condicao: 'SINAIS_VITAIS_ULT >= "38.5" OR EVOLUCAO = "INSTAVEL"',
-        camposAfetados: 'EVOLUCAO, CONDUTA_DIA',
-        script: null,
-      },
-      {
-        cdRegra: 7002,
-        numOrdem: 2,
-        dsRegra: 'REG_OBRIGA_ALERGIA_REVISADA',
-        ativa: 1,
-        tipoRegra: 'VALIDACAO',
-        dsAlerta: 'Confirme ou atualize o campo de alergias antes de assinar a evolução.',
-        condicao: 'ALERGIA_RESUMO = ""',
-        camposAfetados: 'ALERGIA_RESUMO',
-        script: null,
-      },
-    ],
-    actions: [
-      {
-        cdCampo: 38201,
-        cdMetadado: 9001,
-        nomeCampo: 'Resumo de Alergias (Herdado)',
-        identificador: 'ALERGIA_RESUMO',
-        targetDocId: 101,
-        script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC ON ERC.CD_REGISTRO = PEC.CD_EDITOR_REGISTRO JOIN DBAMV.EDITOR_CAMPO EC ON EC.CD_CAMPO = ERC.CD_CAMPO WHERE PDC.CD_ATENDIMENTO = :CD_ATENDIMENTO AND PEC.CD_DOCUMENTO = 101 AND EC.DS_IDENTIFICADOR = 'ALERGIA_IDENTIFICADA' ORDER BY PDC.DH_FECHAMENTO DESC`,
-      },
-      {
-        cdCampo: 38202,
-        cdMetadado: 9002,
-        nomeCampo: 'Últimos Sinais Vitais',
-        identificador: 'SINAIS_VITAIS_ULT',
-        targetDocId: 215,
-        script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC ON ERC.CD_REGISTRO = PEC.CD_EDITOR_REGISTRO JOIN DBAMV.EDITOR_CAMPO EC ON EC.CD_CAMPO = ERC.CD_CAMPO WHERE PDC.CD_ATENDIMENTO = :CD_ATENDIMENTO AND PEC.CD_DOCUMENTO = 215 AND EC.DS_IDENTIFICADOR = 'PA_SISTOLICA' ORDER BY PDC.DH_FECHAMENTO DESC`,
-      },
-      {
-        cdCampo: 38203,
-        cdMetadado: 9003,
-        nomeCampo: 'Balanço Hídrico 24h',
-        identificador: 'BALANCO_24H',
-        targetDocId: 410,
-        script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC ON ERC.CD_REGISTRO = PEC.CD_EDITOR_REGISTRO JOIN DBAMV.EDITOR_CAMPO EC ON EC.CD_CAMPO = ERC.CD_CAMPO WHERE PDC.CD_ATENDIMENTO = :CD_ATENDIMENTO AND PEC.CD_DOCUMENTO = 410 AND EC.DS_IDENTIFICADOR = 'SALDO_HIDRICO_TOTAL' ORDER BY PDC.DH_FECHAMENTO DESC`,
-      },
-    ],
-  },
-  {
-    id: 622,
-    name: 'RESUMO DE ALTA HOSPITALAR',
-    identifier: 'DOC_RESUMO_ALTA',
-    version: 6,
-    engines: ['V3'],
-    total90d: 18940,
-    lastUsedHoursAgo: 0.5,
-    weights: [0.34, 0.31, 0.21, 0.14],
-    fields: [
-      { cdCampo: 62201, cdMetadado: 9101, tag: 'HISTORIA_CLINICA', name: 'Síntese da Anamnese', visualType: 'Editor Rico', rulesCount: 1 },
-      { cdCampo: 62202, cdMetadado: 9102, tag: 'EVOLUCAO_SINTESE', name: 'Resumo da Evolução', visualType: 'Editor Rico', rulesCount: 2 },
-      { cdCampo: 62203, cdMetadado: 9103, tag: 'EXAMES_CRITICOS', name: 'Principais Exames da Internação', visualType: 'Caixa de Texto', rulesCount: 0 },
-      { cdCampo: 62204, cdMetadado: 9104, tag: 'CONDUTA_ALTA', name: 'Orientações de Alta', visualType: 'Editor Rico', rulesCount: 1 },
-    ],
-    rules: [
-      {
-        cdRegra: 7101,
-        numOrdem: 1,
-        dsRegra: 'REG_VALIDA_CONDUTA_ALTA',
-        ativa: 1,
-        tipoRegra: 'VALIDACAO',
-        dsAlerta: 'O resumo de alta exige preenchimento explícito das orientações pós-alta.',
-        condicao: 'CONDUTA_ALTA = ""',
-        camposAfetados: 'CONDUTA_ALTA',
-        script: null,
-      },
-    ],
-    actions: [
-      {
-        cdCampo: 62201,
-        cdMetadado: 9101,
-        nomeCampo: 'Síntese da Anamnese',
-        identificador: 'HISTORIA_CLINICA',
-        targetDocId: 101,
-        script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC ON ERC.CD_REGISTRO = PEC.CD_EDITOR_REGISTRO JOIN DBAMV.EDITOR_CAMPO EC ON EC.CD_CAMPO = ERC.CD_CAMPO WHERE PDC.CD_ATENDIMENTO = :CD_ATENDIMENTO AND PEC.CD_DOCUMENTO = 101 AND EC.DS_IDENTIFICADOR = 'QUEIXA_PRINCIPAL' ORDER BY PDC.DH_FECHAMENTO DESC`,
-      },
-      {
-        cdCampo: 62202,
-        cdMetadado: 9102,
-        nomeCampo: 'Resumo da Evolução',
-        identificador: 'EVOLUCAO_SINTESE',
-        targetDocId: 382,
-        script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC ON ERC.CD_REGISTRO = PEC.CD_EDITOR_REGISTRO JOIN DBAMV.EDITOR_CAMPO EC ON EC.CD_CAMPO = ERC.CD_CAMPO WHERE PDC.CD_ATENDIMENTO = :CD_ATENDIMENTO AND PEC.CD_DOCUMENTO = 382 AND EC.DS_IDENTIFICADOR = 'EVOLUCAO' ORDER BY PDC.DH_FECHAMENTO DESC`,
-      },
-      {
-        cdCampo: 62203,
-        cdMetadado: 9103,
-        nomeCampo: 'Principais Exames da Internação',
-        identificador: 'EXAMES_CRITICOS',
-        targetDocId: 504,
-        script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC ON ERC.CD_REGISTRO = PEC.CD_EDITOR_REGISTRO JOIN DBAMV.EDITOR_CAMPO EC ON EC.CD_CAMPO = ERC.CD_CAMPO WHERE PDC.CD_ATENDIMENTO = :CD_ATENDIMENTO AND PEC.CD_DOCUMENTO = 504 AND EC.DS_IDENTIFICADOR = 'RESULTADO_CRITICO' ORDER BY PDC.DH_FECHAMENTO DESC`,
-      },
-      {
-        cdCampo: 62204,
-        cdMetadado: 9104,
-        nomeCampo: 'Orientações de Alta',
-        identificador: 'CONDUTA_ALTA',
-        targetDocId: 580,
-        script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC ON ERC.CD_REGISTRO = PEC.CD_EDITOR_REGISTRO JOIN DBAMV.EDITOR_CAMPO EC ON EC.CD_CAMPO = ERC.CD_CAMPO WHERE PDC.CD_ATENDIMENTO = :CD_ATENDIMENTO AND PEC.CD_DOCUMENTO = 580 AND EC.DS_IDENTIFICADOR = 'PLANO_TERAPEUTICO' ORDER BY PDC.DH_FECHAMENTO DESC`,
-      },
-    ],
-  },
-  {
-    id: 101,
-    name: 'ANAMNESE MEDICA INICIAL',
-    identifier: 'DOC_ANAMNESE_MEDICA',
-    version: 8,
-    engines: ['V3', 'V2'],
-    total90d: 24110,
-    lastUsedHoursAgo: 0.7,
-    weights: [0.35, 0.25, 0.22, 0.18],
-    fields: [
-      { cdCampo: 10101, cdMetadado: 9201, tag: 'QUEIXA_PRINCIPAL', name: 'Queixa Principal e Duração', visualType: 'Caixa de Texto', rulesCount: 1 },
-      { cdCampo: 10102, cdMetadado: 9202, tag: 'ALERGIA_IDENTIFICADA', name: 'Alergias Medicamentosas', visualType: 'Lista Seleção', rulesCount: 2 },
-      { cdCampo: 10103, cdMetadado: 9203, tag: 'DX_PRINCIPAL', name: 'Hipótese Diagnóstica (CID-10)', visualType: 'Pesquisa CID', rulesCount: 1 },
-    ],
-    rules: [
-      {
-        cdRegra: 7201,
-        numOrdem: 1,
-        dsRegra: 'REG_ALERTA_ALERGIA_GRAVE',
-        ativa: 1,
-        tipoRegra: 'ALERTA',
-        dsAlerta: 'Registrar imediatamente em pulseira de identificação e notificar farmácia clínica.',
-        condicao: 'ALERGIA_IDENTIFICADA = "SIM"',
-        camposAfetados: 'ALERGIA_IDENTIFICADA',
-        script: null,
-      },
-    ],
-    actions: [],
-  },
-  {
-    id: 215,
-    name: 'FOLHA DE SINAIS VITAIS',
-    identifier: 'DOC_SINAIS_VITAIS',
-    version: 5,
-    engines: ['V3', 'V2'],
-    total90d: 21850,
-    lastUsedHoursAgo: 0.3,
-    weights: [0.32, 0.28, 0.22, 0.18],
-    fields: [
-      { cdCampo: 21501, cdMetadado: 9301, tag: 'PA_SISTOLICA', name: 'Pressão Arterial Sistólica (mmHg)', visualType: 'Numérico', rulesCount: 2 },
-      { cdCampo: 21502, cdMetadado: 9302, tag: 'SAT_O2', name: 'Saturação Periférica O2 (%)', visualType: 'Numérico', rulesCount: 1 },
-      { cdCampo: 21503, cdMetadado: 9303, tag: 'ESCORE_NEWS', name: 'Escore NEWS2 Calculado', visualType: 'Numérico Calculado', rulesCount: 1 },
-    ],
-    rules: [
-      {
-        cdRegra: 7301,
-        numOrdem: 1,
-        dsRegra: 'REG_CALC_NEWS2',
-        ativa: 1,
-        tipoRegra: 'CALCULO',
-        dsAlerta: 'Escore NEWS2 >= 5: acionar time de resposta rápida em até 15 minutos.',
-        condicao: 'PA_SISTOLICA < "90" OR SAT_O2 < "92"',
-        camposAfetados: 'ESCORE_NEWS',
-        script: null,
-      },
-    ],
-    actions: [],
-  },
-  {
-    id: 410,
-    name: 'BALANCO HIDRICO UTI',
-    identifier: 'DOC_BALANCO_UTI',
-    version: 4,
-    engines: ['V3', 'V2'],
-    total90d: 8420,
-    lastUsedHoursAgo: 1.4,
-    weights: [0.46, 0.34, 0.15, 0.05],
-    fields: [
-      { cdCampo: 41001, cdMetadado: 9401, tag: 'GANHOS_TOTAIS', name: 'Volume Infundido Total (mL)', visualType: 'Numérico', rulesCount: 0 },
-      { cdCampo: 41002, cdMetadado: 9402, tag: 'PERDAS_TOTAIS', name: 'Diurese e Drenos Total (mL)', visualType: 'Numérico', rulesCount: 0 },
-      { cdCampo: 41003, cdMetadado: 9403, tag: 'SALDO_HIDRICO_TOTAL', name: 'Saldo Hídrico 24h (mL)', visualType: 'Numérico Calculado', rulesCount: 1 },
-    ],
-    rules: [],
-    actions: [],
-  },
-  {
-    id: 504,
-    name: 'EXAMES E PROCEDIMENTOS DIAGNOSTICOS',
-    identifier: 'DOC_EXAMES_PROC',
-    version: 3,
-    engines: ['V3'],
-    total90d: 10960,
-    lastUsedHoursAgo: 2.1,
-    weights: [0.36, 0.29, 0.2, 0.15],
-    fields: [
-      { cdCampo: 50401, cdMetadado: 9501, tag: 'RESULTADO_CRITICO', name: 'Resultados Críticos / Achados', visualType: 'Caixa de Texto', rulesCount: 1 },
-      { cdCampo: 50402, cdMetadado: 9502, tag: 'SINAIS_REFERENCIA', name: 'Parâmetros Basais Associados', visualType: 'Texto', rulesCount: 0 },
-    ],
-    rules: [],
-    actions: [
-      {
-        cdCampo: 50402,
-        cdMetadado: 9502,
-        nomeCampo: 'Parâmetros Basais Associados',
-        identificador: 'SINAIS_REFERENCIA',
-        targetDocId: 215,
-        script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO WHERE PEC.CD_DOCUMENTO = 215`,
-      },
-    ],
-  },
-  {
-    id: 580,
-    name: 'PLANO TERAPEUTICO MULTIPROFISSIONAL',
-    identifier: 'DOC_PLANO_TERAPEUTICO',
-    version: 4,
-    engines: ['V3'],
-    total90d: 7850,
-    lastUsedHoursAgo: 3.0,
-    weights: [0.39, 0.28, 0.23, 0.1],
-    fields: [
-      { cdCampo: 58001, cdMetadado: 9581, tag: 'PLANO_TERAPEUTICO', name: 'Metas Assistenciais da Equipe', visualType: 'Editor Rico', rulesCount: 1 },
-      { cdCampo: 58002, cdMetadado: 9582, tag: 'CID_BASE', name: 'Diagnóstico Referência', visualType: 'Texto', rulesCount: 0 },
-    ],
-    rules: [],
-    actions: [
-      {
-        cdCampo: 58002,
-        cdMetadado: 9582,
-        nomeCampo: 'Diagnóstico Referência',
-        identificador: 'CID_BASE',
-        targetDocId: 101,
-        script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO WHERE PEC.CD_DOCUMENTO = 101`,
-      },
-    ],
-  },
-  {
-    id: 710,
-    name: 'SUMARIO DE TRANSFERENCIA INTERNA',
-    identifier: 'DOC_SUMARIO_TRANSF',
-    version: 3,
-    engines: ['V3', 'V2'],
-    total90d: 5340,
-    lastUsedHoursAgo: 4.5,
-    weights: [0.37, 0.3, 0.18, 0.15],
-    fields: [
-      { cdCampo: 71001, cdMetadado: 9711, tag: 'RESUMO_EVOLUCAO_TRANSF', name: 'Síntese Clínica Pré-Transferência', visualType: 'Editor Rico', rulesCount: 0 },
-      { cdCampo: 71002, cdMetadado: 9712, tag: 'VIT_TRANSF', name: 'Sinais Vitais na Saída', visualType: 'Grade Dinâmica', rulesCount: 0 },
-    ],
-    rules: [],
-    actions: [
-      {
-        cdCampo: 71001,
-        cdMetadado: 9711,
-        nomeCampo: 'Síntese Clínica Pré-Transferência',
-        identificador: 'RESUMO_EVOLUCAO_TRANSF',
-        targetDocId: 382,
-        script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO WHERE PEC.CD_DOCUMENTO IN (382, 215)`,
-      },
-    ],
-  },
-  {
-    id: 772,
-    name: 'EVOLUCAO DE ENFERMAGEM ADMISSIONAL',
-    identifier: 'DOC_EVOL_ENF_ADM',
+    id: 9001,
+    name: 'FICHA DE AVALIACAO CLINICA GERAL AURORA',
+    identifier: 'SBX_AVAL_GERAL_9001',
     version: 7,
     engines: ['V3', 'V2'],
-    total90d: 14680,
-    lastUsedHoursAgo: 1.1,
-    weights: [0.33, 0.27, 0.24, 0.16],
+    total90d: 19450,
+    lastUsedHoursAgo: 0.4,
+    weights: [0.58, 0.42],
     fields: [
-      { cdCampo: 77201, cdMetadado: 9771, tag: 'EVOLUCAO', name: 'Anotação de Enfermagem', visualType: 'Editor Rico', rulesCount: 1 },
-      { cdCampo: 77202, cdMetadado: 9772, tag: 'BRADEN_SCORE', name: 'Escala de Braden', visualType: 'Numérico Calculado', rulesCount: 1 },
+      { cdCampo: 900101, cdMetadado: 99011, tag: 'MOTIVO_ATENDIMENTO', name: 'Motivo Principal da Admissão', visualType: 'Caixa de Texto', rulesCount: 1 },
+      { cdCampo: 900102, cdMetadado: 99012, tag: 'SENSIBILIDADE_MED', name: 'Alertas de Sensibilidade Declarada', visualType: 'Lista Seleção', rulesCount: 2 },
+      { cdCampo: 900103, cdMetadado: 99013, tag: 'REGISTRO_CLINICO', name: 'Registro Clínico Principal', visualType: 'Editor Rico', rulesCount: 1 },
     ],
-    rules: [],
+    rules: [
+      {
+        cdRegra: 91001,
+        numOrdem: 1,
+        dsRegra: 'SBX_REG_SENSIBILIDADE_OBRIGATORIA',
+        ativa: 1,
+        tipoRegra: 'ALERTA',
+        dsAlerta: 'Confirmar sinalização de sensibilidade medicamentosa no cabeçalho assistencial.',
+        condicao: 'SENSIBILIDADE_MED = "POSITIVA"',
+        camposAfetados: 'SENSIBILIDADE_MED, REGISTRO_CLINICO',
+        script: null,
+      },
+    ],
     actions: [],
   },
   {
-    id: 845,
-    name: 'CHECKLIST DE CIRURGIA SEGURA OMS',
-    identifier: 'DOC_CHECKLIST_CIRURGIA',
+    id: 9002,
+    name: 'BOLETIM DE ACOMPANHAMENTO DIARIO INTEGRADO',
+    identifier: 'SBX_BOLETIM_DIARIO_9002',
+    version: 9,
+    engines: ['V3', 'V2'],
+    total90d: 28640,
+    lastUsedHoursAgo: 0.2,
+    weights: [0.55, 0.45],
+    fields: [
+      { cdCampo: 900201, cdMetadado: 99021, tag: 'ALERTA_BASAL', name: 'Sensibilidades Herdadas (Aurora)', visualType: 'Caixa de Texto', rulesCount: 1 },
+      { cdCampo: 900202, cdMetadado: 99022, tag: 'QUADRO_PARAMETROS', name: 'Parâmetros Vitais Recentes', visualType: 'Grade Dinâmica', rulesCount: 1 },
+      { cdCampo: 900203, cdMetadado: 99023, tag: 'SALDO_HIDRICO_SBX', name: 'Balanço Hidroeletrolítico 24h', visualType: 'Numérico Calculado', rulesCount: 1 },
+      { cdCampo: 900204, cdMetadado: 99024, tag: 'REGISTRO_CLINICO', name: 'Registro Clínico Principal', visualType: 'Editor Rico', rulesCount: 2 },
+    ],
+    rules: [
+      {
+        cdRegra: 91002,
+        numOrdem: 1,
+        dsRegra: 'SBX_REG_PROTOCOLO_ESTABILIDADE',
+        ativa: 1,
+        tipoRegra: 'ALERTA',
+        dsAlerta: 'Parâmetros críticos detectados: revisar conduta diária e registrar plano assistencial.',
+        condicao: 'QUADRO_PARAMETROS >= "38.5" OR SALDO_HIDRICO_SBX < "-500"',
+        camposAfetados: 'REGISTRO_CLINICO',
+        script: null,
+      },
+      {
+        cdRegra: 91003,
+        numOrdem: 2,
+        dsRegra: 'SBX_REG_VALIDA_TEXTO_MINIMO',
+        ativa: 1,
+        tipoRegra: 'VALIDACAO',
+        dsAlerta: 'O boletim diário deve conter descrição clínica antes da assinatura.',
+        condicao: 'REGISTRO_CLINICO = ""',
+        camposAfetados: 'REGISTRO_CLINICO',
+        script: null,
+      },
+    ],
+    actions: [
+      {
+        cdCampo: 900201,
+        cdMetadado: 99021,
+        nomeCampo: 'Sensibilidades Herdadas (Aurora)',
+        identificador: 'ALERTA_BASAL',
+        targetDocId: 9001,
+        script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC ON ERC.CD_REGISTRO = PEC.CD_EDITOR_REGISTRO JOIN DBAMV.EDITOR_CAMPO EC ON EC.CD_CAMPO = ERC.CD_CAMPO WHERE PDC.CD_ATENDIMENTO = :CD_ATENDIMENTO AND PEC.CD_DOCUMENTO = 9001 AND EC.DS_IDENTIFICADOR = 'SENSIBILIDADE_MED' ORDER BY PDC.DH_FECHAMENTO DESC`,
+      },
+      {
+        cdCampo: 900202,
+        cdMetadado: 99022,
+        nomeCampo: 'Parâmetros Vitais Recentes',
+        identificador: 'QUADRO_PARAMETROS',
+        targetDocId: 9003,
+        script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC ON ERC.CD_REGISTRO = PEC.CD_EDITOR_REGISTRO JOIN DBAMV.EDITOR_CAMPO EC ON EC.CD_CAMPO = ERC.CD_CAMPO WHERE PDC.CD_ATENDIMENTO = :CD_ATENDIMENTO AND PEC.CD_DOCUMENTO = 9003 AND EC.DS_IDENTIFICADOR = 'PRESSAO_SISTOLICA' ORDER BY PDC.DH_FECHAMENTO DESC`,
+      },
+      {
+        cdCampo: 900203,
+        cdMetadado: 99023,
+        nomeCampo: 'Balanço Hidroeletrolítico 24h',
+        identificador: 'SALDO_HIDRICO_SBX',
+        targetDocId: 9004,
+        script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC ON ERC.CD_REGISTRO = PEC.CD_EDITOR_REGISTRO JOIN DBAMV.EDITOR_CAMPO EC ON EC.CD_CAMPO = ERC.CD_CAMPO WHERE PDC.CD_ATENDIMENTO = :CD_ATENDIMENTO AND PEC.CD_DOCUMENTO = 9004 AND EC.DS_IDENTIFICADOR = 'SALDO_FINAL_24H' ORDER BY PDC.DH_FECHAMENTO DESC`,
+      },
+    ],
+  },
+  {
+    id: 9003,
+    name: 'MAPA DE MONITORAMENTO DE PARAMETROS VITAIS',
+    identifier: 'SBX_PARAM_VITAIS_9003',
     version: 5,
-    engines: ['V3'],
-    total90d: 6120,
-    lastUsedHoursAgo: 5.2,
-    weights: [0.42, 0.35, 0.18, 0.05],
+    engines: ['V3', 'V2'],
+    total90d: 17280,
+    lastUsedHoursAgo: 0.3,
+    weights: [0.52, 0.48],
     fields: [
-      { cdCampo: 84501, cdMetadado: 9841, tag: 'TIME_OUT_OK', name: 'Pausa Cirúrgica Confirmada', visualType: 'CheckBox', rulesCount: 1 },
-      { cdCampo: 84502, cdMetadado: 9842, tag: 'LATERALIDADE', name: 'Demarcação de Lateralidade', visualType: 'Lista Seleção', rulesCount: 1 },
+      { cdCampo: 900301, cdMetadado: 99031, tag: 'PRESSAO_SISTOLICA', name: 'Pressão Arterial Sistólica (mmHg)', visualType: 'Numérico', rulesCount: 1 },
+      { cdCampo: 900302, cdMetadado: 99032, tag: 'SATURACAO_PERIF', name: 'Oximetria Periférica (%)', visualType: 'Numérico', rulesCount: 1 },
+      { cdCampo: 900303, cdMetadado: 99033, tag: 'INDICE_ALERTA_SBX', name: 'Índice de Alerta Precoce Sandbox', visualType: 'Numérico Calculado', rulesCount: 1 },
     ],
-    rules: [],
+    rules: [
+      {
+        cdRegra: 91004,
+        numOrdem: 1,
+        dsRegra: 'SBX_REG_INDICE_ALERTA',
+        ativa: 1,
+        tipoRegra: 'CALCULO',
+        dsAlerta: 'Índice elevado: acionar avaliação clínica prioritária.',
+        condicao: 'PRESSAO_SISTOLICA < "90" OR SATURACAO_PERIF < "92"',
+        camposAfetados: 'INDICE_ALERTA_SBX',
+        script: null,
+      },
+    ],
     actions: [],
   },
   {
-    id: 916,
-    name: 'EVOLUCAO PEDIATRICA ESTRUTURADA',
-    identifier: 'DOC_EVOL_PEDIATRICA',
+    id: 9004,
+    name: 'CONTROLE DE EQUILIBRIO HIDROELETROLITICO',
+    identifier: 'SBX_EQUIL_HIDRO_9004',
     version: 4,
     engines: ['V3', 'V2'],
-    total90d: 4890,
-    lastUsedHoursAgo: 6.4,
-    weights: [0.15, 0.18, 0.57, 0.1],
+    total90d: 7920,
+    lastUsedHoursAgo: 1.3,
+    weights: [0.64, 0.36],
     fields: [
-      { cdCampo: 91601, cdMetadado: 9916, tag: 'EVOLUCAO', name: 'Evolução Clínica Pediátrica', visualType: 'Editor Rico', rulesCount: 1 },
-    ],
-    rules: [],
-    actions: [],
-  },
-  // Legacy V2-only docs awaiting migration to V3
-  {
-    id: 142,
-    name: 'FICHA DE AVALIACAO NUTRICIONAL FLEX',
-    identifier: 'DOC_NUTRI_V2',
-    version: 2,
-    engines: ['V2'],
-    total90d: 3120,
-    lastUsedHoursAgo: 9.0,
-    weights: [0.4, 0.3, 0.2, 0.1],
-    fields: [
-      { cdCampo: 14201, cdMetadado: 8142, tag: 'IMC_ATUAL', name: 'Índice de Massa Corporal', visualType: 'Numérico', rulesCount: 0 },
+      { cdCampo: 900401, cdMetadado: 99041, tag: 'ENTRADA_VOL_ML', name: 'Aporte Hídrico Total (mL)', visualType: 'Numérico', rulesCount: 0 },
+      { cdCampo: 900402, cdMetadado: 99042, tag: 'ELIMINACAO_VOL_ML', name: 'Eliminação Total (mL)', visualType: 'Numérico', rulesCount: 0 },
+      { cdCampo: 900403, cdMetadado: 99043, tag: 'SALDO_FINAL_24H', name: 'Saldo Hídrico Consolidado (mL)', visualType: 'Numérico Calculado', rulesCount: 1 },
     ],
     rules: [],
     actions: [],
   },
   {
-    id: 208,
-    name: 'BOLETIM ANESTESICO PRE-OPERATORIO FLEX',
-    identifier: 'DOC_ANEST_V2',
+    id: 9005,
+    name: 'SUMARIO DE DESFECHO E ORIENTACAO DOMICILIAR',
+    identifier: 'SBX_DESFECHO_9005',
+    version: 6,
+    engines: ['V3'],
+    total90d: 14120,
+    lastUsedHoursAgo: 0.7,
+    weights: [0.54, 0.46],
+    fields: [
+      { cdCampo: 900501, cdMetadado: 99051, tag: 'RESUMO_ADMISSAO', name: 'Resumo da Avaliação Inicial', visualType: 'Editor Rico', rulesCount: 1 },
+      { cdCampo: 900502, cdMetadado: 99052, tag: 'SINTESE_ACOMP', name: 'Síntese do Acompanhamento Diário', visualType: 'Editor Rico', rulesCount: 1 },
+      { cdCampo: 900503, cdMetadado: 99053, tag: 'ACHADOS_DIAG', name: 'Síntese de Exames Relevantes', visualType: 'Caixa de Texto', rulesCount: 0 },
+      { cdCampo: 900504, cdMetadado: 99054, tag: 'ORIENTACAO_SAIDA', name: 'Orientações Domiciliares', visualType: 'Editor Rico', rulesCount: 1 },
+    ],
+    rules: [
+      {
+        cdRegra: 91005,
+        numOrdem: 1,
+        dsRegra: 'SBX_REG_ORIENTACAO_SAIDA',
+        ativa: 1,
+        tipoRegra: 'VALIDACAO',
+        dsAlerta: 'Preencha as orientações domiciliares antes de encerrar o sumário.',
+        condicao: 'ORIENTACAO_SAIDA = ""',
+        camposAfetados: 'ORIENTACAO_SAIDA',
+        script: null,
+      },
+    ],
+    actions: [
+      {
+        cdCampo: 900501,
+        cdMetadado: 99051,
+        nomeCampo: 'Resumo da Avaliação Inicial',
+        identificador: 'RESUMO_ADMISSAO',
+        targetDocId: 9001,
+        script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC ON ERC.CD_REGISTRO = PEC.CD_EDITOR_REGISTRO JOIN DBAMV.EDITOR_CAMPO EC ON EC.CD_CAMPO = ERC.CD_CAMPO WHERE PDC.CD_ATENDIMENTO = :CD_ATENDIMENTO AND PEC.CD_DOCUMENTO = 9001 AND EC.DS_IDENTIFICADOR = 'MOTIVO_ATENDIMENTO' ORDER BY PDC.DH_FECHAMENTO DESC`,
+      },
+      {
+        cdCampo: 900502,
+        cdMetadado: 99052,
+        nomeCampo: 'Síntese do Acompanhamento Diário',
+        identificador: 'SINTESE_ACOMP',
+        targetDocId: 9002,
+        script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC ON ERC.CD_REGISTRO = PEC.CD_EDITOR_REGISTRO JOIN DBAMV.EDITOR_CAMPO EC ON EC.CD_CAMPO = ERC.CD_CAMPO WHERE PDC.CD_ATENDIMENTO = :CD_ATENDIMENTO AND PEC.CD_DOCUMENTO = 9002 AND EC.DS_IDENTIFICADOR = 'REGISTRO_CLINICO' ORDER BY PDC.DH_FECHAMENTO DESC`,
+      },
+      {
+        cdCampo: 900503,
+        cdMetadado: 99053,
+        nomeCampo: 'Síntese de Exames Relevantes',
+        identificador: 'ACHADOS_DIAG',
+        targetDocId: 9006,
+        script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC ON ERC.CD_REGISTRO = PEC.CD_EDITOR_REGISTRO JOIN DBAMV.EDITOR_CAMPO EC ON EC.CD_CAMPO = ERC.CD_CAMPO WHERE PDC.CD_ATENDIMENTO = :CD_ATENDIMENTO AND PEC.CD_DOCUMENTO = 9006 AND EC.DS_IDENTIFICADOR = 'LAUDO_CHAVE' ORDER BY PDC.DH_FECHAMENTO DESC`,
+      },
+      {
+        cdCampo: 900504,
+        cdMetadado: 99054,
+        nomeCampo: 'Orientações Domiciliares',
+        identificador: 'ORIENTACAO_SAIDA',
+        targetDocId: 9007,
+        script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC ON ERC.CD_REGISTRO = PEC.CD_EDITOR_REGISTRO JOIN DBAMV.EDITOR_CAMPO EC ON EC.CD_CAMPO = ERC.CD_CAMPO WHERE PDC.CD_ATENDIMENTO = :CD_ATENDIMENTO AND PEC.CD_DOCUMENTO = 9007 AND EC.DS_IDENTIFICADOR = 'META_REABILITACAO' ORDER BY PDC.DH_FECHAMENTO DESC`,
+      },
+    ],
+  },
+  {
+    id: 9006,
+    name: 'PAINEL DE RESULTADOS DIAGNOSTICOS INTERNOS',
+    identifier: 'SBX_DIAG_INTERNO_9006',
     version: 3,
-    engines: ['V2'],
-    total90d: 4250,
-    lastUsedHoursAgo: 11.5,
-    weights: [0.45, 0.35, 0.15, 0.05],
+    engines: ['V3'],
+    total90d: 9640,
+    lastUsedHoursAgo: 1.9,
+    weights: [0.51, 0.49],
     fields: [
-      { cdCampo: 20801, cdMetadado: 8208, tag: 'ASA_CLASS', name: 'Classificação ASA', visualType: 'Lista Seleção', rulesCount: 0 },
+      { cdCampo: 900601, cdMetadado: 99061, tag: 'LAUDO_CHAVE', name: 'Achados Laboratoriais e Imagem', visualType: 'Caixa de Texto', rulesCount: 1 },
+      { cdCampo: 900602, cdMetadado: 99062, tag: 'VIT_CONTEXTO', name: 'Contexto Basal Associado', visualType: 'Texto', rulesCount: 0 },
+    ],
+    rules: [],
+    actions: [
+      {
+        cdCampo: 900602,
+        cdMetadado: 99062,
+        nomeCampo: 'Contexto Basal Associado',
+        identificador: 'VIT_CONTEXTO',
+        targetDocId: 9003,
+        script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO WHERE PEC.CD_DOCUMENTO = 9003`,
+      },
+    ],
+  },
+  {
+    id: 9007,
+    name: 'ROTEIRO MULTIPROFISSIONAL DE REABILITACAO',
+    identifier: 'SBX_REAB_MULTI_9007',
+    version: 4,
+    engines: ['V3'],
+    total90d: 6810,
+    lastUsedHoursAgo: 2.8,
+    weights: [0.6, 0.4],
+    fields: [
+      { cdCampo: 900701, cdMetadado: 99071, tag: 'META_REABILITACAO', name: 'Metas Assistenciais Semanais', visualType: 'Editor Rico', rulesCount: 1 },
+      { cdCampo: 900702, cdMetadado: 99072, tag: 'FATOR_BASAL', name: 'Fatores Iniciais de Admissão', visualType: 'Texto', rulesCount: 0 },
+    ],
+    rules: [],
+    actions: [
+      {
+        cdCampo: 900702,
+        cdMetadado: 99072,
+        nomeCampo: 'Fatores Iniciais de Admissão',
+        identificador: 'FATOR_BASAL',
+        targetDocId: 9001,
+        script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO WHERE PEC.CD_DOCUMENTO = 9001`,
+      },
+    ],
+  },
+  {
+    id: 9008,
+    name: 'GUIA DE TRANSICAO INTERSETORIAL SANDBOX',
+    identifier: 'SBX_TRANSICAO_9008',
+    version: 3,
+    engines: ['V3', 'V2'],
+    total90d: 4980,
+    lastUsedHoursAgo: 4.1,
+    weights: [0.47, 0.53],
+    fields: [
+      { cdCampo: 900801, cdMetadado: 99081, tag: 'REGISTRO_CLINICO', name: 'Síntese Pré-Movimentação', visualType: 'Editor Rico', rulesCount: 0 },
+      { cdCampo: 900802, cdMetadado: 99082, tag: 'VIT_SAIDA', name: 'Parâmetros Vitais na Saída', visualType: 'Grade Dinâmica', rulesCount: 0 },
+    ],
+    rules: [],
+    actions: [
+      {
+        cdCampo: 900801,
+        cdMetadado: 99081,
+        nomeCampo: 'Síntese Pré-Movimentação',
+        identificador: 'REGISTRO_CLINICO',
+        targetDocId: 9002,
+        script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO WHERE PEC.CD_DOCUMENTO IN (9002, 9003)`,
+      },
+    ],
+  },
+  {
+    id: 9009,
+    name: 'PROTOCOLO DE VERIFICACAO PRE-PROCEDIMENTO',
+    identifier: 'SBX_PRE_PROC_V2_9009',
+    version: 2,
+    engines: ['V2'],
+    total90d: 3540,
+    lastUsedHoursAgo: 7.5,
+    weights: [0.53, 0.47],
+    fields: [
+      { cdCampo: 900901, cdMetadado: 99091, tag: 'CONFERENCIA_SEGURA', name: 'Checklist Pré-Procedimento Confirmado', visualType: 'CheckBox', rulesCount: 0 },
     ],
     rules: [],
     actions: [],
   },
-  // Idle documents (0 use in 90d)
   {
-    id: 991,
-    name: 'PROTOCOLO LEGADO GRIPE SAZONAL 2021',
-    identifier: 'DOC_IDLE_991',
+    id: 9010,
+    name: 'FORMULARIO HISTORICO INATIVO SANDBOX',
+    identifier: 'SBX_INATIVO_9010',
     version: 1,
     engines: ['V3', 'V2'],
     total90d: 0,
-    lastUsedHoursAgo: 2800,
+    lastUsedHoursAgo: 2950,
     idle: true,
-    weights: [0.25, 0.25, 0.25, 0.25],
-    fields: [],
-    rules: [],
-    actions: [],
-  },
-  {
-    id: 994,
-    name: 'FORMULARIO TRANSITORIO TRIAGEM COVID LEGADO',
-    identifier: 'DOC_IDLE_994',
-    version: 1,
-    engines: ['V3', 'V2'],
-    total90d: 0,
-    lastUsedHoursAgo: 3200,
-    idle: true,
-    weights: [0.25, 0.25, 0.25, 0.25],
-    fields: [],
-    rules: [],
-    actions: [],
-  },
-  {
-    id: 997,
-    name: 'FICHA EXPERIMENTO AMBULATORIO DESATIVADA',
-    identifier: 'DOC_IDLE_997',
-    version: 2,
-    engines: ['V3', 'V2'],
-    total90d: 0,
-    lastUsedHoursAgo: 4100,
-    idle: true,
-    weights: [0.25, 0.25, 0.25, 0.25],
+    weights: [0.5, 0.5],
     fields: [],
     rules: [],
     actions: [],
   },
 ];
 
-const DEMO_SIMILARITY_RECORDS = [
+export const DEMO_SIMILARITY_RECORDS = [
   {
-    ATENDIMENTO: 849201,
-    DOCUMENTO: 382,
-    NOME_DOCUMENTO: 'EVOLUCAO MEDICA DIARIA',
-    IDENTIFICADOR: 'EVOLUCAO',
-    DATA_HORA_ISO: '2026-11-23 14:15:00',
-    DATA_HORA: '2026-11-23T14:15:00',
-    PRESTADOR: '10421',
-    NOME_PRESTADOR: 'DR. MARCUS VINICIUS ALMEIDA (DEMO)',
-    LEITO: 'UTI-04',
-    UNIDADE: 'UTI ADULTO',
-    SCORE: 97.4,
-    CD_EMPRESA: 1,
-    NOME_EMPRESA: 'HOSPITAL CENTRAL ALFA (DEMO)',
+    ATENDIMENTO: 770412,
+    DOCUMENTO: 9002,
+    NOME_DOCUMENTO: 'BOLETIM DE ACOMPANHAMENTO DIARIO INTEGRADO',
+    IDENTIFICADOR: 'REGISTRO_CLINICO',
+    DATA_HORA_ISO: '2026-11-23 14:20:00',
+    DATA_HORA: '2026-11-23T14:20:00',
+    PRESTADOR: '90011',
+    NOME_PRESTADOR: 'DR. ARTHUR SILVEIRA QUEIROZ (FICTÍCIO)',
+    LEITO: 'ALA-A-104',
+    UNIDADE: 'TERAPIA INTENSIVA VALE DA AURORA',
+    SCORE: 96.8,
+    CD_EMPRESA: 901,
+    NOME_EMPRESA: 'HOSPITAL VALE DA AURORA (FICTÍCIO)',
     TEXTO_ATUAL:
-      'Paciente consciente, orientado, afebril nas últimas 24h. Mantém estabilidade hemodinâmica sem drogas vasoativas. Murmúrio vesicular presente bilateralmente sem ruídos adventícios. Abdome flácido, indolor à palpação, RHA presentes. Diurese espontânea satisfatória. Conduta: manter antibioticoterapia D4, fisioterapia motora e programar alta da UTI amanhã.',
+      'Paciente vígil, comunicativo e afebril nas últimas 24h. Parâmetros hemodinâmicos estáveis em ar ambiente, boa perfusão periférica e aceitação alimentar plena. Conduta: manter reabilitação motora assistida e reavaliar critérios de transição para enfermaria.',
     TEXTO_ANTERIOR:
-      'Paciente consciente, orientado, afebril nas últimas 24h. Mantém estabilidade hemodinâmica sem drogas vasoativas. Murmúrio vesicular presente bilateralmente sem ruídos adventícios. Abdome flácido, indolor à palpação, RHA presentes. Diurese espontânea satisfatória. Conduta: manter antibioticoterapia D3, fisioterapia motora e reavaliar alta da UTI.',
+      'Paciente vígil, comunicativo e afebril nas últimas 24h. Parâmetros hemodinâmicos estáveis em ar ambiente, boa perfusão periférica e aceitação alimentar satisfatória. Conduta: manter reabilitação motora assistida e reavaliar critérios de transição.',
   },
   {
-    ATENDIMENTO: 849188,
-    DOCUMENTO: 382,
-    NOME_DOCUMENTO: 'EVOLUCAO MEDICA DIARIA',
-    IDENTIFICADOR: 'EVOLUCAO',
-    DATA_HORA_ISO: '2026-11-23 11:40:00',
-    DATA_HORA: '2026-11-23T11:40:00',
-    PRESTADOR: '10421',
-    NOME_PRESTADOR: 'DR. MARCUS VINICIUS ALMEIDA (DEMO)',
-    LEITO: 'UTI-07',
-    UNIDADE: 'UTI ADULTO',
-    SCORE: 92.8,
-    CD_EMPRESA: 1,
-    NOME_EMPRESA: 'HOSPITAL CENTRAL ALFA (DEMO)',
+    ATENDIMENTO: 770398,
+    DOCUMENTO: 9002,
+    NOME_DOCUMENTO: 'BOLETIM DE ACOMPANHAMENTO DIARIO INTEGRADO',
+    IDENTIFICADOR: 'REGISTRO_CLINICO',
+    DATA_HORA_ISO: '2026-11-23 11:05:00',
+    DATA_HORA: '2026-11-23T11:05:00',
+    PRESTADOR: '90011',
+    NOME_PRESTADOR: 'DR. ARTHUR SILVEIRA QUEIROZ (FICTÍCIO)',
+    LEITO: 'ALA-A-109',
+    UNIDADE: 'TERAPIA INTENSIVA VALE DA AURORA',
+    SCORE: 91.2,
+    CD_EMPRESA: 901,
+    NOME_EMPRESA: 'HOSPITAL VALE DA AURORA (FICTÍCIO)',
     TEXTO_ATUAL:
-      'Em acompanhamento pós-operatório D2 de colecistectomia videolaparoscópica. Ferida operatória limpa e seca, sem sinais flogísticos. Aceitando dieta branda sem náuseas ou vômitos. Boa perfusão periférica e débito urinário adequado.',
+      'Pós-operatório D2 sem intercorrências clínicas. Curativo limpo e seco, dor controlada com analgesia simples, diurese espontânea preservada.',
     TEXTO_ANTERIOR:
-      'Em acompanhamento pós-operatório D1 de colecistectomia videolaparoscópica. Ferida operatória limpa e seca, sem sinais flogísticos. Aceitando dieta líquida sem náuseas ou vômitos. Boa perfusão periférica e débito urinário adequado.',
+      'Pós-operatório D1 sem intercorrências clínicas. Curativo limpo e seco, dor controlada com analgesia simples, diurese espontânea adequada.',
   },
   {
-    ATENDIMENTO: 849150,
-    DOCUMENTO: 382,
-    NOME_DOCUMENTO: 'EVOLUCAO MEDICA DIARIA',
-    IDENTIFICADOR: 'EVOLUCAO',
-    DATA_HORA_ISO: '2026-11-23 09:20:00',
-    DATA_HORA: '2026-11-23T09:20:00',
-    PRESTADOR: '11890',
-    NOME_PRESTADOR: 'DRA. CAROLINA FERREIRA MENDES (DEMO)',
-    LEITO: 'ENF-214',
-    UNIDADE: 'CLÍNICA MÉDICA 2º ANDAR',
-    SCORE: 83.5,
-    CD_EMPRESA: 2,
-    NOME_EMPRESA: 'HOSPITAL SANTA BEATRIZ (DEMO)',
+    ATENDIMENTO: 770355,
+    DOCUMENTO: 9002,
+    NOME_DOCUMENTO: 'BOLETIM DE ACOMPANHAMENTO DIARIO INTEGRADO',
+    IDENTIFICADOR: 'REGISTRO_CLINICO',
+    DATA_HORA_ISO: '2026-11-23 08:45:00',
+    DATA_HORA: '2026-11-23T08:45:00',
+    PRESTADOR: '90024',
+    NOME_PRESTADOR: 'DRA. BEATRIZ NOGUEIRA VASCONCELOS (FICTÍCIO)',
+    LEITO: 'SERRA-208',
+    UNIDADE: 'INTERNAÇÃO CLÍNICA SERRA DO MAR',
+    SCORE: 82.4,
+    CD_EMPRESA: 902,
+    NOME_EMPRESA: 'HOSPITAL SERRA DO MAR (FICTÍCIO)',
     TEXTO_ATUAL:
-      'Paciente refere melhora da dispneia em ar ambiente. Saturação 96%, FR 18 irpm, PA 120x80 mmHg. Edema de MMII em regressão (+/4+). Aguarda ecocardiograma transtorácico para ajuste de diurético.',
+      'Apresenta redução expressiva da dispneia após ajuste terapêutico. Saturação periférica 97% em ar ambiente. Programação de exame complementar para revisão ambulatorial.',
     TEXTO_ANTERIOR:
-      'Paciente refere discreta dispneia aos esforços em cateter nasal 2L/min. Saturação 94%, FR 20 irpm, PA 130x80 mmHg. Edema de MMII ++/4+. Solicitado ecocardiograma transtorácico para ajuste de diurético.',
+      'Refere dispneia leve aos médios esforços em suporte nasal de baixo fluxo. Saturação periférica 94%. Solicitado exame complementar de controle.',
   },
   {
-    ATENDIMENTO: 849099,
-    DOCUMENTO: 382,
-    NOME_DOCUMENTO: 'EVOLUCAO MEDICA DIARIA',
-    IDENTIFICADOR: 'EVOLUCAO',
-    DATA_HORA_ISO: '2026-11-22 18:10:00',
-    DATA_HORA: '2026-11-22T18:10:00',
-    PRESTADOR: '12504',
-    NOME_PRESTADOR: 'DR. RAFAEL COSTA NOGUEIRA (DEMO)',
-    LEITO: 'ENF-109',
-    UNIDADE: 'CLÍNICA CIRÚRGICA',
-    SCORE: 64.2,
-    CD_EMPRESA: 2,
-    NOME_EMPRESA: 'HOSPITAL SANTA BEATRIZ (DEMO)',
+    ATENDIMENTO: 770301,
+    DOCUMENTO: 9001,
+    NOME_DOCUMENTO: 'FICHA DE AVALIACAO CLINICA GERAL AURORA',
+    IDENTIFICADOR: 'REGISTRO_CLINICO',
+    DATA_HORA_ISO: '2026-11-22 17:30:00',
+    DATA_HORA: '2026-11-22T17:30:00',
+    PRESTADOR: '90037',
+    NOME_PRESTADOR: 'DR. HENRIQUE MONTEIRO TAVARES (FICTÍCIO)',
+    LEITO: 'SERRA-112',
+    UNIDADE: 'PRONTO ATENDIMENTO SERRA DO MAR',
+    SCORE: 38.5,
+    CD_EMPRESA: 902,
+    NOME_EMPRESA: 'HOSPITAL SERRA DO MAR (FICTÍCIO)',
     TEXTO_ATUAL:
-      'Evolução vespertina: apresenta picos febris isolados (37.9°C). Realizada coleta de hemoculturas pareadas e escalonamento antimicrobiano conforme protocolo institucional. Paciente orientado e colaborativo.',
+      'Reavaliação após hidratação venosa e controle sintomático: paciente normotenso, sem dor abdominal à palpação profunda e liberado com plano de acompanhamento.',
     TEXTO_ANTERIOR:
-      'Evolução matinal: paciente sem queixas álgicas importantes, normotenso, afebril no período noturno. Mantido em observação clínica.',
-  },
-  {
-    ATENDIMENTO: 849042,
-    DOCUMENTO: 382,
-    NOME_DOCUMENTO: 'EVOLUCAO MEDICA DIARIA',
-    IDENTIFICADOR: 'EVOLUCAO',
-    DATA_HORA_ISO: '2026-11-22 14:05:00',
-    DATA_HORA: '2026-11-22T14:05:00',
-    PRESTADOR: '13012',
-    NOME_PRESTADOR: 'DRA. JULIANA ROCHA SILVEIRA (DEMO)',
-    LEITO: 'PED-12',
-    UNIDADE: 'ENFERMARIA PEDIÁTRICA',
-    SCORE: 29.4,
-    CD_EMPRESA: 3,
-    NOME_EMPRESA: 'HOSPITAL MATERNO INFANTIL (DEMO)',
-    TEXTO_ATUAL:
-      'Criança hidratada, ativa e reativa ao exame físico, aceitando bem via oral e aleitamento complementar. Sibilância resolvida após ciclo de broncodilatador inalatório. Pais orientados quanto aos sinais de alarme para possível alta hospitalar.',
-    TEXTO_ANTERIOR:
-      'Admissão com esforço respiratório moderado, tiragem subcostal discreta e sibilos expiratórios difusos. Iniciado oxigenioterapia em cateter nasal e broncodilatador de resgate.',
-  },
-  {
-    ATENDIMENTO: 848980,
-    DOCUMENTO: 916,
-    NOME_DOCUMENTO: 'EVOLUCAO PEDIATRICA ESTRUTURADA',
-    IDENTIFICADOR: 'EVOLUCAO',
-    DATA_HORA_ISO: '2026-11-23 10:00:00',
-    DATA_HORA: '2026-11-23T10:00:00',
-    PRESTADOR: '13012',
-    NOME_PRESTADOR: 'DRA. JULIANA ROCHA SILVEIRA (DEMO)',
-    LEITO: 'PED-05',
-    UNIDADE: 'ENFERMARIA PEDIÁTRICA',
-    SCORE: 88.1,
-    CD_EMPRESA: 3,
-    NOME_EMPRESA: 'HOSPITAL MATERNO INFANTIL (DEMO)',
-    TEXTO_ATUAL:
-      'Lactente corado, hidratado, acianótico, eupneico em ar ambiente. Ausculta pulmonar limpa. Mantém boa aceitação alimentar e peso estável.',
-    TEXTO_ANTERIOR:
-      'Lactente corado, hidratado, acianótico, eupneico em ar ambiente. Ausculta pulmonar com discretos roncos de transmissão. Boa aceitação alimentar.',
+      'Admissão com quadro agudo de desconforto abdominal difuso e náuseas há 12 horas. Iniciada hidratação e investigação diagnóstica.',
   },
 ];
 
-function formatDateBr(date: Date): string {
-  return date.toISOString();
+// Estado em memória isolado para Migração V2 -> V3 no modo Sandbox
+export const DEMO_MIGRATION_DEMANDS: DocumentoMigracao[] = [
+  {
+    id: 'demo-mig-1',
+    documento_flex_id: '9001',
+    documento_html5_id: '9001',
+    status: 'EM_PRODUCAO',
+    complexidade: 'MEDIA',
+    responsavel: 'Equipe Sandbox Alfa',
+    responsavel_dev: 'Analista Demo Alfa',
+    responsavel_perfil: 'Coordenação PEP Demo',
+    lecom: 'SBX-101',
+    codigo_objeto: '401',
+    tipo_documento: 'Avaliação Inicial',
+    campos_relacionados: 'MOTIVO_ATENDIMENTO, SENSIBILIDADE_MED',
+    regras_negocio: 'SBX_REG_SENSIBILIDADE_OBRIGATORIA',
+    observacoes: 'Documento fictício migrado integralmente para o Editor HTML5.',
+    checklist: [],
+    data_inicio: '2026-10-05',
+    data_conclusao_prevista: '2026-10-25',
+    data_conclusao_efetiva: '2026-10-24',
+    created_at: '2026-10-05T10:00:00.000Z',
+    updated_at: '2026-10-24T15:00:00.000Z',
+  },
+  {
+    id: 'demo-mig-2',
+    documento_flex_id: '9002',
+    documento_html5_id: '9002',
+    status: 'HOMOLOGACAO',
+    complexidade: 'ALTA',
+    responsavel: 'Equipe Sandbox Beta',
+    responsavel_dev: 'Analista Demo Beta',
+    responsavel_perfil: 'Coordenação PEP Demo',
+    lecom: 'SBX-102',
+    codigo_objeto: '402',
+    tipo_documento: 'Boletim Diário',
+    campos_relacionados: 'ALERTA_BASAL, QUADRO_PARAMETROS, SALDO_HIDRICO_SBX',
+    regras_negocio: 'SBX_REG_PROTOCOLO_ESTABILIDADE',
+    observacoes: 'Em validação funcional nas unidades fictícias HVA e HSM.',
+    checklist: [],
+    data_inicio: '2026-11-02',
+    data_conclusao_prevista: '2026-11-28',
+    data_conclusao_efetiva: null,
+    created_at: '2026-11-02T09:30:00.000Z',
+    updated_at: '2026-11-20T14:15:00.000Z',
+  },
+  {
+    id: 'demo-mig-3',
+    documento_flex_id: '9009',
+    documento_html5_id: null,
+    status: 'DESENVOLVIMENTO',
+    complexidade: 'BAIXA',
+    responsavel: 'Equipe Sandbox Alfa',
+    responsavel_dev: 'Analista Demo Alfa',
+    responsavel_perfil: null,
+    lecom: 'SBX-103',
+    codigo_objeto: '409',
+    tipo_documento: 'Checklist',
+    campos_relacionados: 'CONFERENCIA_SEGURA',
+    regras_negocio: 'Validação de etapa pré-procedimento',
+    observacoes: 'Conversão em andamento do layout legado Flex.',
+    checklist: [],
+    data_inicio: '2026-11-12',
+    data_conclusao_prevista: '2026-12-05',
+    data_conclusao_efetiva: null,
+    created_at: '2026-11-12T11:00:00.000Z',
+    updated_at: '2026-11-21T16:40:00.000Z',
+  },
+  {
+    id: 'demo-mig-4',
+    documento_flex_id: '9008',
+    documento_html5_id: '9008',
+    status: 'PENDENTES',
+    complexidade: 'MEDIA',
+    responsavel: 'Equipe Sandbox Beta',
+    responsavel_dev: null,
+    responsavel_perfil: 'Coordenação PEP Demo',
+    lecom: 'SBX-104',
+    codigo_objeto: '408',
+    tipo_documento: 'Transição de Cuidado',
+    campos_relacionados: 'REGISTRO_CLINICO, VIT_SAIDA',
+    regras_negocio: null,
+    observacoes: 'Aguardando janela de implantação assistencial.',
+    checklist: [],
+    data_inicio: null,
+    data_conclusao_prevista: '2026-12-15',
+    data_conclusao_efetiva: null,
+    created_at: '2026-11-18T13:20:00.000Z',
+    updated_at: '2026-11-18T13:20:00.000Z',
+  },
+];
+
+// Estado em memória isolado para Dependências BI no modo Sandbox
+export const DEMO_BI_ARTIFACTS: BiArtifact[] = [
+  {
+    id: 'demo-bi-1',
+    nome: 'Painel Sandbox de Adesão aos Boletins Diários',
+    descricao: 'Dashboard fictício para demonstrar o rastreamento entre campos do PEP e indicadores executivos.',
+    tipo: 'PAINEL_BI',
+    ferramenta: 'Power BI',
+    responsavel: 'Núcleo Analítico Sandbox',
+    area: 'Inteligência Assistencial (Demo)',
+    url: 'https://sandbox.goverdoc.local/bi/boletins-diarios',
+    criticidade: 'ALTA',
+    unidades: ['HVA', 'HSM'],
+    documentosVinculados: [
+      {
+        docId: '9002',
+        docName: 'BOLETIM DE ACOMPANHAMENTO DIARIO INTEGRADO',
+        motor: 'V3',
+        fields: ['REGISTRO_CLINICO', 'QUADRO_PARAMETROS'],
+        observacao: 'Mapeamento demonstrativo entre boletim diário e painel gerencial.',
+      },
+    ],
+    criadoEm: '2026-11-01T10:00:00.000Z',
+    atualizadoEm: '2026-11-01T10:00:00.000Z',
+  },
+  {
+    id: 'demo-bi-2',
+    nome: 'Indicador Fictício de Desfecho & Giro Hospitalar',
+    descricao: 'Indicador demonstrativo que consolida orientações domiciliares e metas multiprofissionais.',
+    tipo: 'INDICADOR',
+    ferramenta: 'Qlik',
+    responsavel: 'Escritório de Qualidade Sandbox',
+    area: 'Governança Clínica (Demo)',
+    url: 'https://sandbox.goverdoc.local/bi/desfecho-giro',
+    criticidade: 'ALTA',
+    unidades: ['HVA'],
+    documentosVinculados: [
+      {
+        docId: '9005',
+        docName: 'SUMARIO DE DESFECHO E ORIENTACAO DOMICILIAR',
+        motor: 'V3',
+        fields: ['ORIENTACAO_SAIDA', 'SINTESE_ACOMP'],
+        observacao: 'KPI fictício vinculado ao sumário de desfecho.',
+      },
+      {
+        docId: '9007',
+        docName: 'ROTEIRO MULTIPROFISSIONAL DE REABILITACAO',
+        motor: 'V3',
+        fields: ['META_REABILITACAO'],
+        observacao: 'Cruzamento de metas atingidas na reabilitação.',
+      },
+    ],
+    criadoEm: '2026-11-04T14:20:00.000Z',
+    atualizadoEm: '2026-11-04T14:20:00.000Z',
+  },
+  {
+    id: 'demo-bi-3',
+    nome: 'Relatório Demonstrativo de Rastreio Inicial',
+    descricao: 'Relatório fictício para auditoria de preenchimento de sensibilidades medicamentosas na admissão.',
+    tipo: 'RELATORIO',
+    ferramenta: 'MV',
+    responsavel: 'Segurança do Paciente Sandbox',
+    area: 'Operações Assistenciais (Demo)',
+    url: '',
+    criticidade: 'MEDIA',
+    unidades: ['HSM'],
+    documentosVinculados: [
+      {
+        docId: '9001',
+        docName: 'FICHA DE AVALIACAO CLINICA GERAL AURORA',
+        motor: 'V3',
+        fields: ['SENSIBILIDADE_MED'],
+        observacao: 'Monitoramento simulado de alertas iniciais.',
+      },
+    ],
+    criadoEm: '2026-11-08T09:00:00.000Z',
+    atualizadoEm: '2026-11-08T09:00:00.000Z',
+  },
+];
+
+export function getDemoMigrationCatalog(): {
+  docsFlexTotal: DocumentoFlexItem[];
+  docsHtml5Total: DocumentoFlexItem[];
+} {
+  const now = Date.now();
+  const docsFlexTotal: DocumentoFlexItem[] = DEMO_DOCS.filter((d) => d.engines.includes('V2')).map((d) => ({
+    id: String(d.id),
+    cd_documento_mv: d.id,
+    nome: d.name,
+    tecnologia: 'FLEX',
+    total_usos: d.total90d,
+    ultimo_uso: new Date(now - d.lastUsedHoursAgo * 3600_000).toISOString(),
+  }));
+
+  const docsHtml5Total: DocumentoFlexItem[] = DEMO_DOCS.filter((d) => d.engines.includes('V3')).map((d) => ({
+    id: String(d.id),
+    cd_documento_mv: d.id,
+    nome: d.name,
+    tecnologia: 'HTML5',
+    total_usos: d.total90d,
+    ultimo_uso: new Date(now - d.lastUsedHoursAgo * 3600_000).toISOString(),
+  }));
+
+  return { docsFlexTotal, docsHtml5Total };
+}
+
+export function getDemoBiCatalogDocs(): BiCatalogDocOption[] {
+  return DEMO_DOCS.map((d) => ({
+    id: String(d.id),
+    nome: d.name,
+    motor: d.engines.includes('V3') ? 'V3' : 'V2',
+    totalUsos: d.total90d,
+  }));
 }
 
 function getBindValue(binds: Record<string, unknown> | unknown[] | undefined, key: string): string {
@@ -596,22 +691,15 @@ function getBindValue(binds: Record<string, unknown> | unknown[] | undefined, ke
   return direct !== undefined && direct !== null ? String(direct) : '';
 }
 
-function distributeByHospital(total: number, weights: number[], hospitals: HospitalMapping[]): Record<string, number> {
-  const result: Record<string, number> = {};
-  const active = hospitals.filter((h) => h.ativo !== false);
-  const list = active.length > 0 ? active : DEFAULT_DEMO_HOSPITALS;
-  let assigned = 0;
-  list.forEach((h, idx) => {
-    if (idx === list.length - 1) {
-      result[h.sigla] = Math.max(0, total - assigned);
-    } else {
-      const w = weights[idx % weights.length] ?? 1 / list.length;
-      const val = Math.round((total * w) / list.reduce((acc, _, i) => acc + (weights[i % weights.length] ?? 1 / list.length), 0));
-      result[h.sigla] = val;
-      assigned += val;
-    }
-  });
-  return result;
+function distributeBetweenDemoHospitals(total: number, weights: [number, number]): Record<string, number> {
+  const [w0, w1] = weights;
+  const sum = w0 + w1 || 1;
+  const v0 = Math.round((total * w0) / sum);
+  const v1 = Math.max(0, total - v0);
+  return {
+    [DEFAULT_DEMO_HOSPITALS[0].sigla]: v0,
+    [DEFAULT_DEMO_HOSPITALS[1].sigla]: v1,
+  };
 }
 
 function parseInIds(sql: string): number[] {
@@ -625,18 +713,61 @@ function parseInIds(sql: string): number[] {
 
 /**
  * Executes a deterministic synthetic response matching the Oracle SQL query patterns used across Goverdoc Pro.
+ * Always uses strictly the 2 fictional companies and 10 fictional documents defined in this module.
  */
 export function executeDemoQuery(
   sql: string,
-  binds?: Record<string, unknown> | unknown[],
-  hospitalsInput?: HospitalMapping[]
+  binds?: Record<string, unknown> | unknown[]
 ): Record<string, unknown>[] {
   const upperSql = (sql || '').toUpperCase();
-  const hospitals =
-    hospitalsInput && hospitalsInput.length > 0 ? hospitalsInput : DEFAULT_DEMO_HOSPITALS;
-  const activeHospitals = hospitals.filter((h) => h.ativo !== false);
-  const effectiveHospitals = activeHospitals.length > 0 ? activeHospitals : DEFAULT_DEMO_HOSPITALS;
+  const effectiveHospitals = DEFAULT_DEMO_HOSPITALS;
   const now = Date.now();
+
+  // 0. Companies List (/api/empresas)
+  if (upperSql.includes('MULTI_EMPRESAS') || upperSql.includes('NM_FANTASIA')) {
+    return effectiveHospitals.map((h) => ({
+      CD_MULTI_EMPRESA: h.id,
+      NM_FANTASIA: h.nome,
+    }));
+  }
+
+  // 0b. Document Version Compare (/api/documentos/compare)
+  if (upperSql.includes('VL_VERSAO IN (:VA, :VB)')) {
+    const docId = Number(getBindValue(binds, 'DOC_ID')) || 9002;
+    const vA = Number(getBindValue(binds, 'VA')) || 1;
+    const vB = Number(getBindValue(binds, 'VB')) || 2;
+    const doc = DEMO_DOCS.find((d) => d.id === docId) || DEMO_DOCS[1];
+
+    if (upperSql.includes('NOME_CAMPO') && upperSql.includes('IDENTIFICADOR')) {
+      const fieldsA = doc.fields.slice(0, Math.max(1, doc.fields.length - 1)).map((f) => ({
+        VERSAO: vA,
+        CD_CAMPO: f.cdCampo,
+        IDENTIFICADOR: f.tag,
+        NOME_CAMPO: f.name,
+      }));
+      const fieldsB = doc.fields.map((f) => ({
+        VERSAO: vB,
+        CD_CAMPO: f.cdCampo,
+        IDENTIFICADOR: f.tag,
+        NOME_CAMPO: f.name,
+      }));
+      return [...fieldsA, ...fieldsB];
+    }
+
+    if (upperSql.includes('NOME_REGRA') && upperSql.includes('CD_REGRA')) {
+      const rulesB = doc.rules.map((r) => ({
+        VERSAO: vB,
+        CD_REGRA: r.cdRegra,
+        NOME_REGRA: r.dsRegra,
+      }));
+      const rulesA = doc.rules.slice(0, 1).map((r) => ({
+        VERSAO: vA,
+        CD_REGRA: r.cdRegra,
+        NOME_REGRA: r.dsRegra,
+      }));
+      return [...rulesA, ...rulesB];
+    }
+  }
 
   // 1. Similarity Diff Modal Query (TEXTO_ATUAL / TEXTO_ANTERIOR)
   if (upperSql.includes('TEXTO_ATUAL') && upperSql.includes('TEXTO_ANTERIOR')) {
@@ -649,13 +780,13 @@ export function executeDemoQuery(
     return [
       {
         TEXTO_ATUAL: match.TEXTO_ATUAL,
-        DATA_HORA_ATUAL: '23/11/2026 14:15:00',
-        CD_DOCUMENTO_ATUAL: 991240,
-        CD_REGISTRO_ATUAL: 551020,
+        DATA_HORA_ATUAL: '23/11/2026 14:20:00',
+        CD_DOCUMENTO_ATUAL: 995120,
+        CD_REGISTRO_ATUAL: 881020,
         TEXTO_ANTERIOR: match.TEXTO_ANTERIOR,
-        DATA_HORA_ANTERIOR: '22/11/2026 14:05:00',
-        CD_DOCUMENTO_ANTERIOR: 990812,
-        CD_REGISTRO_ANTERIOR: 550418,
+        DATA_HORA_ANTERIOR: '22/11/2026 14:10:00',
+        CD_DOCUMENTO_ANTERIOR: 994810,
+        CD_REGISTRO_ANTERIOR: 880415,
       },
     ];
   }
@@ -667,7 +798,7 @@ export function executeDemoQuery(
     let filtered = DEMO_SIMILARITY_RECORDS;
     if (cdDoc) {
       const byDoc = filtered.filter((r) => r.DOCUMENTO === cdDoc);
-      filtered = byDoc.length > 0 ? byDoc : filtered.slice(0, 4).map((r) => ({ ...r, DOCUMENTO: cdDoc }));
+      filtered = byDoc.length > 0 ? byDoc : filtered.slice(0, 3).map((r) => ({ ...r, DOCUMENTO: cdDoc }));
     }
     if (cdEmp) {
       filtered = filtered.filter((r) => r.CD_EMPRESA === cdEmp);
@@ -738,45 +869,43 @@ export function executeDemoQuery(
     const docsSlice = DEMO_DOCS.slice(0, 4);
     return docsSlice.map((d, i) => ({
       COD_PERFIL_MODULO: 5000 + cdPerfil * 10 + i,
-      MODULO: 'PEP_DOC_CLINICO',
+      MODULO: 'PEP_SANDBOX_DOC',
       COD_PERFIL_MODULO_PAI: 5000,
       TITULO: d.name,
-      AGRUPADOR: 'DOCUMENTOS CLÍNICOS',
+      AGRUPADOR: 'DOCUMENTOS FICTÍCIOS',
       COD_MOD_PARAMETRO: 8000 + i,
-      MODULO_PARAMETRO: 'PEP_DOC_CLINICO',
+      MODULO_PARAMETRO: 'PEP_SANDBOX_DOC',
       PARAMETRO: 'CD_DOCUMENTO',
       COD_PERFIL_MOD_ORIGEM: 5000 + cdPerfil * 10 + i,
       VALOR_PARAMETRO: `${d.id} - ${d.name}`,
-      DESC_VALOR_PARAMETRO: 'Documento clínico habilitado no perfil',
+      DESC_VALOR_PARAMETRO: 'Documento fictício habilitado no perfil',
     }));
   }
 
   // 7. Ambulatory Profiles List
   if (upperSql.includes('COD_PERFIL') && upperSql.includes('NOME_PERFIL')) {
     return [
-      { COD_PERFIL: 12, NOME_PERFIL: 'CLÍNICA MÉDICA - INTERNAÇÃO (DEMO)', COD_ESPECIALIDADE: 10, ESPECIALIDADE: 'CLÍNICA MÉDICA', SISTEMA: 'PEP', PORTA_ENTRADA: 'I', TIPO_ATENDIMENTO: 'I', COD_TIPO_PRESTADOR: 1, NOME_TIPO_PRESTADOR: 'MÉDICO', COD_SETOR: 101, NOME_SETOR: 'ENFERMARIA CLÍNICA', EMPRESA_FIXA: 1 },
-      { COD_PERFIL: 18, NOME_PERFIL: 'UTI ADULTO - PLANTÃO MÉDICO (DEMO)', COD_ESPECIALIDADE: 22, ESPECIALIDADE: 'MEDICINA INTENSIVA', SISTEMA: 'PEP', PORTA_ENTRADA: 'I', TIPO_ATENDIMENTO: 'I', COD_TIPO_PRESTADOR: 1, NOME_TIPO_PRESTADOR: 'MÉDICO', COD_SETOR: 204, NOME_SETOR: 'UTI ADULTO A', EMPRESA_FIXA: 1 },
-      { COD_PERFIL: 24, NOME_PERFIL: 'ENFERMAGEM ASSISTENCIAL (DEMO)', COD_ESPECIALIDADE: null, ESPECIALIDADE: 'MULTIDISCIPLINAR', SISTEMA: 'PEP', PORTA_ENTRADA: 'I', TIPO_ATENDIMENTO: 'I', COD_TIPO_PRESTADOR: 2, NOME_TIPO_PRESTADOR: 'ENFERMEIRO', COD_SETOR: 101, NOME_SETOR: 'ENFERMARIA CLÍNICA', EMPRESA_FIXA: null },
-      { COD_PERFIL: 31, NOME_PERFIL: 'PRONTO SOCORRO ADULTO (DEMO)', COD_ESPECIALIDADE: 14, ESPECIALIDADE: 'EMERGÊNCIA', SISTEMA: 'PEP', PORTA_ENTRADA: 'U', TIPO_ATENDIMENTO: 'U', COD_TIPO_PRESTADOR: 1, NOME_TIPO_PRESTADOR: 'MÉDICO', COD_SETOR: 301, NOME_SETOR: 'PRONTO ATENDIMENTO', EMPRESA_FIXA: 4 },
-      { COD_PERFIL: 45, NOME_PERFIL: 'PEDIATRIA HOSPITALAR (DEMO)', COD_ESPECIALIDADE: 35, ESPECIALIDADE: 'PEDIATRIA', SISTEMA: 'PEP', PORTA_ENTRADA: 'I', TIPO_ATENDIMENTO: 'I', COD_TIPO_PRESTADOR: 1, NOME_TIPO_PRESTADOR: 'MÉDICO', COD_SETOR: 402, NOME_SETOR: 'PEDIATRIA', EMPRESA_FIXA: 3 },
+      { COD_PERFIL: 91, NOME_PERFIL: 'INTERNAÇÃO CLÍNICA AURORA (DEMO)', COD_ESPECIALIDADE: 10, ESPECIALIDADE: 'CLÍNICA MÉDICA', SISTEMA: 'PEP', PORTA_ENTRADA: 'I', TIPO_ATENDIMENTO: 'I', COD_TIPO_PRESTADOR: 1, NOME_TIPO_PRESTADOR: 'MÉDICO', COD_SETOR: 911, NOME_SETOR: 'ALA AURORA SUL', EMPRESA_FIXA: 901 },
+      { COD_PERFIL: 92, NOME_PERFIL: 'TERAPIA INTENSIVA VALE DA AURORA (DEMO)', COD_ESPECIALIDADE: 22, ESPECIALIDADE: 'MEDICINA INTENSIVA', SISTEMA: 'PEP', PORTA_ENTRADA: 'I', TIPO_ATENDIMENTO: 'I', COD_TIPO_PRESTADOR: 1, NOME_TIPO_PRESTADOR: 'MÉDICO', COD_SETOR: 912, NOME_SETOR: 'UTI AURORA', EMPRESA_FIXA: 901 },
+      { COD_PERFIL: 93, NOME_PERFIL: 'ENFERMAGEM SERRA DO MAR (DEMO)', COD_ESPECIALIDADE: null, ESPECIALIDADE: 'MULTIDISCIPLINAR', SISTEMA: 'PEP', PORTA_ENTRADA: 'I', TIPO_ATENDIMENTO: 'I', COD_TIPO_PRESTADOR: 2, NOME_TIPO_PRESTADOR: 'ENFERMEIRO', COD_SETOR: 921, NOME_SETOR: 'UNIDADE SERRA B', EMPRESA_FIXA: 902 },
+      { COD_PERFIL: 94, NOME_PERFIL: 'PRONTO ATENDIMENTO SERRA DO MAR (DEMO)', COD_ESPECIALIDADE: 14, ESPECIALIDADE: 'URGÊNCIA', SISTEMA: 'PEP', PORTA_ENTRADA: 'U', TIPO_ATENDIMENTO: 'U', COD_TIPO_PRESTADOR: 1, NOME_TIPO_PRESTADOR: 'MÉDICO', COD_SETOR: 922, NOME_SETOR: 'PA SERRA', EMPRESA_FIXA: 902 },
     ];
   }
 
   // 8. Document Profile Bindings (:CD_DOCUMENTO)
   if (upperSql.includes('DS_PERFIL_AMBULATORIAL')) {
-    const cdDoc = Number(getBindValue(binds, 'CD_DOCUMENTO')) || 382;
-    const empLabel = effectiveHospitals.map((h) => h.sigla).slice(0, 3).join(', ');
+    const cdDoc = Number(getBindValue(binds, 'CD_DOCUMENTO')) || 9002;
     return [
-      { CD_DOCUMENTO: cdDoc, NM_TITULO: 'Documentos Clínicos > Evolução/Registro', DS_PERFIL_AMBULATORIAL: 'CLÍNICA MÉDICA - INTERNAÇÃO (DEMO)', EMPRESA: empLabel || 'TODAS' },
-      { CD_DOCUMENTO: cdDoc, NM_TITULO: 'Prontuário > Terapia Intensiva', DS_PERFIL_AMBULATORIAL: 'UTI ADULTO - PLANTÃO MÉDICO (DEMO)', EMPRESA: effectiveHospitals[0]?.sigla || 'HCA' },
-      { CD_DOCUMENTO: cdDoc, NM_TITULO: 'Urgência e Emergência', DS_PERFIL_AMBULATORIAL: 'PRONTO SOCORRO ADULTO (DEMO)', EMPRESA: effectiveHospitals[effectiveHospitals.length - 1]?.sigla || 'UPA' },
+      { CD_DOCUMENTO: cdDoc, NM_TITULO: 'Prontuário Sandbox > Acompanhamento', DS_PERFIL_AMBULATORIAL: 'INTERNAÇÃO CLÍNICA AURORA (DEMO)', EMPRESA: 'HVA' },
+      { CD_DOCUMENTO: cdDoc, NM_TITULO: 'Prontuário Sandbox > Terapia Intensiva', DS_PERFIL_AMBULATORIAL: 'TERAPIA INTENSIVA VALE DA AURORA (DEMO)', EMPRESA: 'HVA' },
+      { CD_DOCUMENTO: cdDoc, NM_TITULO: 'Prontuário Sandbox > Enfermaria Serra', DS_PERFIL_AMBULATORIAL: 'ENFERMAGEM SERRA DO MAR (DEMO)', EMPRESA: 'HSM' },
     ];
   }
 
   // 9. Document Metadata (Versions & Layouts)
   if (upperSql.includes('CODIGO_DOCUMENTO') && upperSql.includes('VALOR_VERSAO')) {
-    const cdDoc = Number(getBindValue(binds, 'CD_DOCUMENTO')) || 382;
-    const doc = DEMO_DOCS.find((d) => d.id === cdDoc) || DEMO_DOCS[0];
+    const cdDoc = Number(getBindValue(binds, 'CD_DOCUMENTO')) || 9002;
+    const doc = DEMO_DOCS.find((d) => d.id === cdDoc) || DEMO_DOCS[1];
     return [
       {
         CODIGO_DOCUMENTO: doc.id,
@@ -784,17 +913,17 @@ export function executeDemoQuery(
         IDENTIFICADOR_DOCUMENTO: doc.identifier,
         CODIGO_VERSAO_DOCUMENTO: doc.id * 10 + doc.version,
         CODIGO_TIPO_LAYOUT: 1,
-        IDENTIFICADOR_LAYOUT: 'CORPO_PRINCIPAL',
-        DESCRICAO_TIPO_LAYOUT: 'Corpo Principal do Documento',
+        IDENTIFICADOR_LAYOUT: 'CORPO_SANDBOX',
+        DESCRICAO_TIPO_LAYOUT: 'Corpo Principal do Documento (Demo)',
         VALOR_VERSAO: doc.version,
         STATUS_ATIVO: 1,
         CODIGO_TIPO_VERSAO: 3,
         DESCRICAO_TIPO_VERSAO: 'Publicado',
-        CODIGO_LAYOUT_CABECALHO: 901,
-        DOCUMENTO_CABECALHO: 50,
-        CODIGO_LAYOUT_RODAPE: 902,
+        CODIGO_LAYOUT_CABECALHO: 9901,
+        DOCUMENTO_CABECALHO: 9000,
+        CODIGO_LAYOUT_RODAPE: 9902,
         QUANTIDADE_REGRAS: doc.rules.length,
-        QUANTIDADE_CAMPOS: doc.fields.length || 4,
+        QUANTIDADE_CAMPOS: doc.fields.length || 2,
       },
       {
         CODIGO_DOCUMENTO: doc.id,
@@ -802,24 +931,24 @@ export function executeDemoQuery(
         IDENTIFICADOR_DOCUMENTO: doc.identifier,
         CODIGO_VERSAO_DOCUMENTO: doc.id * 10 + Math.max(1, doc.version - 1),
         CODIGO_TIPO_LAYOUT: 1,
-        IDENTIFICADOR_LAYOUT: 'CORPO_PRINCIPAL',
-        DESCRICAO_TIPO_LAYOUT: 'Versão Anterior (Histórico)',
+        IDENTIFICADOR_LAYOUT: 'CORPO_SANDBOX',
+        DESCRICAO_TIPO_LAYOUT: 'Versão Anterior (Histórico Demo)',
         VALOR_VERSAO: Math.max(1, doc.version - 1),
         STATUS_ATIVO: 0,
         CODIGO_TIPO_VERSAO: 2,
         DESCRICAO_TIPO_VERSAO: 'Histórico',
-        CODIGO_LAYOUT_CABECALHO: 901,
-        DOCUMENTO_CABECALHO: 50,
-        CODIGO_LAYOUT_RODAPE: 902,
+        CODIGO_LAYOUT_CABECALHO: 9901,
+        DOCUMENTO_CABECALHO: 9000,
+        CODIGO_LAYOUT_RODAPE: 9902,
         QUANTIDADE_REGRAS: Math.max(0, doc.rules.length - 1),
-        QUANTIDADE_CAMPOS: Math.max(2, doc.fields.length - 1),
+        QUANTIDADE_CAMPOS: Math.max(1, doc.fields.length - 1),
       },
     ];
   }
 
   // 10. Document Actions (SQL Queries on fields)
   if (upperSql.includes('CODIGO_ORIGEM') && upperSql.includes('SCRIPT_ACAO_COMPLETO')) {
-    const cdDoc = Number(getBindValue(binds, 'CD_DOCUMENTO')) || 382;
+    const cdDoc = Number(getBindValue(binds, 'CD_DOCUMENTO')) || 9002;
     const doc = DEMO_DOCS.find((d) => d.id === cdDoc);
     if (!doc) return [];
     return doc.actions.map((a) => ({
@@ -839,7 +968,7 @@ export function executeDemoQuery(
 
   // 11. Document Rules
   if (upperSql.includes('TIPO_REGRA') && upperSql.includes('CAMPOS_AFETADOS')) {
-    const cdDoc = Number(getBindValue(binds, 'CD_DOCUMENTO')) || 382;
+    const cdDoc = Number(getBindValue(binds, 'CD_DOCUMENTO')) || 9002;
     const doc = DEMO_DOCS.find((d) => d.id === cdDoc);
     if (!doc) return [];
     return doc.rules.map((r) => ({
@@ -864,13 +993,13 @@ export function executeDemoQuery(
 
   // 12. Document Fields
   if (upperSql.includes('DS_TIPO_VISUALIZACAO') && upperSql.includes('CD_CAMPO')) {
-    const cdDoc = Number(getBindValue(binds, 'CD_DOCUMENTO')) || 382;
+    const cdDoc = Number(getBindValue(binds, 'CD_DOCUMENTO')) || 9002;
     const doc = DEMO_DOCS.find((d) => d.id === cdDoc);
     const fields = doc?.fields.length
       ? doc.fields
       : [
-          { cdCampo: cdDoc * 100 + 1, cdMetadado: 9901, tag: 'CAMPO_DESCRICAO', name: 'Registro Clínico Principal', visualType: 'Editor Rico', rulesCount: 0 },
-          { cdCampo: cdDoc * 100 + 2, cdMetadado: 9902, tag: 'DATA_AVALIACAO', name: 'Data/Hora da Avaliação', visualType: 'Data/Hora', rulesCount: 0 },
+          { cdCampo: cdDoc * 100 + 1, cdMetadado: 99901, tag: 'REGISTRO_CLINICO', name: 'Registro Clínico Principal', visualType: 'Editor Rico', rulesCount: 0 },
+          { cdCampo: cdDoc * 100 + 2, cdMetadado: 99902, tag: 'DATA_REGISTRO', name: 'Data/Hora da Avaliação', visualType: 'Data/Hora', rulesCount: 0 },
         ];
     const targetDoc = doc || { id: cdDoc, version: 1 };
     return fields.map((f) => ({
@@ -883,7 +1012,7 @@ export function executeDemoQuery(
       DS_TIPO_VISUALIZACAO: f.visualType,
       CD_LAYOUT: targetDoc.id * 10 + 1,
       CD_TIPO_LAYOUT: 1,
-      DS_TIPO_LAYOUT: 'Corpo Principal',
+      DS_TIPO_LAYOUT: 'Corpo Principal (Demo)',
       VL_VERSAO: targetDoc.version,
       TP_VERSAO: 'PUBLISHED',
       SN_PUBLICADO: 1,
@@ -893,31 +1022,38 @@ export function executeDemoQuery(
 
   // 13. Hospital KPIs (/api/hospitals/stats)
   if (upperSql.includes('TOTAL_DOCS') && upperSql.includes('DOCS_ATIVOS')) {
-    const hospId = Number(getBindValue(binds, 'ID')) || 1;
-    const hIndex = Math.max(0, effectiveHospitals.findIndex((h) => h.id === hospId));
-    const scale = [1.0, 0.78, 0.58, 0.42][hIndex % 4] ?? 0.5;
+    const hospId = Number(getBindValue(binds, 'ID')) || 901;
+    const hIndex = hospId === 902 ? 1 : 0;
+    const activeCount = DEMO_DOCS.filter((d) => !d.idle).length;
+    const totalPerHosp = DEMO_DOCS.filter((d) => !d.idle).reduce((acc, d) => {
+      const dist = distributeBetweenDemoHospitals(d.total90d, d.weights);
+      const sigla = effectiveHospitals[hIndex].sigla;
+      return acc + (dist[sigla] ?? 0);
+    }, 0);
+
     return [
       {
-        TOTAL_DOCS: Math.round(48200 * scale),
-        DOCS_ATIVOS: 9 + (hIndex % 3),
-        ULTIMO_REGISTRO: new Date(now - (hIndex + 1) * 14 * 60_000),
+        TOTAL_DOCS: totalPerHosp,
+        DOCS_ATIVOS: activeCount - hIndex,
+        ULTIMO_REGISTRO: new Date(now - (hIndex + 1) * 12 * 60_000),
       },
     ];
   }
 
   // 14. Hospital Detail Table (/api/hospitals/stats)
   if (upperSql.includes('USO_UNIDADE')) {
-    const hospId = Number(getBindValue(binds, 'ID')) || 1;
-    const hIndex = Math.max(0, effectiveHospitals.findIndex((h) => h.id === hospId));
-    return DEMO_DOCS.filter((d) => !d.idle && d.engines.includes('V3'))
+    const hospId = Number(getBindValue(binds, 'ID')) || 901;
+    const hIndex = hospId === 902 ? 1 : 0;
+    const sigla = effectiveHospitals[hIndex].sigla;
+    return DEMO_DOCS.filter((d) => !d.idle)
       .map((d) => {
-        const w = d.weights[hIndex % d.weights.length] ?? 0.25;
+        const dist = distributeBetweenDemoHospitals(d.total90d, d.weights);
         return {
           CD_DOCUMENTO: d.id,
           NOME: d.name,
           VERSAO: d.version,
-          USO_UNIDADE: Math.round(d.total90d * w),
-          ULTIMO_USO: new Date(now - (d.lastUsedHoursAgo + hIndex * 0.4) * 3600_000),
+          USO_UNIDADE: dist[sigla] ?? 0,
+          ULTIMO_USO: new Date(now - (d.lastUsedHoursAgo + hIndex * 0.5) * 3600_000),
         };
       })
       .sort((a, b) => b.USO_UNIDADE - a.USO_UNIDADE);
@@ -925,13 +1061,17 @@ export function executeDemoQuery(
 
   // 15. Hospital Top 5 Chart (/api/hospitals/stats)
   if (upperSql.includes('AS USO') && upperSql.includes('ROWNUM <= 5')) {
-    const hospId = Number(getBindValue(binds, 'ID')) || 1;
-    const hIndex = Math.max(0, effectiveHospitals.findIndex((h) => h.id === hospId));
+    const hospId = Number(getBindValue(binds, 'ID')) || 901;
+    const hIndex = hospId === 902 ? 1 : 0;
+    const sigla = effectiveHospitals[hIndex].sigla;
     return DEMO_DOCS.filter((d) => !d.idle)
-      .map((d) => ({
-        NOME: d.name,
-        USO: Math.round(d.total90d * (d.weights[hIndex % d.weights.length] ?? 0.25)),
-      }))
+      .map((d) => {
+        const dist = distributeBetweenDemoHospitals(d.total90d, d.weights);
+        return {
+          NOME: d.name,
+          USO: dist[sigla] ?? 0,
+        };
+      })
       .sort((a, b) => b.USO - a.USO)
       .slice(0, 5);
   }
@@ -939,25 +1079,25 @@ export function executeDemoQuery(
   // 16. SLA Assinatura (Dashboard & Hospital Quality)
   if (upperSql.includes('FAIXA_SLA')) {
     const hospId = Number(getBindValue(binds, 'ID')) || 0;
-    const factor = hospId ? Math.max(0.2, 1 / ((hospId % 4) + 1)) : 1;
+    const factor = hospId === 901 ? 0.55 : hospId === 902 ? 0.45 : 1;
     return [
-      { FAIXA_SLA: 'Até 1 hora', TOTAL: Math.round(89420 * factor) },
-      { FAIXA_SLA: '1 a 6 horas', TOTAL: Math.round(24150 * factor) },
-      { FAIXA_SLA: '6 a 24 horas', TOTAL: Math.round(9840 * factor) },
-      { FAIXA_SLA: 'Acima de 24 horas', TOTAL: Math.round(3120 * factor) },
-      { FAIXA_SLA: 'Pendente de Assinatura', TOTAL: Math.round(1900 * factor) },
+      { FAIXA_SLA: 'Até 1 hora', TOTAL: Math.round(74200 * factor) },
+      { FAIXA_SLA: '1 a 6 horas', TOTAL: Math.round(21800 * factor) },
+      { FAIXA_SLA: '6 a 24 horas', TOTAL: Math.round(9120 * factor) },
+      { FAIXA_SLA: 'Acima de 24 horas', TOTAL: Math.round(2640 * factor) },
+      { FAIXA_SLA: 'Pendente de Assinatura', TOTAL: Math.round(1620 * factor) },
     ];
   }
 
   // 17. Shift Volume (volumeTurno)
   if (upperSql.includes('TURNO')) {
-    const hospId = Number(getBindValue(binds, 'ID')) || 1;
-    const factor = 1 / ((hospId % 3) + 1);
+    const hospId = Number(getBindValue(binds, 'ID')) || 901;
+    const factor = hospId === 902 ? 0.82 : 1;
     return [
-      { TURNO: 'Manhã', TOTAL: Math.round(14200 * factor) },
-      { TURNO: 'Tarde', TOTAL: Math.round(11850 * factor) },
-      { TURNO: 'Noite', TOTAL: Math.round(7420 * factor) },
-      { TURNO: 'Madrugada', TOTAL: Math.round(3190 * factor) },
+      { TURNO: 'Manhã', TOTAL: Math.round(11400 * factor) },
+      { TURNO: 'Tarde', TOTAL: Math.round(9650 * factor) },
+      { TURNO: 'Noite', TOTAL: Math.round(5840 * factor) },
+      { TURNO: 'Madrugada', TOTAL: Math.round(2410 * factor) },
     ];
   }
 
@@ -988,15 +1128,19 @@ export function executeDemoQuery(
     return [{ TOTAL_GERAL_PREENCHIDO: sum }];
   }
 
-  // 21. Dashboard Unit Adherence
+  // 21. Dashboard Unit Adherence (always strictly 2 fictional companies)
   if (upperSql.includes('QTD_TOTAL_PREENCHIDA')) {
-    const total = DEMO_DOCS.reduce((acc, d) => acc + d.total90d, 0);
-    const dist = distributeByHospital(total, [0.37, 0.28, 0.21, 0.14], effectiveHospitals);
+    const totals: Record<number, number> = { 901: 0, 902: 0 };
+    DEMO_DOCS.forEach((d) => {
+      const dist = distributeBetweenDemoHospitals(d.total90d, d.weights);
+      totals[901] += dist.HVA;
+      totals[902] += dist.HSM;
+    });
     return effectiveHospitals
       .map((h) => ({
         CD_MULTI_EMPRESA: h.id,
         SIGLA_UNIDADE: h.sigla,
-        QTD_TOTAL_PREENCHIDA: dist[h.sigla] ?? 0,
+        QTD_TOTAL_PREENCHIDA: totals[h.id] ?? 0,
       }))
       .sort((a, b) => Number(b.QTD_TOTAL_PREENCHIDA) - Number(a.QTD_TOTAL_PREENCHIDA));
   }
@@ -1004,11 +1148,9 @@ export function executeDemoQuery(
   // 22. Dashboard Unit Inactivity
   if (upperSql.includes('DIAS_SEM_USO')) {
     return [
-      { CD_DOCUMENTO: 916, DS_DOCUMENTO: 'EVOLUCAO PEDIATRICA ESTRUTURADA', SIGLA_UNIDADE: effectiveHospitals[3]?.sigla || 'UPA', ULTIMA_DATA_USO: new Date(now - 68 * 86400_000), DIAS_SEM_USO: 68 },
-      { CD_DOCUMENTO: 410, DS_DOCUMENTO: 'BALANCO HIDRICO UTI', SIGLA_UNIDADE: effectiveHospitals[2]?.sigla || 'HMI', ULTIMA_DATA_USO: new Date(now - 45 * 86400_000), DIAS_SEM_USO: 45 },
-      { CD_DOCUMENTO: 845, DS_DOCUMENTO: 'CHECKLIST DE CIRURGIA SEGURA OMS', SIGLA_UNIDADE: effectiveHospitals[3]?.sigla || 'UPA', ULTIMA_DATA_USO: new Date(now - 39 * 86400_000), DIAS_SEM_USO: 39 },
-      { CD_DOCUMENTO: 710, DS_DOCUMENTO: 'SUMARIO DE TRANSFERENCIA INTERNA', SIGLA_UNIDADE: effectiveHospitals[1]?.sigla || 'HSB', ULTIMA_DATA_USO: new Date(now - 24 * 86400_000), DIAS_SEM_USO: 24 },
-      { CD_DOCUMENTO: 580, DS_DOCUMENTO: 'PLANO TERAPEUTICO MULTIPROFISSIONAL', SIGLA_UNIDADE: effectiveHospitals[0]?.sigla || 'HCA', ULTIMA_DATA_USO: new Date(now - 14 * 86400_000), DIAS_SEM_USO: 14 },
+      { CD_DOCUMENTO: 9010, DS_DOCUMENTO: 'FORMULARIO HISTORICO INATIVO SANDBOX', SIGLA_UNIDADE: 'HSM', ULTIMA_DATA_USO: new Date(now - 74 * 86400_000), DIAS_SEM_USO: 74 },
+      { CD_DOCUMENTO: 9009, DS_DOCUMENTO: 'PROTOCOLO DE VERIFICACAO PRE-PROCEDIMENTO', SIGLA_UNIDADE: 'HVA', ULTIMA_DATA_USO: new Date(now - 38 * 86400_000), DIAS_SEM_USO: 38 },
+      { CD_DOCUMENTO: 9008, DS_DOCUMENTO: 'GUIA DE TRANSICAO INTERSETORIAL SANDBOX', SIGLA_UNIDADE: 'HSM', ULTIMA_DATA_USO: new Date(now - 21 * 86400_000), DIAS_SEM_USO: 21 },
     ];
   }
 
@@ -1017,12 +1159,12 @@ export function executeDemoQuery(
     const isV3 = upperSql.includes('EDITOR.EDITOR_DOCUMENTO');
     const docs = DEMO_DOCS.filter((d) => !d.idle && d.engines.includes(isV3 ? 'V3' : 'V2'));
     return docs.map((d) => {
-      const hospCols = distributeByHospital(d.total90d, d.weights, effectiveHospitals);
+      const hospCols = distributeBetweenDemoHospitals(d.total90d, d.weights);
       return {
         CÓDIGO: d.id,
         NOME: d.name,
         TOTAL: d.total90d,
-        'ÚLTIMO USO': formatDateBr(new Date(now - d.lastUsedHoursAgo * 3600_000)),
+        'ÚLTIMO USO': new Date(now - d.lastUsedHoursAgo * 3600_000).toISOString(),
         ...hospCols,
       };
     });
@@ -1030,10 +1172,10 @@ export function executeDemoQuery(
 
   // 24. Dashboard & Generic KPI Counts
   if (upperSql.includes('SYSDATE - 1')) {
-    return [{ TOTAL: 1428 }];
+    return [{ TOTAL: 1210 }];
   }
   if (upperSql.includes("'ASSINADO'")) {
-    return [{ TOTAL: 39840 }];
+    return [{ TOTAL: 34920 }];
   }
   if (upperSql.includes('AS TOTAL') || upperSql.includes('COUNT(')) {
     const sum = DEMO_DOCS.reduce((acc, d) => acc + d.total90d, 0);

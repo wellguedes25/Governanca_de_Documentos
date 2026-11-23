@@ -1,6 +1,13 @@
 import fs from 'fs';
 import path from 'path';
-import { DEMO_CONNECTION, DEMO_CONNECTION_ID, DEFAULT_DEMO_HOSPITALS } from './demo-mock';
+import {
+  DEMO_CONNECTION,
+  DEMO_CONNECTION_ID,
+  DEFAULT_DEMO_HOSPITALS,
+  DEMO_DOC_MAPPINGS,
+  DEMO_AUDIT_DOC_ID,
+  DEMO_REPORT_BASE_URL,
+} from './demo-mock';
 
 const getStoragePaths = () => {
   const root = process.cwd();
@@ -497,17 +504,24 @@ function withDemoInjected(data: StorageData): StorageData {
   const userConnections = (data.connections || []).filter((c) => c.id !== DEMO_CONNECTION_ID);
   const hasRealConnections = userConnections.length > 0;
   const connections = [...userConnections, DEMO_CONNECTION];
-  const hospitalsMapping =
-    data.hospitalsMapping && data.hospitalsMapping.length > 0
-      ? data.hospitalsMapping
-      : !hasRealConnections || data.activeConnectionId === DEMO_CONNECTION_ID
-        ? DEFAULT_DEMO_HOSPITALS
-        : [];
+  const isDemoActive = data.activeConnectionId === DEMO_CONNECTION_ID || !hasRealConnections;
+
+  if (isDemoActive) {
+    return {
+      ...data,
+      connections,
+      hospitalsMapping: DEFAULT_DEMO_HOSPITALS,
+      docMappings: DEMO_DOC_MAPPINGS,
+      auditDocId: DEMO_AUDIT_DOC_ID,
+      reportBaseUrl: DEMO_REPORT_BASE_URL,
+      customCards: [],
+    };
+  }
 
   return {
     ...data,
     connections,
-    hospitalsMapping,
+    hospitalsMapping: data.hospitalsMapping || [],
   };
 }
 
@@ -573,6 +587,30 @@ export async function saveData(data: StorageData) {
         conn.password = encrypt(conn.password);
       }
     });
+  }
+
+  // Never overwrite real hospital/doc configurations on disk with virtual sandbox defaults
+  if (dataToSave.activeConnectionId === DEMO_CONNECTION_ID && fs.existsSync(storageFile)) {
+    try {
+      const existingOnDisk = JSON.parse(fs.readFileSync(storageFile, 'utf-8'));
+      if (Array.isArray(existingOnDisk.hospitalsMapping)) {
+        dataToSave.hospitalsMapping = existingOnDisk.hospitalsMapping;
+      }
+      if (Array.isArray(existingOnDisk.docMappings)) {
+        dataToSave.docMappings = existingOnDisk.docMappings;
+      }
+      if (existingOnDisk.auditDocId !== undefined) {
+        dataToSave.auditDocId = existingOnDisk.auditDocId;
+      }
+      if (existingOnDisk.reportBaseUrl !== undefined) {
+        dataToSave.reportBaseUrl = existingOnDisk.reportBaseUrl;
+      }
+      if (Array.isArray(existingOnDisk.customCards)) {
+        dataToSave.customCards = existingOnDisk.customCards;
+      }
+    } catch {
+      // Ignore parse error if existing file is corrupted
+    }
   }
 
   fs.writeFileSync(storageFile, JSON.stringify(dataToSave, null, 2));

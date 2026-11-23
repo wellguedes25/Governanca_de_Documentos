@@ -3,7 +3,16 @@ import fs from 'fs';
 import path from 'path';
 import { getData } from '@/lib/storage';
 import { executeQuery } from '@/lib/oracle';
+import { DEMO_CONNECTION_ID, DEMO_MIGRATION_DEMANDS, getDemoMigrationCatalog } from '@/lib/demo-mock';
 import { DocumentoMigracao, MigracaoKpisData, DocumentoFlexItem } from '@/types/migracao.types';
+
+let demoDemandsMemory: DocumentoMigracao[] | null = null;
+function getDemoDemands(): DocumentoMigracao[] {
+  if (!demoDemandsMemory) {
+    demoDemandsMemory = JSON.parse(JSON.stringify(DEMO_MIGRATION_DEMANDS));
+  }
+  return demoDemandsMemory!;
+}
 
 const DEMANDS_FILE = path.join(process.cwd(), 'data', 'migration-demands.json');
 const V2_CACHE_FILE = path.join(process.cwd(), 'data', 'v2-catalog-cache.json');
@@ -70,45 +79,55 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const forceSync = searchParams.get('sync') === 'true';
-    const demands = getStoredDemands();
     const storageData = await getData();
+    const isDemo = storageData.activeConnectionId === DEMO_CONNECTION_ID;
 
-    let docsFlexTotal = readCachedDocs(V2_CACHE_FILE, 'FLEX');
-    let docsHtml5Total = readCachedDocs(V3_CACHE_FILE, 'HTML5');
+    const demands = isDemo ? getDemoDemands() : getStoredDemands();
+    let docsFlexTotal: DocumentoFlexItem[] = [];
+    let docsHtml5Total: DocumentoFlexItem[] = [];
 
-    // Se o cache estiver vazio, expirado ou for solicitado sync=true, consulta Oracle diretamente
-    const shouldSyncV2 = forceSync || docsFlexTotal.length === 0 || isCacheStale(V2_CACHE_FILE);
-    const shouldSyncV3 = forceSync || docsHtml5Total.length === 0 || isCacheStale(V3_CACHE_FILE);
+    if (isDemo) {
+      const demoCatalog = getDemoMigrationCatalog();
+      docsFlexTotal = demoCatalog.docsFlexTotal;
+      docsHtml5Total = demoCatalog.docsHtml5Total;
+    } else {
+      docsFlexTotal = readCachedDocs(V2_CACHE_FILE, 'FLEX');
+      docsHtml5Total = readCachedDocs(V3_CACHE_FILE, 'HTML5');
 
-    if (shouldSyncV2 || shouldSyncV3) {
-      const connection = storageData.connections.find(c => c.id === storageData.activeConnectionId);
-      if (connection) {
-        try {
-          if (shouldSyncV2) {
-            const sqlV2 = storageData.activeQuery;
-            if (sqlV2) {
-              const resV2 = await executeQuery(connection, sqlV2, {}, { ttlSeconds: 300, forceRefresh: forceSync });
-              const rowsV2 = Array.isArray(resV2) ? resV2 : ((resV2 as any)?.rows || []);
-              if (rowsV2.length > 0) {
-                fs.writeFileSync(V2_CACHE_FILE, JSON.stringify(rowsV2, null, 2), 'utf8');
-                docsFlexTotal = readCachedDocs(V2_CACHE_FILE, 'FLEX');
+      // Se o cache estiver vazio, expirado ou for solicitado sync=true, consulta Oracle diretamente
+      const shouldSyncV2 = forceSync || docsFlexTotal.length === 0 || isCacheStale(V2_CACHE_FILE);
+      const shouldSyncV3 = forceSync || docsHtml5Total.length === 0 || isCacheStale(V3_CACHE_FILE);
+
+      if (shouldSyncV2 || shouldSyncV3) {
+        const connection = storageData.connections.find(c => c.id === storageData.activeConnectionId);
+        if (connection) {
+          try {
+            if (shouldSyncV2) {
+              const sqlV2 = storageData.activeQuery;
+              if (sqlV2) {
+                const resV2 = await executeQuery(connection, sqlV2, {}, { ttlSeconds: 300, forceRefresh: forceSync });
+                const rowsV2 = Array.isArray(resV2) ? resV2 : ((resV2 as any)?.rows || []);
+                if (rowsV2.length > 0) {
+                  fs.writeFileSync(V2_CACHE_FILE, JSON.stringify(rowsV2, null, 2), 'utf8');
+                  docsFlexTotal = readCachedDocs(V2_CACHE_FILE, 'FLEX');
+                }
               }
             }
-          }
 
-          if (shouldSyncV3) {
-            const sqlV3 = storageData.activeQueryV3 || storageData.activeQuery;
-            if (sqlV3) {
-              const resV3 = await executeQuery(connection, sqlV3, {}, { ttlSeconds: 300, forceRefresh: forceSync });
-              const rowsV3 = Array.isArray(resV3) ? resV3 : ((resV3 as any)?.rows || []);
-              if (rowsV3.length > 0) {
-                fs.writeFileSync(V3_CACHE_FILE, JSON.stringify(rowsV3, null, 2), 'utf8');
-                docsHtml5Total = readCachedDocs(V3_CACHE_FILE, 'HTML5');
+            if (shouldSyncV3) {
+              const sqlV3 = storageData.activeQueryV3 || storageData.activeQuery;
+              if (sqlV3) {
+                const resV3 = await executeQuery(connection, sqlV3, {}, { ttlSeconds: 300, forceRefresh: forceSync });
+                const rowsV3 = Array.isArray(resV3) ? resV3 : ((resV3 as any)?.rows || []);
+                if (rowsV3.length > 0) {
+                  fs.writeFileSync(V3_CACHE_FILE, JSON.stringify(rowsV3, null, 2), 'utf8');
+                  docsHtml5Total = readCachedDocs(V3_CACHE_FILE, 'HTML5');
+                }
               }
             }
+          } catch (oracleErr) {
+            console.error('[API Migração] Erro ao sincronizar catálogo com Oracle:', oracleErr);
           }
-        } catch (oracleErr) {
-          console.error('[API Migração] Erro ao sincronizar catálogo com Oracle:', oracleErr);
         }
       }
     }
@@ -177,7 +196,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const demands = getStoredDemands();
+    const storageData = await getData();
+    const isDemo = storageData.activeConnectionId === DEMO_CONNECTION_ID;
+    const demands = isDemo ? getDemoDemands() : getStoredDemands();
 
     if (!body.documento_flex_id) {
       return NextResponse.json({ error: 'Documento Flex de origem é obrigatório' }, { status: 400 });
@@ -186,12 +207,13 @@ export async function POST(request: Request) {
     const id = body.id || `demanda-${Date.now()}`;
     const now = new Date().toISOString();
 
-    const flexDocs = readCachedDocs(V2_CACHE_FILE, 'FLEX');
+    const demoCatalog = isDemo ? getDemoMigrationCatalog() : null;
+    const flexDocs = demoCatalog ? demoCatalog.docsFlexTotal : readCachedDocs(V2_CACHE_FILE, 'FLEX');
     const flexDoc = flexDocs.find(d => String(d.cd_documento_mv) === String(body.documento_flex_id));
 
     let html5Doc = null;
     if (body.documento_html5_id) {
-      const html5Docs = readCachedDocs(V3_CACHE_FILE, 'HTML5');
+      const html5Docs = demoCatalog ? demoCatalog.docsHtml5Total : readCachedDocs(V3_CACHE_FILE, 'HTML5');
       html5Doc = html5Docs.find(d => String(d.cd_documento_mv) === String(body.documento_html5_id));
     }
 
@@ -231,7 +253,9 @@ export async function POST(request: Request) {
       demands.unshift(newDemand);
     }
 
-    saveStoredDemands(demands);
+    if (!isDemo) {
+      saveStoredDemands(demands);
+    }
 
     return NextResponse.json({
       success: true,
@@ -252,7 +276,9 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'ID e status são obrigatórios' }, { status: 400 });
     }
 
-    const demands = getStoredDemands();
+    const storageData = await getData();
+    const isDemo = storageData.activeConnectionId === DEMO_CONNECTION_ID;
+    const demands = isDemo ? getDemoDemands() : getStoredDemands();
     const demandIndex = demands.findIndex(d => d.id === id);
 
     if (demandIndex === -1) {
@@ -266,7 +292,9 @@ export async function PATCH(request: Request) {
       demands[demandIndex].data_conclusao_efetiva = new Date().toISOString().split('T')[0];
     }
 
-    saveStoredDemands(demands);
+    if (!isDemo) {
+      saveStoredDemands(demands);
+    }
 
     return NextResponse.json({
       success: true,
@@ -287,14 +315,20 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'ID é obrigatório' }, { status: 400 });
     }
 
-    const demands = getStoredDemands();
+    const storageData = await getData();
+    const isDemo = storageData.activeConnectionId === DEMO_CONNECTION_ID;
+    const demands = isDemo ? getDemoDemands() : getStoredDemands();
     const filtered = demands.filter(d => d.id !== id);
 
     if (filtered.length === demands.length) {
       return NextResponse.json({ error: 'Demanda não encontrada' }, { status: 404 });
     }
 
-    saveStoredDemands(filtered);
+    if (isDemo) {
+      demoDemandsMemory = filtered;
+    } else {
+      saveStoredDemands(filtered);
+    }
 
     return NextResponse.json({ success: true, message: 'Demanda excluída com sucesso' });
   } catch (err: any) {

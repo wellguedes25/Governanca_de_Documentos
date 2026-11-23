@@ -236,8 +236,7 @@ export async function executeQuery(
   options?: { ttlSeconds?: number, forceRefresh?: boolean }
 ) {
   if (isDemoConnection(connection)) {
-    const storageData = await getData();
-    return executeDemoQuery(sql, binds, storageData.hospitalsMapping);
+    return executeDemoQuery(sql, binds);
   }
   let conn;
   try {

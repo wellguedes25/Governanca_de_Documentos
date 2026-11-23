@@ -2,7 +2,21 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { getData } from '@/lib/storage';
+import {
+  DEMO_CONNECTION_ID,
+  DEFAULT_DEMO_HOSPITALS,
+  DEMO_BI_ARTIFACTS,
+  getDemoBiCatalogDocs,
+} from '@/lib/demo-mock';
 import { BiArtifact, BiCatalogDocOption } from '@/types/bi-dependencies.types';
+
+let demoArtifactsMemory: BiArtifact[] | null = null;
+function getDemoArtifacts(): BiArtifact[] {
+  if (!demoArtifactsMemory) {
+    demoArtifactsMemory = JSON.parse(JSON.stringify(DEMO_BI_ARTIFACTS));
+  }
+  return demoArtifactsMemory!;
+}
 
 const BI_DEPS_FILE = path.join(process.cwd(), 'data', 'bi-dependencies.json');
 const V2_CACHE_FILE = path.join(process.cwd(), 'data', 'v2-catalog-cache.json');
@@ -139,8 +153,18 @@ function readCatalogCache(filePath: string, motor: 'V2' | 'V3'): BiCatalogDocOpt
 
 export async function GET() {
   try {
-    const artifacts = getStoredArtifacts();
     const storageData = await getData();
+    const isDemo = storageData.activeConnectionId === DEMO_CONNECTION_ID;
+
+    if (isDemo) {
+      return NextResponse.json({
+        artifacts: getDemoArtifacts(),
+        catalogDocs: getDemoBiCatalogDocs(),
+        hospitals: DEFAULT_DEMO_HOSPITALS,
+      });
+    }
+
+    const artifacts = getStoredArtifacts();
 
     const v3Docs = readCatalogCache(V3_CACHE_FILE, 'V3');
     const v2Docs = readCatalogCache(V2_CACHE_FILE, 'V2');
@@ -167,7 +191,9 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const artifacts = getStoredArtifacts();
+    const storageData = await getData();
+    const isDemo = storageData.activeConnectionId === DEMO_CONNECTION_ID;
+    const artifacts = isDemo ? getDemoArtifacts() : getStoredArtifacts();
     const now = new Date().toISOString();
 
     if (body.action === 'IMPORT_BATCH' && Array.isArray(body.artifacts)) {
@@ -244,7 +270,11 @@ export async function POST(request: Request) {
       }
 
       const nextList = Array.from(byNameOrId.values());
-      saveStoredArtifacts(nextList);
+      if (isDemo) {
+        demoArtifactsMemory = nextList;
+      } else {
+        saveStoredArtifacts(nextList);
+      }
       return NextResponse.json({
         artifacts: nextList,
         summary: { createdCount, updatedCount }
@@ -272,7 +302,11 @@ export async function POST(request: Request) {
     };
 
     const next = [newArtifact, ...artifacts];
-    saveStoredArtifacts(next);
+    if (isDemo) {
+      demoArtifactsMemory = next;
+    } else {
+      saveStoredArtifacts(next);
+    }
     return NextResponse.json({ artifact: newArtifact, artifacts: next }, { status: 201 });
   } catch (err: any) {
     console.error('POST /api/dependencias-bi erro:', err);
@@ -287,7 +321,9 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'ID do artefato é obrigatório.' }, { status: 400 });
     }
 
-    const artifacts = getStoredArtifacts();
+    const storageData = await getData();
+    const isDemo = storageData.activeConnectionId === DEMO_CONNECTION_ID;
+    const artifacts = isDemo ? getDemoArtifacts() : getStoredArtifacts();
     const idx = artifacts.findIndex(a => a.id === body.id);
     if (idx === -1) {
       return NextResponse.json({ error: 'Artefato não encontrado.' }, { status: 404 });
@@ -312,7 +348,11 @@ export async function PUT(request: Request) {
 
     const next = [...artifacts];
     next[idx] = updated;
-    saveStoredArtifacts(next);
+    if (isDemo) {
+      demoArtifactsMemory = next;
+    } else {
+      saveStoredArtifacts(next);
+    }
 
     return NextResponse.json({ artifact: updated, artifacts: next });
   } catch (err: any) {
@@ -329,13 +369,19 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Parâmetro id é obrigatório.' }, { status: 400 });
     }
 
-    const artifacts = getStoredArtifacts();
+    const storageData = await getData();
+    const isDemo = storageData.activeConnectionId === DEMO_CONNECTION_ID;
+    const artifacts = isDemo ? getDemoArtifacts() : getStoredArtifacts();
     const next = artifacts.filter(a => a.id !== id);
     if (next.length === artifacts.length) {
       return NextResponse.json({ error: 'Artefato não encontrado.' }, { status: 404 });
     }
 
-    saveStoredArtifacts(next);
+    if (isDemo) {
+      demoArtifactsMemory = next;
+    } else {
+      saveStoredArtifacts(next);
+    }
     return NextResponse.json({ artifacts: next });
   } catch (err: any) {
     console.error('DELETE /api/dependencias-bi erro:', err);

@@ -55,11 +55,11 @@ RUN addgroup --system --gid 1001 nodejs \
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/oracledb ./node_modules/oracledb
 
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
 
-USER nextjs
-
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+# Garante permissão de escrita em volumes montados no Coolify antes de iniciar como usuário não-root nextjs
+CMD ["sh", "-c", "mkdir -p /app/data && chown -R nextjs:nodejs /app/data && exec su -s /bin/sh nextjs -c 'node server.js'"]

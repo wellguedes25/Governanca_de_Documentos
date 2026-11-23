@@ -48,6 +48,19 @@ interface AuthenticatedUser {
   role: 'ADMIN' | 'ANALISTA';
 }
 
+async function parseJsonSafe(res: Response): Promise<any> {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      error: `Erro HTTP ${res.status}: resposta inesperada do servidor.`,
+      technicalDetails: text.slice(0, 300),
+    };
+  }
+}
+
 function ConnectPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -91,8 +104,8 @@ function ConnectPageContent() {
     async function loadConnections() {
       try {
         const res = await fetch('/api/auth/connect');
-        if (!res.ok) throw new Error('Falha ao listar conexões.');
-        const data = await res.json();
+        const data = await parseJsonSafe(res);
+        if (!res.ok) throw new Error(data.error || 'Falha ao listar conexões.');
         if (mounted) {
           setConnections(data.connections || []);
           if (data.defaultActiveId) {
@@ -135,7 +148,7 @@ function ConnectPageContent() {
           password: loginPassword,
         }),
       });
-      const data = await res.json();
+      const data = await parseJsonSafe(res);
       if (!res.ok || !data.success) {
         setLoginError(data.error || 'Usuário ou senha inválidos.');
         return;
@@ -179,7 +192,7 @@ function ConnectPageContent() {
           version: 'V3',
         }),
       });
-      const data = await res.json();
+      const data = await parseJsonSafe(res);
       if (!res.ok || !data.success) {
         setLoginError(data.error || 'Não foi possível iniciar o ambiente de demonstração.');
         setEnteringDemo(false);
@@ -219,7 +232,7 @@ function ConnectPageContent() {
           ...newConnForm,
         }),
       });
-      const data = await res.json();
+      const data = await parseJsonSafe(res);
       if (!res.ok) {
         setCreateError(data.error || 'Não foi possível cadastrar a conexão.');
         return;
@@ -261,7 +274,7 @@ function ConnectPageContent() {
         }),
       });
 
-      const data = await res.json();
+      const data = await parseJsonSafe(res);
 
       if (!res.ok || !data.success) {
         if (res.status === 401) {
@@ -337,12 +350,6 @@ function ConnectPageContent() {
                 <span className="text-2xl font-extrabold tracking-tight text-[var(--foreground)] leading-none font-[family-name:var(--font-manrope)]">
                   Goverdoc <span className="text-[var(--accent-ink)] font-black uppercase text-sm tracking-wider">PRO</span>
                 </span>
-                <Badge
-                  variant="outline"
-                  className="text-[10px] font-bold bg-[var(--accent)] text-[var(--accent-ink)] border-[var(--tint-olive-border)] px-2.5 py-0.5 uppercase tracking-wide"
-                >
-                  Gateway Clínico • DBAMV
-                </Badge>
               </div>
               <p className="text-xs font-medium text-[var(--muted)]">
                 Governança Clínica &amp; Prontuário Eletrônico

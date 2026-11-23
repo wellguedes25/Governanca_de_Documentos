@@ -38,10 +38,14 @@ export async function POST(request: Request) {
 
     if (body.action === 'DEMO_ACCESS') {
       const docVersion: 'V2' | 'V3' = body.version === 'V2' ? 'V2' : 'V3';
-      const data = await getData();
-      if (data.activeConnectionId !== DEMO_CONNECTION_ID) {
-        data.activeConnectionId = DEMO_CONNECTION_ID;
-        await saveData(data);
+      try {
+        const data = await getData();
+        if (data.activeConnectionId !== DEMO_CONNECTION_ID) {
+          data.activeConnectionId = DEMO_CONNECTION_ID;
+          await saveData(data);
+        }
+      } catch (persistErr) {
+        console.warn('[Auth/Connect] Aviso ao persistir modo sandbox em storage:', persistErr);
       }
 
       const token = await createSessionToken({

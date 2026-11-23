@@ -1,15 +1,24 @@
-// @ts-expect-error - oracledb types may not be fully resolved in build env
-import * as oracledb from 'oracledb';
 import { getData, saveData, DbConnection, HospitalMapping } from './storage';
 import { decrypt } from './encryption';
 import { queryCache, generateCacheKey } from './cache';
 import { isDemoConnection, executeDemoQuery } from './demo-mock';
 
-interface CustomPool extends oracledb.Pool {
+let cachedOracleDb: any = null;
+async function loadOracleDb(): Promise<any> {
+  if (!cachedOracleDb) {
+    // Carrega driver nativo sob demanda para evitar erro em ambientes sem Oracle ou no Modo Demonstração
+    // @ts-expect-error - oracledb types may not be fully resolved in build env
+    const mod = await import('oracledb');
+    cachedOracleDb = (mod as any)?.default ?? mod;
+  }
+  return cachedOracleDb;
+}
+
+interface CustomPool {
   currentAlias?: string;
   activeHospitals?: HospitalMapping[];
   close(timeout: number): Promise<void>;
-  getConnection(): Promise<oracledb.Connection>;
+  getConnection(): Promise<any>;
   poolMin?: number;
   poolMax?: number;
 }
@@ -51,6 +60,7 @@ export function generateAcronym(name: string): string {
 async function fetchActiveHospitals(pool: CustomPool): Promise<HospitalMapping[]> {
   let conn;
   try {
+    const oracledb = await loadOracleDb();
     conn = await pool.getConnection();
     const result = await conn.execute(
       `SELECT CD_MULTI_EMPRESA, DS_MULTI_EMPRESA FROM DBAMV.MULTI_EMPRESAS WHERE SN_ATIVO = 'S' ORDER BY CD_MULTI_EMPRESA`,
@@ -105,8 +115,9 @@ if (typeof process !== 'undefined' && !globalThis.__oracleShutdownRegistered) {
 async function initOracle() {
   if (!globalThis.clientInitialized) {
     try {
+      const oracledb = await loadOracleDb();
       const data = await getData();
-      const libDir = data.oracleClientPath;
+      const libDir = process.env.ORACLE_CLIENT_PATH || data.oracleClientPath;
 
       if (!libDir) {
         console.error('❌ Oracle Client Path is not defined in storage.');
@@ -166,6 +177,7 @@ export async function getPool(connection: DbConnection): Promise<CustomPool> {
   }
 
   console.log(`[Oracle] Creating new pool for: ${connection.name} (${alias})`);
+  const oracledb = await loadOracleDb();
   const pool = await oracledb.createPool({
     user: connection.user,
     password: decryptedPassword,
@@ -339,6 +351,7 @@ export async function executeQuery(
     // Remove ponto e vírgula final se houver
     const cleanSql = finalSql.trim().replace(/;$/, '');
 
+    const oracledb = await loadOracleDb();
     const start = Date.now();
     const result = await conn.execute(cleanSql, binds, {
       outFormat: oracledb.OUT_FORMAT_OBJECT,
@@ -398,6 +411,7 @@ export async function testConnection(connection: DbConnection) {
   await initOracle();
   let conn;
   try {
+    const oracledb = await loadOracleDb();
     const connectString = normalizeConnectString(connection.connectString);
     const decryptedPassword = decrypt(connection.password || '');
     conn = await oracledb.getConnection({

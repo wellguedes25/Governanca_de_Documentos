@@ -37,7 +37,7 @@ const mainMenuItems = [
   { href: '/migracao', label: 'Migração', icon: ArrowLeftRight },
   { href: '/linhagem', label: 'Linhagem', icon: GitFork },
   { href: '/hospitais', label: 'Unidades', icon: Building2 },
-  { href: '/similaridade', label: 'Auditoria NLP', icon: Activity },
+  { href: '/similaridade', label: 'Auditoria Similaridade', icon: Activity },
   { href: '/dependencias-bi', label: 'Dependências BI', icon: BarChart3 },
 ];
 

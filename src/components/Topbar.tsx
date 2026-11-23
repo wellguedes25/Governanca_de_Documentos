@@ -29,7 +29,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/migracao': 'Governança de Migração',
   '/linhagem': 'Linhagem Global',
   '/hospitais': 'Hospitais & Unidades',
-  '/similaridade': 'Auditoria NLP',
+  '/similaridade': 'Auditoria Similaridade',
   '/dependencias-bi': 'Dependências BI & Indicadores',
   '/configuracoes/consultas': 'Motores SQL',
   '/configuracoes/conexoes': 'Conexões Oracle',

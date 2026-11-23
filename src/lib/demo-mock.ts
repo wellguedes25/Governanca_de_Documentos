@@ -1276,13 +1276,13 @@ export function executeDemoQuery(
 
   // 17. Shift Volume (volumeTurno)
   if (upperSql.includes('TURNO')) {
-    const hospId = Number(getBindValue(binds, 'ID')) || 901;
-    const factor = hospId === 902 ? 0.82 : 1;
+    const hospId = Number(getBindValue(binds, 'ID')) || 0;
+    const factor = hospId === 901 ? 0.56 : hospId === 902 ? 0.44 : 1;
+    const dia = Math.round(78420 * factor);
+    const noite = Math.round(39750 * factor);
     return [
-      { TURNO: 'Manhã', TOTAL: Math.round(11400 * factor) },
-      { TURNO: 'Tarde', TOTAL: Math.round(9650 * factor) },
-      { TURNO: 'Noite', TOTAL: Math.round(5840 * factor) },
-      { TURNO: 'Madrugada', TOTAL: Math.round(2410 * factor) },
+      { TURNO: 'DIA', QTD: dia, TOTAL: dia },
+      { TURNO: 'NOITE', QTD: noite, TOTAL: noite },
     ];
   }
 
@@ -1307,13 +1307,26 @@ export function executeDemoQuery(
     }));
   }
 
-  // 20. Dashboard 3M Volume
-  if (upperSql.includes('TOTAL_GERAL_PREENCHIDO')) {
-    const sum = DEMO_DOCS.reduce((acc, d) => acc + d.total90d, 0);
-    return [{ TOTAL_GERAL_PREENCHIDO: sum }];
+  // 20. Dashboard 24h KPI (prod24h - checked BEFORE TOTAL_GERAL_PREENCHIDO / TOTAL_GERAL)
+  if (upperSql.includes('SYSDATE - 1')) {
+    return [{ TOTAL_GERAL: 1210, QTD_ASSINADO: 1125, QTD_FECHADO: 85, TOTAL: 1210 }];
   }
 
-  // 21. Dashboard Unit Adherence (always strictly 2 fictional companies)
+  // 21. Dashboard Signed KPI (assinados - checked BEFORE TOTAL_GERAL_PREENCHIDO)
+  if (upperSql.includes('QTD_ASSINADO') || upperSql.includes("TP_STATUS = 'ASSINADO'")) {
+    const sum = DEMO_DOCS.reduce((acc, d) => acc + d.total90d, 0);
+    const assinados = Math.round(sum * 0.954);
+    const fechados = Math.max(0, sum - assinados);
+    return [{ TOTAL_GERAL: sum, QTD_ASSINADO: assinados, QTD_FECHADO: fechados, TOTAL: assinados }];
+  }
+
+  // 22. Dashboard 3M Volume & Total KPI (volume3m / total / globalTotal)
+  if (upperSql.includes('TOTAL_GERAL_PREENCHIDO')) {
+    const sum = DEMO_DOCS.reduce((acc, d) => acc + d.total90d, 0);
+    return [{ TOTAL_GERAL_PREENCHIDO: sum, TOTAL_GERAL: sum, TOTAL: sum }];
+  }
+
+  // 23. Dashboard Unit Adherence (always strictly 2 fictional companies)
   if (upperSql.includes('QTD_TOTAL_PREENCHIDA')) {
     const totals: Record<number, number> = { 901: 0, 902: 0 };
     DEMO_DOCS.forEach((d) => {
@@ -1330,7 +1343,7 @@ export function executeDemoQuery(
       .sort((a, b) => Number(b.QTD_TOTAL_PREENCHIDA) - Number(a.QTD_TOTAL_PREENCHIDA));
   }
 
-  // 22. Dashboard Unit Inactivity
+  // 24. Dashboard Unit Inactivity
   if (upperSql.includes('DIAS_SEM_USO')) {
     return [
       { CD_DOCUMENTO: 9010, DS_DOCUMENTO: 'FORMULARIO HISTORICO INATIVO SANDBOX', SIGLA_UNIDADE: 'HSM', ULTIMA_DATA_USO: new Date(now - 74 * 86400_000), DIAS_SEM_USO: 74 },
@@ -1339,7 +1352,7 @@ export function executeDemoQuery(
     ];
   }
 
-  // 23. Main Documents Catalog (activeQuery / activeQueryV3)
+  // 25. Main Documents Catalog (activeQuery / activeQueryV3)
   if (upperSql.includes('NM_TITULO') && upperSql.includes('CD_DOCUMENTO')) {
     const isV3 = upperSql.includes('EDITOR.EDITOR_DOCUMENTO');
     const docs = DEMO_DOCS.filter((d) => !d.idle && d.engines.includes(isV3 ? 'V3' : 'V2'));
@@ -1355,16 +1368,10 @@ export function executeDemoQuery(
     });
   }
 
-  // 24. Dashboard & Generic KPI Counts
-  if (upperSql.includes('SYSDATE - 1')) {
-    return [{ TOTAL: 1210 }];
-  }
-  if (upperSql.includes("'ASSINADO'")) {
-    return [{ TOTAL: 34920 }];
-  }
+  // 26. Generic KPI Fallback
   if (upperSql.includes('AS TOTAL') || upperSql.includes('COUNT(')) {
     const sum = DEMO_DOCS.reduce((acc, d) => acc + d.total90d, 0);
-    return [{ TOTAL: sum }];
+    return [{ TOTAL_GERAL_PREENCHIDO: sum, TOTAL_GERAL: sum, TOTAL: sum }];
   }
 
   return [];

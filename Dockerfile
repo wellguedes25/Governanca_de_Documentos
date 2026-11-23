@@ -5,7 +5,7 @@ FROM node:20-bookworm-slim AS deps
 WORKDIR /app
 
 COPY package.json package-lock.json* .npmrc* ./
-RUN npm ci --legacy-peer-deps
+RUN NODE_ENV=development npm ci --include=dev --legacy-peer-deps
 
 # ==========================================
 # Estágio 2: Build Next.js (Standalone)

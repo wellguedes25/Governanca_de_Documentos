@@ -1,19 +1,18 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  X, Save, Trash2, CheckSquare, Square, Plus, 
-  Calendar, User, ShieldCheck, Tag, GitBranch, Layers, Clock, Search
+import {
+  X, Save, Trash2, CheckSquare, Square,
+  User, ShieldCheck, Tag, GitBranch, Layers, Clock, Search
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { 
-  DocumentoMigracao, 
-  DocumentoFlexItem, 
+import {
+  DocumentoMigracao,
+  DocumentoFlexItem,
   ChecklistItem,
   StatusMigracao,
   ComplexidadeMigracao
@@ -54,6 +53,7 @@ export function MigracaoDrawer({
   initialStatus
 }: MigracaoDrawerProps) {
   const { confirmAction } = useUI();
+
   // Seção 1: Dados da Demanda
   const [flexId, setFlexId] = useState<string>('');
   const [flexSearch, setFlexSearch] = useState<string>('');
@@ -62,7 +62,6 @@ export function MigracaoDrawer({
   const [complexidade, setComplexidade] = useState<ComplexidadeMigracao>('MEDIA');
   const [tipoDocumento, setTipoDocumento] = useState<string>('');
 
-  // Ordenação numérica crescente por código com filtro de pesquisa instantâneo para Flex
   const sortedAndFilteredFlex = useMemo(() => {
     return [...docsFlexTotal]
       .sort((a, b) => Number(a.cd_documento_mv) - Number(b.cd_documento_mv))
@@ -81,11 +80,10 @@ export function MigracaoDrawer({
   const [responsavelDev, setResponsavelDev] = useState<string>('');
   const [responsavelPerfil, setResponsavelPerfil] = useState<string>('');
 
-  // Seção 3: Dados Documento
+  // Seção 3: Dados Documento Destino V3
   const [codigoObjeto, setCodigoObjeto] = useState<string>('');
   const [html5Search, setHtml5Search] = useState<string>('');
 
-  // Ordenação numérica crescente por código com filtro de pesquisa instantâneo
   const sortedAndFilteredHtml5 = useMemo(() => {
     return [...docsHtml5Total]
       .sort((a, b) => Number(a.cd_documento_mv) - Number(b.cd_documento_mv))
@@ -114,6 +112,18 @@ export function MigracaoDrawer({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (!open) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [open, onClose]);
+
+  useEffect(() => {
     if (migracao) {
       setFlexId(String(migracao.documento_flex_id || ''));
       setHtml5Id(String(migracao.documento_html5_id || ''));
@@ -134,7 +144,6 @@ export function MigracaoDrawer({
       setHtml5Search('');
       setFlexSearch('');
     } else {
-      // Nova Demanda
       setFlexId(initialFlexDoc ? String(initialFlexDoc.cd_documento_mv) : (docsFlexTotal[0] ? String(docsFlexTotal[0].cd_documento_mv) : ''));
       setHtml5Id('');
       setHtml5Search('');
@@ -226,75 +235,80 @@ export function MigracaoDrawer({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-5 overflow-hidden">
+      {/* Backdrop Frosted */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-md sylva-fade-in"
         onClick={onClose}
       />
 
-      {/* Drawer deslizante da direita */}
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-6 sm:pl-10">
-        <div className="w-screen max-w-2xl sylva-glass bg-[var(--card-bg)] border-l border-[var(--border-subtle)] shadow-2xl flex flex-col animate-in slide-in-from-right duration-200 text-[var(--text-primary)]">
-          
-          {/* Header da Gaveta */}
-          <div className="px-6 py-4.5 border-b border-[var(--border-subtle)] flex items-center justify-between bg-[var(--dock-bg)]/80">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-[#CCF352]/10 text-[#CCF352] border border-[#CCF352]/20 flex items-center justify-center shrink-0 shadow-2xs">
-                <Layers size={18} />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)]">
-                    {migracao ? 'Detalhe da Demanda de Migração' : 'Nova Demanda de Migração'}
-                  </h3>
-                  <Badge variant="outline" className="text-[10px] font-bold border-[#CCF352]/30 bg-[#CCF352]/10 text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205] rounded-full">
-                    PEP MV
-                  </Badge>
-                </div>
-                <p className="text-xs text-[var(--text-muted)] font-medium truncate max-w-md mt-0.5">
-                  {tipoDocumento || 'Transição V2 Flex ➔ V3 Editor'}
-                </p>
-              </div>
+      {/* Modal Central Amplo Sylva */}
+      <div className="relative w-full max-w-4xl max-h-[92vh] sylva-dock rounded-[26px] border border-[var(--border)] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 fade-in duration-200">
+        {/* Header */}
+        <header className="px-6 py-4.5 border-b border-[var(--border)] flex items-center justify-between gap-4 bg-[var(--card-subtle)]/50">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-[var(--accent)] text-[var(--accent-ink)] border border-[var(--tint-olive-border)] flex items-center justify-center shrink-0">
+              <Layers size={18} />
             </div>
-
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-full text-[var(--text-muted)] hover:text-[#CCF352] hover:bg-white/5 transition-all cursor-pointer"
-            >
-              <X size={18} />
-            </button>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base sm:text-lg font-bold text-[var(--foreground)] tracking-tight">
+                  {migracao ? 'Detalhe da Demanda de Migração' : 'Nova Demanda de Migração'}
+                </h3>
+                <Badge
+                  variant="outline"
+                  className="text-[10px] font-bold border-[var(--tint-olive-border)] bg-[var(--accent)] text-[var(--accent-ink)] rounded-full"
+                >
+                  PEP MV
+                </Badge>
+              </div>
+              <p className="text-xs text-[var(--muted)] font-medium truncate mt-0.5">
+                {tipoDocumento || 'Transição V2 Flex ➔ V3 Editor'}
+              </p>
+            </div>
           </div>
 
-          {/* Form com Scroll */}
-          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 text-xs scrollbar-thin">
-            
-            {/* 1. DADOS DA DEMANDA */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-[#EDF4F2] text-xs font-bold text-[#0F2426] uppercase tracking-wider">
-                <Tag size={14} className="text-[#074E52]" />
-                <span>Dados da Demanda</span>
-              </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-9 h-9 rounded-full sylva-pill flex items-center justify-center text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition-all cursor-pointer shrink-0"
+            title="Fechar (Esc)"
+          >
+            <X size={18} />
+          </button>
+        </header>
 
-              <div className="space-y-1.5">
+        {/* Form Body com Scroll */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 text-xs scrollbar-thin">
+          {/* 1. PARIDADE DE DOCUMENTOS (BENTO 2 COLUNAS: V2 ORIGEM vs V3 DESTINO) */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-[var(--border-subtle)] text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider">
+              <GitBranch size={14} className="text-[var(--lime-dark)] dark:text-[var(--lime)]" />
+              <span>Pareamento de Documentos (V2 Flex ➔ V3 Editor)</span>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Card Origem V2 Flex */}
+              <div className="sylva-glass rounded-2xl p-4 border border-[var(--border)] space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <Label className="block">Documento Flex Origem (V2) *</Label>
+                  <Label className="text-xs font-bold text-[var(--foreground)]">
+                    Documento Flex Origem (V2) *
+                  </Label>
                   {docsFlexTotal.length > 0 && (
-                    <span className="text-[10px] text-slate-400 font-mono">
+                    <span className="text-[10px] text-[var(--muted)] font-mono">
                       {sortedAndFilteredFlex.length} de {docsFlexTotal.length} docs
                     </span>
                   )}
                 </div>
 
-                {/* Campo de Pesquisa Rápida Flex */}
                 <div className="relative">
-                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
                   <input
                     type="text"
                     placeholder="Pesquisar por código (ex: 1914) ou nome..."
                     value={flexSearch}
                     onChange={(e) => setFlexSearch(e.target.value)}
-                    className="w-full h-8 pl-8 pr-2.5 rounded-lg border border-[#D5E4E0] bg-[#F7FAF9] text-xs text-[#0F2426] placeholder:text-slate-400 focus:outline-none focus:border-[#074E52] focus:bg-white transition-all shadow-2xs"
+                    className="w-full h-8.5 pl-8 pr-3 rounded-full border border-[var(--border)] bg-[var(--card-solid)] text-xs text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--lime)] transition-all"
                   />
                 </div>
 
@@ -306,7 +320,7 @@ export function MigracaoDrawer({
                     if (selected && !tipoDocumento) setTipoDocumento(selected.nome);
                   }}
                   required
-                  className="w-full h-9 px-3 rounded-xl border border-[#D5E4E0] bg-white text-xs text-[#0F2426] focus:outline-none focus:border-[#074E52] shadow-2xs font-mono"
+                  className="w-full h-9 px-3 rounded-xl border border-[var(--border)] bg-[var(--card-solid)] text-xs text-[var(--foreground)] focus:outline-none focus:border-[var(--lime)] font-mono"
                 >
                   <option value="" className="font-sans">Selecione o modelo Flex...</option>
                   {sortedAndFilteredFlex.map(d => (
@@ -317,13 +331,74 @@ export function MigracaoDrawer({
                 </select>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <Label className="mb-1 block">Status / Etapa *</Label>
+              {/* Card Destino V3 HTML5 */}
+              <div className="sylva-glass rounded-2xl p-4 border border-[var(--border)] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold text-[var(--foreground)]">
+                    Documento Destino HTML5 (V3)
+                  </Label>
+                  {docsHtml5Total.length > 0 && (
+                    <span className="text-[10px] text-[var(--muted)] font-mono">
+                      {sortedAndFilteredHtml5.length} de {docsHtml5Total.length} docs
+                    </span>
+                  )}
+                </div>
+
+                <div className="relative">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Pesquisar por código (ex: 622) ou nome..."
+                    value={html5Search}
+                    onChange={(e) => setHtml5Search(e.target.value)}
+                    className="w-full h-8.5 pl-8 pr-3 rounded-full border border-[var(--border)] bg-[var(--card-solid)] text-xs text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--lime)] transition-all"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <select
+                    value={html5Id}
+                    onChange={(e) => setHtml5Id(e.target.value)}
+                    className="flex-1 min-w-0 h-9 px-3 rounded-xl border border-[var(--border)] bg-[var(--card-solid)] text-xs text-[var(--foreground)] focus:outline-none focus:border-[var(--lime)] font-mono"
+                  >
+                    <option value="" className="font-sans">Ainda não pareado / Em desenvolvimento</option>
+                    {sortedAndFilteredHtml5.map(d => (
+                      <option key={d.id || d.cd_documento_mv} value={d.cd_documento_mv}>
+                        [{d.cd_documento_mv}] {d.nome}
+                      </option>
+                    ))}
+                  </select>
+
+                  <input
+                    type="text"
+                    value={codigoObjeto}
+                    onChange={(e) => setCodigoObjeto(e.target.value.slice(0, 4))}
+                    maxLength={4}
+                    placeholder="Obj: 646"
+                    title="Cód. Objeto Perfil (Máx. 4 dígitos)"
+                    className="w-24 h-9 px-2.5 rounded-xl border border-[var(--border)] bg-[var(--card-solid)] text-xs font-mono text-center tracking-wider uppercase text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--lime)] shrink-0"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. CLASSIFICAÇÃO & RESPONSÁVEIS */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Dados da Demanda */}
+            <div className="space-y-3.5">
+              <div className="flex items-center gap-2 pb-2 border-b border-[var(--border-subtle)] text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider">
+                <Tag size={14} className="text-[var(--lime-dark)] dark:text-[var(--lime)]" />
+                <span>Dados da Demanda</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="block text-[11px] text-[var(--foreground-secondary)]">Status / Etapa *</Label>
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value as StatusMigracao)}
-                    className="w-full h-9 px-3 rounded-xl border border-[#D5E4E0] bg-white text-xs text-[#0F2426] focus:outline-none focus:border-[#074E52] shadow-2xs font-semibold"
+                    className="w-full h-9 px-3 rounded-xl border border-[var(--border)] bg-[var(--card-solid)] text-xs text-[var(--foreground)] focus:outline-none focus:border-[var(--lime)] font-semibold"
                   >
                     <option value="PENDENTES">Pendentes</option>
                     <option value="DESENVOLVIMENTO">Desenvolvimento</option>
@@ -334,12 +409,12 @@ export function MigracaoDrawer({
                   </select>
                 </div>
 
-                <div>
-                  <Label className="mb-1 block">Esforço / Complexidade</Label>
+                <div className="space-y-1">
+                  <Label className="block text-[11px] text-[var(--foreground-secondary)]">Esforço / Complexidade</Label>
                   <select
                     value={complexidade}
                     onChange={(e) => setComplexidade(e.target.value as ComplexidadeMigracao)}
-                    className="w-full h-9 px-3 rounded-xl border border-[#D5E4E0] bg-white text-xs text-[#0F2426] focus:outline-none focus:border-[#074E52] shadow-2xs"
+                    className="w-full h-9 px-3 rounded-xl border border-[var(--border)] bg-[var(--card-solid)] text-xs text-[var(--foreground)] focus:outline-none focus:border-[var(--lime)]"
                   >
                     <option value="BAIXA">Baixa</option>
                     <option value="MEDIA">Média</option>
@@ -348,8 +423,8 @@ export function MigracaoDrawer({
                 </div>
               </div>
 
-              <div>
-                <Label className="mb-1 block">Tipo de Documento / Categoria</Label>
+              <div className="space-y-1">
+                <Label className="block text-[11px] text-[var(--foreground-secondary)]">Tipo de Documento / Categoria</Label>
                 <Input
                   value={tipoDocumento}
                   onChange={(e) => setTipoDocumento(e.target.value)}
@@ -358,26 +433,26 @@ export function MigracaoDrawer({
               </div>
             </div>
 
-            {/* 2. RESPONSÁVEIS */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-[#EDF4F2] text-xs font-bold text-[#0F2426] uppercase tracking-wider">
-                <User size={14} className="text-[#074E52]" />
-                <span>Responsáveis</span>
+            {/* Responsáveis */}
+            <div className="space-y-3.5">
+              <div className="flex items-center gap-2 pb-2 border-b border-[var(--border-subtle)] text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider">
+                <User size={14} className="text-[var(--lime-dark)] dark:text-[var(--lime)]" />
+                <span>Responsáveis & Chamado</span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <Label className="mb-1 block">LECOM (Ticket)</Label>
-                  <Input
-                    value={lecom}
-                    onChange={(e) => setLecom(e.target.value)}
-                    placeholder="Ex: 1.042.964"
-                    className="font-mono"
-                  />
-                </div>
+              <div className="space-y-1">
+                <Label className="block text-[11px] text-[var(--foreground-secondary)]">LECOM (Ticket)</Label>
+                <Input
+                  value={lecom}
+                  onChange={(e) => setLecom(e.target.value)}
+                  placeholder="Ex: 1.042.964"
+                  className="font-mono"
+                />
+              </div>
 
-                <div>
-                  <Label className="mb-1 block">Responsável Dev</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="block text-[11px] text-[var(--foreground-secondary)]">Responsável Dev</Label>
                   <Input
                     value={responsavelDev}
                     onChange={(e) => setResponsavelDev(e.target.value)}
@@ -385,8 +460,8 @@ export function MigracaoDrawer({
                   />
                 </div>
 
-                <div>
-                  <Label className="mb-1 block">Responsável Perfil</Label>
+                <div className="space-y-1">
+                  <Label className="block text-[11px] text-[var(--foreground-secondary)]">Responsável Perfil</Label>
                   <Input
                     value={responsavelPerfil}
                     onChange={(e) => setResponsavelPerfil(e.target.value)}
@@ -395,77 +470,18 @@ export function MigracaoDrawer({
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* 3. DADOS DOCUMENTO (DE-PARA DESTINO) */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-[#EDF4F2] text-xs font-bold text-[#0F2426] uppercase tracking-wider">
-                <GitBranch size={14} className="text-[#074E52]" />
-                <span>Dados Documento (Destino V3)</span>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-start gap-4">
-                {/* Código Documento HTML com busca e ordenação */}
-                <div className="flex-1 w-full space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label className="block">Código Documento HTML</Label>
-                    {docsHtml5Total.length > 0 && (
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {sortedAndFilteredHtml5.length} de {docsHtml5Total.length} docs
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Campo de Pesquisa Rápida */}
-                  <div className="relative">
-                    <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                    <input
-                      type="text"
-                      placeholder="Pesquisar por código (ex: 622) ou nome..."
-                      value={html5Search}
-                      onChange={(e) => setHtml5Search(e.target.value)}
-                      className="w-full h-8 pl-8 pr-2.5 rounded-lg border border-[#D5E4E0] bg-[#F7FAF9] text-xs text-[#0F2426] placeholder:text-slate-400 focus:outline-none focus:border-[#074E52] focus:bg-white transition-all shadow-2xs"
-                    />
-                  </div>
-
-                  {/* Select Ordenado por Código */}
-                  <select
-                    value={html5Id}
-                    onChange={(e) => setHtml5Id(e.target.value)}
-                    className="w-full h-9 px-3 rounded-xl border border-[#D5E4E0] bg-white text-xs text-[#0F2426] focus:outline-none focus:border-[#074E52] shadow-2xs font-mono"
-                  >
-                    <option value="" className="font-sans">Ainda não pareado / Em desenvolvimento</option>
-                    {sortedAndFilteredHtml5.map(d => (
-                      <option key={d.id || d.cd_documento_mv} value={d.cd_documento_mv}>
-                        [{d.cd_documento_mv}] {d.nome}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Cód. Objeto Perfil (Reduzido para 4 caracteres) */}
-                <div className="w-full sm:w-36 space-y-1.5 shrink-0">
-                  <Label className="block whitespace-nowrap">Cód. Objeto Perfil</Label>
-                  <Input
-                    value={codigoObjeto}
-                    onChange={(e) => setCodigoObjeto(e.target.value.slice(0, 4))}
-                    maxLength={4}
-                    placeholder="Ex: 646"
-                    className="font-mono text-center tracking-wider text-xs h-9 uppercase"
-                  />
-                  <span className="text-[10px] text-slate-400 block text-center">Máx. 4 dígitos</span>
-                </div>
-              </div>
+          {/* 3. REGRAS, RELACIONAMENTOS E CRONOGRAMA */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b border-[var(--border-subtle)] text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider">
+              <ShieldCheck size={14} className="text-[var(--lime-dark)] dark:text-[var(--lime)]" />
+              <span>Regras, Relacionamentos Flex & Cronograma</span>
             </div>
 
-            {/* 4. REGRAS E RELACIONAMENTOS FLEX */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-[#EDF4F2] text-xs font-bold text-[#0F2426] uppercase tracking-wider">
-                <ShieldCheck size={14} className="text-[#074E52]" />
-                <span>Regras e Relacionamentos Flex</span>
-              </div>
-
-              <div>
-                <Label className="mb-1 block">Regras e Relacionamentos</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="block text-[11px] text-[var(--foreground-secondary)]">Regras e Relacionamentos</Label>
                 <Textarea
                   value={regrasNegocio}
                   onChange={(e) => setRegrasNegocio(e.target.value)}
@@ -474,8 +490,8 @@ export function MigracaoDrawer({
                 />
               </div>
 
-              <div>
-                <Label className="mb-1 block">Campos Relacionados</Label>
+              <div className="space-y-1">
+                <Label className="block text-[11px] text-[var(--foreground-secondary)]">Campos Relacionados</Label>
                 <Textarea
                   value={camposRelacionados}
                   onChange={(e) => setCamposRelacionados(e.target.value)}
@@ -485,129 +501,127 @@ export function MigracaoDrawer({
               </div>
             </div>
 
-            {/* 5. CRONOGRAMA */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-[#EDF4F2] text-xs font-bold text-[#0F2426] uppercase tracking-wider">
-                <Clock size={14} className="text-[#074E52]" />
-                <span>Cronograma</span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              <div className="space-y-1">
+                <Label className="flex items-center gap-1 text-[11px] text-[var(--foreground-secondary)]">
+                  <Clock size={11} /> Data Início
+                </Label>
+                <Input
+                  type="date"
+                  value={dataInicio}
+                  onChange={(e) => setDataInicio(e.target.value)}
+                  className="font-mono"
+                />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <Label className="mb-1 block">Data Início</Label>
-                  <Input
-                    type="date"
-                    value={dataInicio}
-                    onChange={(e) => setDataInicio(e.target.value)}
-                    className="font-mono"
-                  />
-                </div>
-
-                <div>
-                  <Label className="mb-1 block">Limite Desenvolvimento</Label>
-                  <Input
-                    type="date"
-                    value={dataPrevisao}
-                    onChange={(e) => setDataPrevisao(e.target.value)}
-                    className="font-mono"
-                  />
-                </div>
-
-                <div>
-                  <Label className="mb-1 block">Entrada em Produção</Label>
-                  <Input
-                    type="date"
-                    value={dataEfetiva}
-                    onChange={(e) => setDataEfetiva(e.target.value)}
-                    className="font-mono"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* 6. CHECKLIST DE GOVERNANÇA ASSISTENCIAL */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 pb-2 border-b border-[#EDF4F2] text-xs font-bold text-[#0F2426] uppercase tracking-wider">
-                <CheckSquare size={14} className="text-[#074E52]" />
-                <span>Checklist de Homologação</span>
+              <div className="space-y-1">
+                <Label className="flex items-center gap-1 text-[11px] text-[var(--foreground-secondary)]">
+                  <Clock size={11} /> Limite Desenvolvimento
+                </Label>
+                <Input
+                  type="date"
+                  value={dataPrevisao}
+                  onChange={(e) => setDataPrevisao(e.target.value)}
+                  className="font-mono"
+                />
               </div>
 
-              <div className="space-y-2">
-                {checklist.map(item => (
-                  <div 
-                    key={item.id}
-                    onClick={() => handleToggleChecklist(item.id)}
-                    className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-[#F7FAF9] border border-[#EDF4F2] transition-all cursor-pointer select-none"
-                  >
-                    {item.concluido ? (
-                      <CheckSquare size={15} className="text-[#074E52]" />
-                    ) : (
-                      <Square size={15} className="text-slate-300" />
-                    )}
-                    <span className={cn(
-                      "text-xs transition-colors",
-                      item.concluido ? "text-[#0F2426] font-semibold" : "text-slate-500"
-                    )}>
-                      {item.label}
-                    </span>
-                  </div>
-                ))}
+              <div className="space-y-1">
+                <Label className="flex items-center gap-1 text-[11px] text-[var(--foreground-secondary)]">
+                  <Clock size={11} /> Entrada em Produção
+                </Label>
+                <Input
+                  type="date"
+                  value={dataEfetiva}
+                  onChange={(e) => setDataEfetiva(e.target.value)}
+                  className="font-mono"
+                />
               </div>
-            </div>
-
-            {/* 7. OBSERVAÇÕES */}
-            <div>
-              <Label className="mb-1 block">Observações e Objetivo</Label>
-              <Textarea
-                value={observacoes}
-                onChange={(e) => setObservacoes(e.target.value)}
-                placeholder="Objetivo assistencial, notas para a equipe ou detalhes do projeto..."
-                rows={3}
-              />
-            </div>
-
-          </form>
-
-          {/* Footer Fixo de Ações */}
-          <div className="px-6 py-3.5 border-t border-[var(--border-subtle)] bg-[var(--dock-bg)]/80 flex items-center justify-between">
-            {migracao ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleDelete}
-                className="h-9 px-3 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border-rose-500/30 cursor-pointer shadow-2xs gap-1.5"
-              >
-                <Trash2 size={13} />
-                <span>Excluir</span>
-              </Button>
-            ) : <div />}
-
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onClose}
-                className="h-9 px-4 text-xs font-semibold rounded-full border-[var(--border-subtle)] bg-[var(--card-bg)] hover:bg-[var(--dock-bg)] text-[var(--text-primary)] cursor-pointer shadow-2xs"
-              >
-                Cancelar
-              </Button>
-
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleSubmit}
-                disabled={saving}
-                className="h-9 px-5 text-xs font-bold rounded-full bg-[#CCF352] hover:bg-[#b8dd3e] text-[#141312] cursor-pointer shadow-2xs gap-1.5 transition-all"
-              >
-                <Save size={13} />
-                <span>{saving ? 'Salvando...' : 'Salvar Demanda'}</span>
-              </Button>
             </div>
           </div>
 
-        </div>
+          {/* 4. CHECKLIST DE HOMOLOGAÇÃO (GRID 2 COLUNAS) */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-[var(--border-subtle)] text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider">
+              <CheckSquare size={14} className="text-[var(--lime-dark)] dark:text-[var(--lime)]" />
+              <span>Checklist de Homologação Assistencial</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {checklist.map(item => (
+                <div
+                  key={item.id}
+                  onClick={() => handleToggleChecklist(item.id)}
+                  className={cn(
+                    "flex items-center gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer select-none",
+                    item.concluido
+                      ? "bg-[var(--accent)] border-[var(--tint-olive-border)]"
+                      : "bg-[var(--card-subtle)] hover:bg-[var(--card-hover)] border-[var(--border)]"
+                  )}
+                >
+                  {item.concluido ? (
+                    <CheckSquare size={15} className="text-[var(--lime-dark)] dark:text-[var(--lime)] shrink-0" />
+                  ) : (
+                    <Square size={15} className="text-[var(--muted)] shrink-0" />
+                  )}
+                  <span className={cn(
+                    "text-xs transition-colors leading-snug",
+                    item.concluido ? "text-[var(--foreground)] font-semibold" : "text-[var(--foreground-secondary)]"
+                  )}>
+                    {item.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 5. OBSERVAÇÕES */}
+          <div className="space-y-1.5">
+            <Label className="block text-[11px] text-[var(--foreground-secondary)]">Observações e Objetivo</Label>
+            <Textarea
+              value={observacoes}
+              onChange={(e) => setObservacoes(e.target.value)}
+              placeholder="Objetivo assistencial, notas para a equipe ou detalhes do projeto..."
+              rows={2}
+            />
+          </div>
+        </form>
+
+        {/* Footer Fixo de Ações */}
+        <footer className="px-6 py-4 border-t border-[var(--border)] bg-[var(--card-subtle)]/50 flex items-center justify-between gap-3">
+          {migracao ? (
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="px-4 py-2 rounded-full tone-danger border text-xs font-bold flex items-center gap-1.5 cursor-pointer hover:brightness-110 transition-all"
+            >
+              <Trash2 size={13} />
+              <span>Excluir</span>
+            </button>
+          ) : (
+            <div />
+          )}
+
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-full sylva-pill text-xs font-semibold text-[var(--foreground-secondary)] hover:text-[var(--foreground)] cursor-pointer transition-all"
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={saving}
+              className="px-5 py-2 rounded-full bg-[var(--lime)] text-[var(--lime-ink)] hover:brightness-105 text-xs font-bold shadow-[0_4px_14px_rgba(204,243,82,0.25)] cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-all"
+            >
+              <Save size={13} />
+              <span>{saving ? 'Salvando...' : 'Salvar Demanda'}</span>
+            </button>
+          </div>
+        </footer>
       </div>
     </div>
   );

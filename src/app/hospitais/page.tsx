@@ -379,7 +379,7 @@ export default function HospitaisPage() {
             <Badge 
               variant="outline" 
               suppressHydrationWarning
-              className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border-[#CCF352]/30 bg-[#CCF352]/10 text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205]"
+              className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border-[var(--tint-olive-border)] bg-[var(--accent)] text-[var(--accent-ink)]"
             >
               Motor {resolvedVersion}
             </Badge>
@@ -428,7 +428,7 @@ export default function HospitaisPage() {
       <div className="sylva-dock bg-[var(--dock-bg)]/80 p-2 rounded-2xl border border-[var(--border-subtle)] overflow-x-auto scrollbar-thin backdrop-blur-md">
         <div className="flex items-center gap-1.5 min-w-max">
           <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider px-3 flex items-center gap-1.5">
-            <Building2 size={13} className="text-[#CCF352]" />
+            <Building2 size={13} className="text-[var(--accent-ink)]" />
             Unidade:
           </span>
           {hospitals.map((h, idx) => {
@@ -507,68 +507,68 @@ export default function HospitaisPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
             {/* Card 1: Total Preenchido (Olive Tint com Neon Lime) */}
-            <div className="bg-[var(--tint-olive-bg)] border border-[var(--tint-olive-border)] text-[var(--tint-olive-fg)] p-5 rounded-2xl shadow-xs flex flex-col justify-between transition-all">
+            <div className="sylva-card-olive text-[var(--tint-olive-fg)] p-5 rounded-2xl flex flex-col justify-between transition-all">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold uppercase tracking-wider opacity-80">Total Preenchido</span>
-                <Badge variant="outline" className="text-[10px] font-bold bg-white/10 text-[var(--tint-olive-fg)] border-white/15 rounded-full px-2 py-0.5">
+                <Badge variant="outline" className="text-[10px] font-bold bg-[var(--tint-olive-btn)] text-[var(--tint-olive-fg)] border-[var(--tint-olive-border)] rounded-full px-2 py-0.5">
                   Volume 90d
                 </Badge>
               </div>
               <div className="text-3xl font-extrabold font-mono text-[var(--tint-olive-fg)] tracking-tight my-1">
                 {Number(data?.kpis?.TOTAL_DOCS || 0).toLocaleString('pt-BR')}
               </div>
-              <p className="text-[11px] opacity-80 mt-1 truncate">
+              <p className="text-[11px] text-[var(--tint-olive-muted)] mt-1 truncate">
                 Prontuários eletrônicos na unidade
               </p>
-              <div className="w-full h-1.5 bg-black/20 dark:bg-white/10 rounded-full overflow-hidden mt-3">
+              <div className="w-full h-1.5 bg-black/15 dark:bg-white/10 rounded-full overflow-hidden mt-3">
                 <div className="h-full bg-[#CCF352] rounded-full w-4/5 shadow-[0_0_8px_rgba(204,243,82,0.5)]" />
               </div>
             </div>
 
             {/* Card 2: Documentos Únicos em Uso (Mocha Tint) */}
-            <div className="bg-[var(--tint-mocha-bg)] border border-[var(--tint-mocha-border)] text-[var(--tint-mocha-fg)] p-5 rounded-2xl shadow-xs flex flex-col justify-between transition-all">
+            <div className="sylva-card-mocha text-[var(--tint-mocha-fg)] p-5 rounded-2xl flex flex-col justify-between transition-all">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold uppercase tracking-wider opacity-80">Modelos Ativos</span>
-                <Badge variant="outline" className="text-[10px] font-bold bg-amber-500/15 text-amber-500 border-amber-500/25 rounded-full px-2 py-0.5 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 text-amber-500" />
+                <Badge variant="outline" className="text-[10px] font-bold tone-warning rounded-full px-2 py-0.5 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" />
                   Aderência Local
                 </Badge>
               </div>
               <div className="text-3xl font-extrabold font-mono text-[var(--tint-mocha-fg)] tracking-tight my-1">
                 {Number(data?.kpis?.DOCS_ATIVOS || 0).toLocaleString('pt-BR')}
               </div>
-              <p className="text-[11px] opacity-80 mt-1 truncate">
+              <p className="text-[11px] text-[var(--tint-mocha-muted)] mt-1 truncate">
                 Modelos com registros homologados
               </p>
-              <div className="w-full h-1.5 bg-black/20 dark:bg-white/10 rounded-full overflow-hidden mt-3">
+              <div className="w-full h-1.5 bg-black/15 dark:bg-white/10 rounded-full overflow-hidden mt-3">
                 <div className="h-full bg-amber-500 rounded-full w-2/3 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
               </div>
             </div>
 
             {/* Card 3: SLA de Assinatura (Slate Tint) */}
-            <div className="bg-[var(--tint-slate-bg)] border border-[var(--tint-slate-border)] text-[var(--tint-slate-fg)] p-5 rounded-2xl shadow-xs flex flex-col justify-between transition-all">
+            <div className="sylva-card-slate text-[var(--tint-slate-fg)] p-5 rounded-2xl flex flex-col justify-between transition-all">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold uppercase tracking-wider opacity-80">SLA Assinatura (24h)</span>
-                <Badge variant="outline" className="text-[10px] font-bold bg-sky-500/15 text-sky-400 border-sky-500/25 rounded-full px-2 py-0.5">
+                <Badge variant="outline" className="text-[10px] font-bold tone-info rounded-full px-2 py-0.5">
                   Regra CFM
                 </Badge>
               </div>
               <div className="text-3xl font-extrabold font-mono text-[var(--tint-slate-fg)] tracking-tight my-1">
                 {slaPercentage}%
               </div>
-              <p className="text-[11px] opacity-80 mt-1 truncate">
+              <p className="text-[11px] text-[var(--tint-slate-muted)] mt-1 truncate">
                 Fechamento tempestivo de prontuários
               </p>
-              <div className="w-full h-1.5 bg-black/20 dark:bg-white/10 rounded-full overflow-hidden mt-3">
+              <div className="w-full h-1.5 bg-black/15 dark:bg-white/10 rounded-full overflow-hidden mt-3">
                 <div className="h-full bg-sky-400 rounded-full w-11/12 shadow-[0_0_8px_rgba(56,189,248,0.5)]" />
               </div>
             </div>
 
             {/* Card 4: Última Atividade Registrada (Sylva Frosted Glass) */}
-            <div className="sylva-glass bg-[var(--card-bg)] border border-[var(--border-subtle)] text-[var(--text-primary)] p-5 rounded-2xl shadow-xs flex flex-col justify-between transition-all">
+            <div className="sylva-glass border border-[var(--border-subtle)] text-[var(--text-primary)] p-5 rounded-2xl shadow-xs flex flex-col justify-between transition-all">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Última Atividade</span>
-                <Badge variant="outline" className="text-[10px] font-bold bg-[#CCF352]/10 text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205] border-[#CCF352]/30 rounded-full px-2 py-0.5">
+                <Badge variant="outline" className="text-[10px] font-bold bg-[var(--accent)] text-[var(--accent-ink)] border-[var(--tint-olive-border)] rounded-full px-2 py-0.5">
                   Tempo Real
                 </Badge>
               </div>
@@ -594,14 +594,14 @@ export default function HospitaisPage() {
                 <div className="flex items-center justify-between pb-4 mb-4 border-b border-[var(--border-subtle)]">
                   <div>
                     <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
-                      <FileText size={16} className="text-[#CCF352]" />
+                      <FileText size={16} className="text-[var(--accent-ink)]" />
                       Documentos Mais Movimentados na Unidade
                     </h3>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5">
                       Prontuários com maior volume recente em <b>{selectedHospital?.nome}</b>
                     </p>
                   </div>
-                  <span className="text-xs font-bold font-mono px-2.5 py-1 rounded-full bg-[#CCF352]/10 text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205] border border-[#CCF352]/30">
+                  <span className="text-xs font-bold font-mono px-2.5 py-1 rounded-full bg-[var(--accent)] text-[var(--accent-ink)] border border-[var(--tint-olive-border)]">
                     {selectedHospital?.sigla}
                   </span>
                 </div>
@@ -619,19 +619,19 @@ export default function HospitaisPage() {
                     </thead>
                     <tbody className="divide-y divide-[var(--border-subtle)]">
                       {data?.details?.slice(0, 8).map((item: DetailItem) => (
-                        <tr key={item.CD_DOCUMENTO} className="group hover:bg-white/5 dark:hover:bg-white/[0.03] transition-colors">
+                        <tr key={item.CD_DOCUMENTO} className="group hover:bg-[var(--hover-bg)] transition-colors">
                           <td className="py-3">
                             <div className="cursor-pointer" onClick={() => fetchDocDetails(item.CD_DOCUMENTO)}>
-                              <p className="font-semibold text-[var(--text-primary)] group-hover:text-[#CCF352] transition-colors">{item.NOME}</p>
+                              <p className="font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent-ink)] transition-colors">{item.NOME}</p>
                               <p className="text-[10px] text-[var(--text-muted)] font-mono mt-0.5">CÓDIGO: #{item.CD_DOCUMENTO}</p>
                             </div>
                           </td>
                           <td className="py-3 text-center font-mono">
-                            <span className="px-2 py-0.5 rounded-full bg-[var(--dock-bg)] text-[var(--text-secondary)] text-[10px] font-bold border border-[var(--border-subtle)]">
+                            <span className="px-2 py-0.5 rounded-full bg-[var(--card-subtle)] text-[var(--text-secondary)] text-[10px] font-bold border border-[var(--border-subtle)]">
                               v{item.VERSAO || '1.0'}
                             </span>
                           </td>
-                          <td className="py-3 text-right font-mono font-bold text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205] tabular-nums">
+                          <td className="py-3 text-right font-mono font-bold text-[var(--accent-ink)] tabular-nums">
                             {Number(item.USO_UNIDADE).toLocaleString('pt-BR')}
                           </td>
                           <td className="py-3 text-right font-mono text-[var(--text-muted)] text-[11px]">
@@ -642,7 +642,7 @@ export default function HospitaisPage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => fetchDocDetails(item.CD_DOCUMENTO)}
-                              className="h-7 px-2 text-[10px] rounded-lg text-[#CCF352] hover:bg-[#CCF352]/10 cursor-pointer font-bold"
+                              className="h-7 px-2 text-[10px] rounded-lg text-[var(--accent-ink)] hover:bg-[var(--accent)] cursor-pointer font-bold"
                               title="Visualizar Metadados & Regras"
                             >
                               <Layers size={13} className="mr-1" />
@@ -660,7 +660,7 @@ export default function HospitaisPage() {
                 <span>Exibindo os modelos com maior volume na unidade</span>
                 <Link 
                   href={`/documentos?search=${selectedHospital?.sigla}`}
-                  className="font-bold text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205] hover:underline flex items-center gap-1"
+                  className="font-bold text-[var(--accent-ink)] hover:underline flex items-center gap-1"
                 >
                   Abrir na Matriz Geral de Documentos <ChevronRight size={13} />
                 </Link>
@@ -671,10 +671,10 @@ export default function HospitaisPage() {
             <div className="space-y-6">
               
               {/* Ranking Top 5 */}
-              <div className="sylva-glass bg-[var(--card-bg)] border border-[var(--border-subtle)] rounded-2xl p-6 shadow-xs">
+              <div className="sylva-glass border border-[var(--border-subtle)] rounded-2xl p-6 shadow-xs">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
-                    <TrendingUp size={16} className="text-[#CCF352]" />
+                    <TrendingUp size={16} className="text-[var(--accent-ink)]" />
                     Top 5 Documentos Mais Usados
                   </h3>
                 </div>
@@ -687,7 +687,7 @@ export default function HospitaisPage() {
                       <div key={i} className="group space-y-1.5">
                         <div className="flex justify-between items-center text-xs">
                           <span className="font-semibold text-[var(--text-primary)] truncate max-w-[70%]" title={doc.NOME}>
-                            <span className="font-mono text-[#CCF352] font-bold mr-1.5">#{i + 1}</span>
+                            <span className="font-mono text-[var(--accent-ink)] font-bold mr-1.5">#{i + 1}</span>
                             {doc.NOME}
                           </span>
                           <span className="font-mono font-bold text-[var(--text-primary)] tabular-nums">
@@ -710,13 +710,13 @@ export default function HospitaisPage() {
               </div>
 
               {/* Insight Operacional da Unidade na Rede */}
-              <div className="sylva-card bg-[var(--dock-bg)]/80 border border-[var(--border-subtle)] rounded-2xl p-5 shadow-xs">
-                <h4 className="text-xs font-bold text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205] flex items-center gap-2 mb-2 uppercase tracking-wide">
-                  <Activity size={14} className="text-[#CCF352]" />
+              <div className="sylva-card border border-[var(--border-subtle)] rounded-2xl p-5 shadow-xs">
+                <h4 className="text-xs font-bold text-[var(--accent-ink)] flex items-center gap-2 mb-2 uppercase tracking-wide">
+                  <Activity size={14} className="text-[var(--accent-ink)]" />
                   Representatividade na Rede
                 </h4>
                 <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                  A unidade <b>{selectedHospital?.sigla}</b> é responsável por <span className="font-bold text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205]">{(data.globalTotal > 0 ? ((Number(data.kpis.TOTAL_DOCS) / Number(data.globalTotal)) * 100) : 0).toFixed(1)}%</span> de todo o volume de prontuários eletrônicos preenchidos na base <span className="font-semibold text-[var(--text-primary)]">{activeConnName || 'ativa'}</span> (filtro motor {resolvedVersion}).
+                  A unidade <b>{selectedHospital?.sigla}</b> é responsável por <span className="font-bold text-[var(--accent-ink)]">{(data.globalTotal > 0 ? ((Number(data.kpis.TOTAL_DOCS) / Number(data.globalTotal)) * 100) : 0).toFixed(1)}%</span> de todo o volume de prontuários eletrônicos preenchidos na base <span className="font-semibold text-[var(--text-primary)]">{activeConnName || 'ativa'}</span> (filtro motor {resolvedVersion}).
                 </p>
               </div>
 
@@ -724,18 +724,18 @@ export default function HospitaisPage() {
           </div>
 
           {/* 7. Seção de Qualidade e SLA de Assinatura */}
-          <div className="sylva-glass bg-[var(--card-bg)] border border-[var(--border-subtle)] rounded-2xl p-6 shadow-xs space-y-6">
+          <div className="sylva-glass border border-[var(--border-subtle)] rounded-2xl p-6 shadow-xs space-y-6">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
               <div>
                 <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
-                  <Clock size={16} className="text-[#CCF352]" />
+                  <Clock size={16} className="text-[var(--accent-ink)]" />
                   Governança Clínica: SLA de Fechamento e Assinatura Digital
                 </h3>
                 <p className="text-xs text-[var(--text-muted)] mt-0.5">
                   Conformidade com resolução CFM nº 1.821 e diretrizes de integridade documental
                 </p>
               </div>
-              <Badge variant="outline" className="text-xs font-mono font-bold text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205] bg-[#CCF352]/10 border-[#CCF352]/30 px-2.5 py-0.5 rounded-full">
+              <Badge variant="outline" className="text-xs font-mono font-bold text-[var(--accent-ink)] bg-[var(--accent)] border-[var(--tint-olive-border)] px-2.5 py-0.5 rounded-full">
                 {slaPercentage}% em dia
               </Badge>
             </div>
@@ -781,10 +781,10 @@ export default function HospitaisPage() {
               </div>
 
               {/* Coluna 2: Card de Avaliação Regulatória e Faturamento */}
-              <div className="sylva-card bg-[var(--dock-bg)]/70 rounded-2xl p-5 border border-[var(--border-subtle)] flex flex-col justify-between space-y-4">
+              <div className="sylva-card rounded-2xl p-5 border border-[var(--border-subtle)] flex flex-col justify-between space-y-4">
                 <div>
                   <h4 className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-2 mb-2 uppercase tracking-wide">
-                    <ShieldCheck size={16} className="text-[#CCF352]" />
+                    <ShieldCheck size={16} className="text-[var(--accent-ink)]" />
                     Diagnóstico Regulatório &amp; Faturamento
                   </h4>
                   <p className="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
@@ -792,24 +792,24 @@ export default function HospitaisPage() {
                   </p>
 
                   <div className="grid grid-cols-2 gap-3 text-center">
-                    <div className="sylva-glass bg-[var(--card-bg)] p-3 rounded-xl border border-[var(--border-subtle)] shadow-2xs">
+                    <div className="sylva-glass p-3 rounded-xl border border-[var(--border-subtle)] shadow-2xs">
                       <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block">Dentro do Prazo (&le; 24h)</span>
-                      <span className="text-xl font-bold font-mono text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205]">{within24h.toLocaleString('pt-BR')}</span>
+                      <span className="text-xl font-bold font-mono text-[var(--accent-ink)]">{within24h.toLocaleString('pt-BR')}</span>
                       <span className="text-[10px] text-[var(--text-muted)] block font-medium">Conforme regulamentação</span>
                     </div>
 
-                    <div className="sylva-glass bg-[var(--card-bg)] p-3 rounded-xl border border-[var(--border-subtle)] shadow-2xs">
+                    <div className="sylva-glass p-3 rounded-xl border border-[var(--border-subtle)] shadow-2xs">
                       <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block">Acima de 24h (Risco)</span>
-                      <span className="text-xl font-bold font-mono text-rose-400">{over24h.toLocaleString('pt-BR')}</span>
-                      <span className="text-[10px] text-rose-400/80 block font-medium">Requer intervenção</span>
+                      <span className="text-xl font-bold font-mono text-rose-500">{over24h.toLocaleString('pt-BR')}</span>
+                      <span className="text-[10px] text-rose-500/90 block font-medium">Requer intervenção</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-3 bg-[var(--card-bg)] rounded-xl border border-[var(--border-subtle)] flex items-center gap-2.5 text-xs text-[var(--text-primary)] font-medium">
-                  <CheckCircle2 size={16} className="text-[#CCF352] shrink-0" />
+                <div className="p-3 bg-[var(--card-subtle)] rounded-xl border border-[var(--border-subtle)] flex items-center gap-2.5 text-xs text-[var(--text-primary)] font-medium">
+                  <CheckCircle2 size={16} className="text-[var(--accent-ink)] shrink-0" />
                   <span>
-                    Índice de conformidade geral da unidade: <b className="text-[#CCF352] dark:text-[#CCF352] light:text-[#3f5205]">{slaPercentage}%</b>.
+                    Índice de conformidade geral da unidade: <b className="text-[var(--accent-ink)]">{slaPercentage}%</b>.
                   </span>
                 </div>
               </div>

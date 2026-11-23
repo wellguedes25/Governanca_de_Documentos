@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, .dark, .dark *));
+
 @theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -118,6 +120,19 @@
   --tone-neutral-bg: rgba(255, 255, 255, 0.06);
   --tone-neutral-fg: #C9C6BF;
   --tone-neutral-border: rgba(255, 255, 255, 0.12);
+
+  /* Compatibility Token Aliases (Dark) */
+  --tint-olive-bg: var(--tint-olive);
+  --tint-mocha-bg: var(--tint-mocha);
+  --tint-slate-bg: var(--tint-slate);
+  --canvas-bg: var(--background);
+  --card-bg: var(--card-solid);
+  --dock-bg: var(--glass-dock);
+  --hover-bg: var(--card-hover);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--foreground-secondary);
+  --text-muted: var(--muted);
+  --lime-dark: var(--accent-ink);
 }
 
 [data-theme="light"] {
@@ -214,6 +229,19 @@
   --tone-neutral-bg: rgba(23, 22, 21, 0.05);
   --tone-neutral-fg: #4A4741;
   --tone-neutral-border: rgba(23, 22, 21, 0.12);
+
+  /* Compatibility Token Aliases (Light) */
+  --tint-olive-bg: var(--tint-olive);
+  --tint-mocha-bg: var(--tint-mocha);
+  --tint-slate-bg: var(--tint-slate);
+  --canvas-bg: var(--background);
+  --card-bg: var(--card-solid);
+  --dock-bg: var(--glass-dock);
+  --hover-bg: var(--card-hover);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--foreground-secondary);
+  --text-muted: var(--muted);
+  --lime-dark: var(--accent-ink);
 }
 
 body {
@@ -272,7 +300,8 @@ body {
    SYLVA SURFACES & COMPONENTS
    ========================================================================== */
 
-.sylva-glass {
+.sylva-glass,
+.sylva-card {
   background: var(--card);
   backdrop-filter: blur(22px) saturate(130%);
   -webkit-backdrop-filter: blur(22px) saturate(130%);
@@ -586,5 +615,35 @@ body {
 :root.dark .hover\:bg-\[\#F3F7F6\]:hover,
 :root.dark .hover\:bg-\[\#E6F4F1\]:hover {
   background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ==========================================================================
+   SYLVA LIGHT MODE CONTRAST BRIDGE (Legible neon/bright text on light paper)
+   ========================================================================== */
+
+:root[data-theme="light"] .text-\[\#CCF352\],
+:root[data-theme="light"] .text-\[var\(--lime\)\],
+:root[data-theme="light"] .hover\:text-\[\#CCF352\]:hover,
+:root[data-theme="light"] .group:hover .group-hover\:text-\[\#CCF352\],
+:root[data-theme="light"] .group:hover .group-hover\:text-\[var\(--lime\)\] {
+  color: var(--accent-ink) !important;
+}
+
+:root[data-theme="light"] .text-sky-400 {
+  color: #0284c7 !important;
+}
+
+:root[data-theme="light"] .text-amber-400,
+:root[data-theme="light"] .text-amber-300 {
+  color: #b45309 !important;
+}
+
+:root[data-theme="light"] .text-emerald-400 {
+  color: #047857 !important;
+}
+
+:root[data-theme="light"] .text-rose-400,
+:root[data-theme="light"] .text-rose-300 {
+  color: #be123c !important;
 }
 

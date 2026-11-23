@@ -27,14 +27,14 @@ export function PageHeader({
       <div className="flex flex-col gap-1.5 min-w-0">
         {kicker && (
           <div className="flex items-center">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--accent)] text-[var(--lime)] border border-[var(--tint-olive-border)]">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--accent)] text-[var(--accent-ink)] border border-[var(--tint-olive-border)]">
               {kicker}
             </span>
           </div>
         )}
         <div className="flex items-center gap-3">
           {Icon && (
-            <div className="w-10 h-10 rounded-2xl sylva-pill text-[var(--lime)] flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-2xl sylva-pill text-[var(--accent-ink)] flex items-center justify-center shrink-0">
               <Icon size={19} strokeWidth={2} />
             </div>
           )}

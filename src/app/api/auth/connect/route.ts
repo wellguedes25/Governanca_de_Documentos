@@ -3,6 +3,8 @@ import { getData, saveData } from '@/lib/storage';
 import { testConnection } from '@/lib/oracle';
 import { createSessionToken, SESSION_COOKIE_NAME, SESSION_DURATION_MS } from '@/lib/session';
 import { formatDatabaseError } from '@/lib/error-formatter';
+import { isDemoConnection } from '@/lib/demo-mock';
+import { encrypt } from '@/lib/encryption';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +18,7 @@ export async function GET() {
         name: conn.name,
         user: conn.user,
         host: hostDisplay,
+        isDemo: isDemoConnection(conn),
       };
     });
 
@@ -31,6 +34,46 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+
+    if (body.action === 'CREATE_CONNECTION') {
+      const name = String(body.name || '').trim();
+      const user = String(body.user || '').trim();
+      const password = String(body.password || '');
+      const connectString = String(body.connectString || '').trim();
+
+      if (!name || !user || !password || !connectString) {
+        return NextResponse.json(
+          { error: 'Preencha Nome, Usuário, Senha e Connect String para cadastrar a conexão.' },
+          { status: 400 }
+        );
+      }
+
+      const data = await getData();
+      const newConn = {
+        id: `conn-${Date.now()}`,
+        name,
+        user,
+        password: encrypt(password),
+        connectString,
+      };
+
+      data.connections = [...(data.connections || []), newConn];
+      data.activeConnectionId = newConn.id;
+      await saveData(data);
+
+      const hostDisplay = newConn.connectString.split('/')[0] || 'Oracle Host';
+      return NextResponse.json({
+        success: true,
+        connection: {
+          id: newConn.id,
+          name: newConn.name,
+          user: newConn.user,
+          host: hostDisplay,
+          isDemo: false,
+        },
+      });
+    }
+
     const { connectionId, version } = body;
 
     if (!connectionId) {

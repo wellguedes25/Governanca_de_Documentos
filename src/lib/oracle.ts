@@ -3,6 +3,7 @@ import * as oracledb from 'oracledb';
 import { getData, saveData, DbConnection, HospitalMapping } from './storage';
 import { decrypt } from './encryption';
 import { queryCache, generateCacheKey } from './cache';
+import { isDemoConnection, executeDemoQuery } from './demo-mock';
 
 interface CustomPool extends oracledb.Pool {
   currentAlias?: string;
@@ -234,6 +235,10 @@ export async function executeQuery(
   binds: Record<string, unknown> | unknown[] = {},
   options?: { ttlSeconds?: number, forceRefresh?: boolean }
 ) {
+  if (isDemoConnection(connection)) {
+    const storageData = await getData();
+    return executeDemoQuery(sql, binds, storageData.hospitalsMapping);
+  }
   let conn;
   try {
     const cacheKey = generateCacheKey(connection.id, sql, binds);
@@ -367,6 +372,9 @@ export async function executeQuery(
 }
 
 export async function testConnection(connection: DbConnection) {
+  if (isDemoConnection(connection)) {
+    return { success: true };
+  }
   await initOracle();
   let conn;
   try {

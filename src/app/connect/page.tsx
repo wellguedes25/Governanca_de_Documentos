@@ -17,7 +17,10 @@ import {
   Lock,
   Zap,
   Sun,
-  Moon
+  Moon,
+  Plus,
+  X,
+  Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +33,7 @@ interface ConnectionItem {
   name: string;
   user: string;
   host: string;
+  isDemo?: boolean;
 }
 
 function ConnectPageContent() {
@@ -47,6 +51,15 @@ function ConnectPageContent() {
   const [connectionSuccess, setConnectionSuccess] = useState(false);
   const [errorInfo, setErrorInfo] = useState<FriendlyErrorInfo | null>(null);
   const [showTechDetails, setShowTechDetails] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [creatingConn, setCreatingConn] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [newConnForm, setNewConnForm] = useState({
+    name: '',
+    user: '',
+    password: '',
+    connectString: '',
+  });
 
   // Carrega conexões disponíveis
   useEffect(() => {
@@ -77,6 +90,48 @@ function ConnectPageContent() {
       mounted = false;
     };
   }, []);
+
+  const handleCreateConnection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateError(null);
+
+    if (!newConnForm.name.trim() || !newConnForm.user.trim() || !newConnForm.password || !newConnForm.connectString.trim()) {
+      setCreateError('Preencha Nome, Usuário, Senha e Connect String para salvar.');
+      return;
+    }
+
+    setCreatingConn(true);
+    try {
+      const res = await fetch('/api/auth/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'CREATE_CONNECTION',
+          ...newConnForm,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCreateError(data.error || 'Não foi possível cadastrar a conexão.');
+        return;
+      }
+
+      const created: ConnectionItem = data.connection;
+      setConnections((prev) => {
+        const real = prev.filter((c) => !c.isDemo);
+        const demos = prev.filter((c) => c.isDemo);
+        return [...real, created, ...demos];
+      });
+      setSelectedConnId(created.id);
+      setNewConnForm({ name: '', user: '', password: '', connectString: '' });
+      setShowCreateForm(false);
+      setErrorInfo(null);
+    } catch (err: any) {
+      setCreateError(err.message || 'Erro de comunicação ao salvar a conexão.');
+    } finally {
+      setCreatingConn(false);
+    }
+  };
 
   const handleConnect = async () => {
     if (!selectedConnId) return;
@@ -240,10 +295,87 @@ function ConnectPageContent() {
                     <Database size={15} className="text-[var(--accent-ink)]" />
                     1. Ambiente de Dados (Oracle)
                   </label>
-                  <span className="text-[11px] font-medium text-[var(--muted)]">
-                    {connections.length} {connections.length === 1 ? 'base configurada' : 'bases configuradas'}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-medium text-[var(--muted)]">
+                      {connections.filter((c) => !c.isDemo).length}{' '}
+                      {connections.filter((c) => !c.isDemo).length === 1 ? 'base real' : 'bases reais'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCreateForm((v) => !v);
+                        setCreateError(null);
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider sylva-pill text-[var(--accent-ink)] hover:border-[var(--lime)] cursor-pointer transition-all"
+                    >
+                      {showCreateForm ? <X size={11} /> : <Plus size={11} />}
+                      <span>{showCreateForm ? 'Cancelar' : 'Nova Conexão'}</span>
+                    </button>
+                  </div>
                 </div>
+
+                {/* Formulário Inline de Criação de Conexão */}
+                {showCreateForm && (
+                  <form
+                    onSubmit={handleCreateConnection}
+                    className="p-3.5 rounded-2xl bg-[var(--card-subtle)] border border-[var(--border-strong)] space-y-2.5 animate-in fade-in duration-200"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--foreground)]">
+                        Cadastrar Instância Oracle
+                      </span>
+                      <span className="text-[10px] text-[var(--muted)]">Criptografia AES-256</span>
+                    </div>
+
+                    {createError && (
+                      <div className="p-2 rounded-xl tone-danger border text-[11px] font-medium">
+                        {createError}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Nome (ex: PRODUÇÃO)"
+                        value={newConnForm.name}
+                        onChange={(e) => setNewConnForm((f) => ({ ...f, name: e.target.value }))}
+                        className="w-full bg-[var(--card-solid)] border border-[var(--border)] rounded-xl px-3 py-1.5 text-xs text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--lime)]"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Usuário (ex: DBAMV)"
+                        value={newConnForm.user}
+                        onChange={(e) => setNewConnForm((f) => ({ ...f, user: e.target.value }))}
+                        className="w-full bg-[var(--card-solid)] border border-[var(--border)] rounded-xl px-3 py-1.5 text-xs font-mono text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--lime)]"
+                      />
+                      <input
+                        type="password"
+                        placeholder="Senha Oracle"
+                        value={newConnForm.password}
+                        onChange={(e) => setNewConnForm((f) => ({ ...f, password: e.target.value }))}
+                        className="w-full bg-[var(--card-solid)] border border-[var(--border)] rounded-xl px-3 py-1.5 text-xs text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--lime)]"
+                      />
+                      <input
+                        type="text"
+                        placeholder="host:1521/servico"
+                        value={newConnForm.connectString}
+                        onChange={(e) => setNewConnForm((f) => ({ ...f, connectString: e.target.value }))}
+                        className="w-full bg-[var(--card-solid)] border border-[var(--border)] rounded-xl px-3 py-1.5 text-xs font-mono text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--lime)]"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-0.5">
+                      <button
+                        type="submit"
+                        disabled={creatingConn}
+                        className="px-4 py-1.5 rounded-full sylva-lime-btn text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {creatingConn ? <RotateCw size={12} className="animate-spin" /> : <Check size={12} />}
+                        <span>{creatingConn ? 'Salvando...' : 'Salvar Conexão'}</span>
+                      </button>
+                    </div>
+                  </form>
+                )}
 
                 {/* Barra de Pesquisa Rápida para Múltiplas Conexões */}
                 {!loadingList && connections.length > 2 && (
@@ -306,10 +438,10 @@ function ConnectPageContent() {
                                   : 'bg-[var(--card-solid)] border border-[var(--border)] text-[var(--muted)] group-hover:text-[var(--foreground)]'
                               )}
                             >
-                              <Server size={16} />
+                              {conn.isDemo ? <Sparkles size={16} /> : <Server size={16} />}
                             </div>
                             <div className="min-w-0">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span
                                   className={cn(
                                     'text-xs font-bold truncate',
@@ -321,6 +453,11 @@ function ConnectPageContent() {
                                 <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold text-[var(--accent-ink)] bg-[var(--card-solid)] border border-[var(--border)]">
                                   {conn.user}
                                 </span>
+                                {conn.isDemo && (
+                                  <span className="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border tone-info">
+                                    SANDBOX • DADOS MOCKADOS
+                                  </span>
+                                )}
                               </div>
                               <p className="text-[10px] text-[var(--muted)] font-mono truncate mt-0.5" title={conn.host}>
                                 {conn.host}
@@ -474,7 +611,11 @@ function ConnectPageContent() {
                 ) : (
                   <>
                     <ShieldCheck size={16} />
-                    <span>Validar e Entrar no Sistema</span>
+                    <span>
+                      {connections.find((c) => c.id === selectedConnId)?.isDemo
+                        ? 'Entrar no Modo Demonstração'
+                        : 'Validar e Entrar no Sistema'}
+                    </span>
                     <ArrowRight size={15} />
                   </>
                 )}

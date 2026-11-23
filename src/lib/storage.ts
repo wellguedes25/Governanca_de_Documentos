@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { DEMO_CONNECTION, DEMO_CONNECTION_ID, DEFAULT_DEMO_HOSPITALS } from './demo-mock';
 
 const getStoragePaths = () => {
   const root = process.cwd();
@@ -492,18 +493,36 @@ function ensureDataDir() {
   }
 }
 
+function withDemoInjected(data: StorageData): StorageData {
+  const userConnections = (data.connections || []).filter((c) => c.id !== DEMO_CONNECTION_ID);
+  const hasRealConnections = userConnections.length > 0;
+  const connections = [...userConnections, DEMO_CONNECTION];
+  const hospitalsMapping =
+    data.hospitalsMapping && data.hospitalsMapping.length > 0
+      ? data.hospitalsMapping
+      : !hasRealConnections || data.activeConnectionId === DEMO_CONNECTION_ID
+        ? DEFAULT_DEMO_HOSPITALS
+        : [];
+
+  return {
+    ...data,
+    connections,
+    hospitalsMapping,
+  };
+}
+
 export async function getData(): Promise<StorageData> {
   const { storageFile } = getStoragePaths();
   ensureDataDir();
 
   if (!fs.existsSync(storageFile)) {
-    return INITIAL_DATA;
+    return withDemoInjected(INITIAL_DATA);
   }
   
   const fileContent = fs.readFileSync(storageFile, 'utf-8');
   try {
     const data = JSON.parse(fileContent);
-    return {
+    return withDemoInjected({
       ...INITIAL_DATA,
       ...data,
       activeQueryV3: data.activeQueryV3 || INITIAL_DATA.activeQueryV3,
@@ -529,10 +548,10 @@ export async function getData(): Promise<StorageData> {
       similarityQuery: data.similarityQuery || INITIAL_DATA.similarityQuery,
       auditDays: data.auditDays !== undefined ? Number(data.auditDays) : INITIAL_DATA.auditDays,
       auditDocId: data.auditDocId !== undefined ? data.auditDocId : INITIAL_DATA.auditDocId
-    };
+    });
   } catch (e) {
     console.error('[Storage] Erro ao parsear storage.json:', e);
-    return INITIAL_DATA;
+    return withDemoInjected(INITIAL_DATA);
   }
 }
 
@@ -545,6 +564,10 @@ export async function saveData(data: StorageData) {
   // Clone data to avoid mutating the in-memory object directly
   const dataToSave = JSON.parse(JSON.stringify(data));
   if (dataToSave.connections) {
+    // Keep built-in sandbox connection virtual so it is never persisted as a real credential
+    dataToSave.connections = dataToSave.connections.filter(
+      (conn: DbConnection) => conn.id !== DEMO_CONNECTION_ID
+    );
     dataToSave.connections.forEach((conn: DbConnection) => {
       if (conn.password && !conn.password.startsWith('encrypted:')) {
         conn.password = encrypt(conn.password);

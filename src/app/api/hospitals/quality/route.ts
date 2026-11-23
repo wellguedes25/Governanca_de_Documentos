@@ -54,7 +54,10 @@ export async function GET(request: Request) {
       ? (data as any).analyticQueriesV3.slaAssinatura
       : (data.analyticQueries?.slaAssinatura || DEFAULT_SLA_QUERY);
 
-    const slaRes = await executeQuery(activeConn, slaSql, { ID: hospitalId }, { ttlSeconds: 600, forceRefresh: force });
+    const numericHospitalId = isNaN(Number(hospitalId)) ? hospitalId : Number(hospitalId);
+    const binds = /:ID\b/i.test(slaSql) ? { ID: numericHospitalId } : {};
+
+    const slaRes = await executeQuery(activeConn, slaSql, binds, { ttlSeconds: 600, forceRefresh: force });
 
     return NextResponse.json({
       sla: slaRes || [],

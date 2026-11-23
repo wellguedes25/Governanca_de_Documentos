@@ -266,8 +266,8 @@ export default function HospitaisPage() {
     try {
       const forceParam = force ? '&force=true' : '';
       const [resStats, resQuality] = await Promise.all([
-        fetch(`/api/dashboard/stats?type=hospital&hospitalId=${hId}&version=${resolvedVersion}${forceParam}`),
-        fetch(`/api/dashboard/quality?hospitalId=${hId}&version=${resolvedVersion}${forceParam}`)
+        fetch(`/api/hospitals/stats?id=${hId}&version=${resolvedVersion}${forceParam}`),
+        fetch(`/api/hospitals/quality?id=${hId}&version=${resolvedVersion}${forceParam}`)
       ]);
 
       const jsonStats = await resStats.json();

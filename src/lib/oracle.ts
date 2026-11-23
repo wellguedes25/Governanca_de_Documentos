@@ -229,12 +229,33 @@ export async function getPool(connection: DbConnection): Promise<CustomPool> {
   return pool;
 }
 
+/**
+ * Garante que apenas instruções de leitura (SELECT / WITH) sejam executadas pelo portal.
+ */
+export function assertReadOnlySql(sql: string): void {
+  const withoutComments = String(sql || '')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/--[^\r\n]*/g, ' ')
+    .trim();
+
+  if (!/^\s*(SELECT|WITH)\b/i.test(withoutComments)) {
+    throw new Error('Operação bloqueada por política de segurança Read-Only: apenas consultas SELECT são permitidas.');
+  }
+
+  const withoutStringLiterals = withoutComments.replace(/'(?:''|[^'])*'/g, "''");
+  if (/\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|GRANT|REVOKE|MERGE|CREATE)\b/i.test(withoutStringLiterals)) {
+    throw new Error('Operação bloqueada por política de segurança Read-Only: apenas consultas SELECT são permitidas.');
+  }
+}
+
 export async function executeQuery(
   connection: DbConnection, 
   sql: string, 
   binds: Record<string, unknown> | unknown[] = {},
   options?: { ttlSeconds?: number, forceRefresh?: boolean }
 ) {
+  assertReadOnlySql(sql);
+
   if (isDemoConnection(connection)) {
     return executeDemoQuery(sql, binds);
   }

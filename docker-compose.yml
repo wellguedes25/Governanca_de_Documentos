@@ -1,13 +1,27 @@
 services:
-  medlytics:
-    build: .
-    container_name: medlytics_dashboard
+  goverdoc-pro:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: goverdoc-pro
+    restart: unless-stopped
     ports:
       - "3000:3000"
-    volumes:
-      - ./data:/app/data
-      - ./SQL/.env:/app/SQL/.env
-    restart: always
     environment:
-      - NODE_ENV=production
-      - ORACLE_CLIENT_PATH=/opt/oracle/instantclient_21_1
+      NODE_ENV: production
+      # Gere com: openssl rand -hex 32 (64 caracteres hexadecimais)
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      # Senha inicial do usuário 'admin' quando data/users.json ainda não existir
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-admin123}
+      # Caminho do Oracle Instant Client dentro do container
+      ORACLE_CLIENT_PATH: /opt/oracle/instantclient
+      LD_LIBRARY_PATH: /opt/oracle/instantclient
+    volumes:
+      # Persistência local de conexões criptografadas, usuários, migrações e dependências BI
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/api/auth/connect"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 25s

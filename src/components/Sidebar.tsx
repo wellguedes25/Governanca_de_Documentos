@@ -19,11 +19,12 @@ import {
   Sparkles,
   Layers,
   ShieldCheck,
-  BarChart3
+  BarChart3,
+  Users
 } from 'lucide-react';
 import { useUI } from '@/context/UIContext';
 import { cn } from '@/lib/utils';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface SidebarProps {
   mobileOpen?: boolean;
@@ -43,6 +44,7 @@ const mainMenuItems = [
 const infraMenuItems = [
   { href: '/configuracoes/consultas', label: 'Motores SQL', icon: Database },
   { href: '/configuracoes/conexoes', label: 'Conexões Oracle', icon: Settings },
+  { href: '/configuracoes/usuarios', label: 'Usuários & Acesso', icon: Users },
 ];
 
 const COMPACT_ROUTES = ['/linhagem', '/migracao'];
@@ -51,6 +53,22 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
   const pathname = usePathname();
   const { sidebarOpen, setSidebarOpen, docVersion, setDocVersion, theme, toggleTheme } = useUI();
   const lastPathnameRef = useRef<string | null>(null);
+  const [userRole, setUserRole] = useState<'ADMIN' | 'ANALISTA' | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    fetch('/api/auth/session')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (mounted && d?.session?.role) {
+          setUserRole(d.session.role);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [pathname]);
 
   // Auto-recolhe para Dock ao entrar em telas horizontais densas (/linhagem e /migracao)
   useEffect(() => {
@@ -208,9 +226,9 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
         </div>
       </div>
 
-      {/* Rodapé — Infraestrutura + Toggle Dark Mode estilo Sylva */}
+      {/* Rodapé — Infraestrutura (Apenas ADMIN) + Toggle Dark Mode estilo Sylva */}
       <div className="pt-4 mt-4 border-t border-[var(--border-subtle)] space-y-1">
-        {infraMenuItems.map((item) => {
+        {userRole === 'ADMIN' && infraMenuItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href);
           const Icon = item.icon;
           return (
@@ -308,7 +326,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
       </div>
 
       <div className="flex flex-col items-center gap-1.5 pt-3 border-t border-[var(--border-subtle)]">
-        {infraMenuItems.map((item) => {
+        {userRole === 'ADMIN' && infraMenuItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href);
           const Icon = item.icon;
           return (

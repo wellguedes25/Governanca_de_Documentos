@@ -3,6 +3,10 @@ const SESSION_SECRET = process.env.ENCRYPTION_KEY || 'goverdoc-secret-session-ke
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 horas
 
 export interface SessionData {
+  userId: string;
+  username: string;
+  userName: string;
+  role: 'ADMIN' | 'ANALISTA';
   connectionId: string;
   connectionName: string;
   version: 'V2' | 'V3';

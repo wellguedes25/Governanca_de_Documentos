@@ -18,12 +18,28 @@ export async function middleware(request: NextRequest) {
 
   const sessionToken = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const session = await verifySessionToken(sessionToken);
-  const isAuthenticated = !!session;
+  const isAuthenticated = Boolean(session && session.userId);
 
   // Se já estiver autenticado e tentar acessar /connect ou /, redireciona para o dashboard
   if (isAuthenticated && (pathname === '/connect' || pathname === '/')) {
     const dashboardUrl = new URL('/dashboard', request.url);
     return NextResponse.redirect(dashboardUrl);
+  }
+
+  // Controle de perfil: apenas ADMIN acessa /configuracoes/* e rotas administrativas
+  if (isAuthenticated && session?.role !== 'ADMIN') {
+    if (pathname.startsWith('/configuracoes')) {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
+    if (
+      pathname.startsWith('/api/users') ||
+      (pathname.startsWith('/api/connections') && request.method !== 'GET')
+    ) {
+      return NextResponse.json(
+        { error: 'Acesso restrito a administradores.' },
+        { status: 403 }
+      );
+    }
   }
 
   // Se não estiver autenticado:

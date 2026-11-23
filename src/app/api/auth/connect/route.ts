@@ -5,6 +5,7 @@ import { createSessionToken, SESSION_COOKIE_NAME, SESSION_DURATION_MS } from '@/
 import { formatDatabaseError } from '@/lib/error-formatter';
 import { isDemoConnection } from '@/lib/demo-mock';
 import { encrypt } from '@/lib/encryption';
+import { authenticateUser } from '@/lib/users';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +36,41 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
+    if (body.action === 'LOGIN') {
+      const authUser = authenticateUser(body.username, body.password);
+      if (!authUser) {
+        return NextResponse.json(
+          { error: 'Usuário ou senha inválidos, ou conta inativa.' },
+          { status: 401 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        user: {
+          id: authUser.id,
+          username: authUser.username,
+          name: authUser.name,
+          role: authUser.role,
+        },
+      });
+    }
+
     if (body.action === 'CREATE_CONNECTION') {
+      const authUser = authenticateUser(body.authUsername, body.authPassword);
+      if (!authUser) {
+        return NextResponse.json(
+          { error: 'Autenticação de usuário necessária para cadastrar conexões.' },
+          { status: 401 }
+        );
+      }
+      if (authUser.role !== 'ADMIN') {
+        return NextResponse.json(
+          { error: 'Apenas administradores podem cadastrar novas conexões Oracle.' },
+          { status: 403 }
+        );
+      }
+
       const name = String(body.name || '').trim();
       const user = String(body.user || '').trim();
       const password = String(body.password || '');
@@ -74,7 +109,15 @@ export async function POST(request: Request) {
       });
     }
 
-    const { connectionId, version } = body;
+    const { connectionId, version, username, password } = body;
+
+    const authUser = authenticateUser(username, password);
+    if (!authUser) {
+      return NextResponse.json(
+        { error: 'Usuário ou senha inválidos, ou conta inativa.' },
+        { status: 401 }
+      );
+    }
 
     if (!connectionId) {
       return NextResponse.json({ error: 'Nenhuma conexão foi selecionada.' }, { status: 400 });
@@ -108,8 +151,12 @@ export async function POST(request: Request) {
       await saveData(data);
     }
 
-    // Cria o token assinado de sessão
+    // Cria o token assinado de sessão com os dados do usuário autenticado
     const token = await createSessionToken({
+      userId: authUser.id,
+      username: authUser.username,
+      userName: authUser.name,
+      role: authUser.role,
       connectionId: connection.id,
       connectionName: connection.name,
       version: docVersion,
@@ -117,6 +164,12 @@ export async function POST(request: Request) {
 
     const response = NextResponse.json({
       success: true,
+      user: {
+        id: authUser.id,
+        username: authUser.username,
+        name: authUser.name,
+        role: authUser.role,
+      },
       connection: {
         id: connection.id,
         name: connection.name,

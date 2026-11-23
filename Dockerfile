@@ -1,62 +1,65 @@
-# --- STAGE 1: BUILD ---
+# ==========================================
+# Estágio 1: Dependências de Produção/Build
+# ==========================================
+FROM node:20-bookworm-slim AS deps
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# ==========================================
+# Estágio 2: Build Next.js (Standalone)
+# ==========================================
 FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 
-# Instalar dependências de build se necessário
-COPY package.json package-lock.json ./
-RUN npm ci
-
-# Copiar código e gerar build standalone
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
 
-# --- STAGE 2: RUNTIME ---
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN mkdir -p data && npm run build
+
+# ==========================================
+# Estágio 3: Runner + Oracle Instant Client
+# ==========================================
 FROM node:20-bookworm-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
-# 1. Instalar dependências do Sistema (Oracle + Python)
-RUN apt-get update && apt-get install -y \
-    libaio1 \
-    python3 \
-    python3-pip \
-    python3-venv \
-    unzip \
-    wget \
+# Instala dependências nativas e Oracle Instant Client Basic Light (Linux x64)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libaio1 \
+      unzip \
+      curl \
+      ca-certificates \
+    && mkdir -p /opt/oracle \
+    && curl -fL -o /tmp/instantclient.zip https://download.oracle.com/otn_software/linux/instantclient/instantclient-basiclite-linuxx64.zip \
+    && unzip -q /tmp/instantclient.zip -d /opt/oracle \
+    && rm -f /tmp/instantclient.zip \
+    && ln -s /opt/oracle/instantclient_* /opt/oracle/instantclient \
+    && echo /opt/oracle/instantclient > /etc/ld.so.conf.d/oracle-instantclient.conf \
+    && ldconfig \
+    && apt-get purge -y --auto-remove unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Configurar Oracle Instant Client (Thick Mode)
-RUN mkdir -p /opt/oracle
-WORKDIR /opt/oracle
-RUN wget https://download.oracle.com/otn_software/linux/instantclient/211000/instantclient-basic-linux.x64-21.1.0.0.0dbru.zip \
-    && unzip instantclient-basic-linux.x64-21.1.0.0.0dbru.zip \
-    && rm instantclient-basic-linux.x64-21.1.0.0.0dbru.zip \
-    && echo /opt/oracle/instantclient_21_1 > /etc/ld.so.conf.d/oracle-instantclient.conf \
-    && ldconfig
+ENV LD_LIBRARY_PATH=/opt/oracle/instantclient
+ENV ORACLE_CLIENT_PATH=/opt/oracle/instantclient
 
-ENV LD_LIBRARY_PATH=/opt/oracle/instantclient_21_1
+RUN addgroup --system --gid 1001 nodejs \
+    && adduser --system --uid 1001 nextjs
 
-# 3. Configurar Python e bibliotecas
-WORKDIR /app
-RUN python3 -m venv /app/.venv
-ENV PATH="/app/.venv/bin:$PATH"
-RUN pip install --no-cache-dir pandas oracledb python-dotenv
-
-# 4. Copiar artefatos do Next.js Standalone
-# O modo standalone gera uma pasta compacta com tudo que o app precisa
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/data ./data
-COPY --from=builder /app/SQL ./SQL
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Criar pasta para persistência de dados se não existir
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
+
+USER nextjs
 
 EXPOSE 3000
 
-# Comando para rodar a aplicação
-# Nota: nextjs standalone usa 'server.js' como entrada
 CMD ["node", "server.js"]

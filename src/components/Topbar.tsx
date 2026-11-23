@@ -10,7 +10,8 @@ import {
   Plus,
   Sparkles,
   Layers,
-  Database
+  Database,
+  UserCheck
 } from 'lucide-react';
 import { useUI } from '@/context/UIContext';
 import { cn } from '@/lib/utils';
@@ -32,6 +33,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/dependencias-bi': 'Dependências BI & Indicadores',
   '/configuracoes/consultas': 'Motores SQL',
   '/configuracoes/conexoes': 'Conexões Oracle',
+  '/configuracoes/usuarios': 'Usuários & Controle de Acesso',
 };
 
 export function Topbar({ onOpenMobileMenu, onOpenSearch }: TopbarProps) {
@@ -40,6 +42,11 @@ export function Topbar({ onOpenMobileMenu, onOpenSearch }: TopbarProps) {
   const { sidebarOpen, docVersion, setDocVersion } = useUI();
   const [oracleStatus, setOracleStatus] = useState<OracleStatus>('unknown');
   const [sessionConnName, setSessionConnName] = useState<string>('');
+  const [sessionUser, setSessionUser] = useState<{
+    name: string;
+    username: string;
+    role: 'ADMIN' | 'ANALISTA';
+  } | null>(null);
 
   const activeVersion = docVersion || 'V3';
 
@@ -52,8 +59,16 @@ export function Topbar({ onOpenMobileMenu, onOpenSearch }: TopbarProps) {
     fetch('/api/auth/session')
       .then((r) => r.json())
       .then((d) => {
-        if (mounted && d.session?.connectionName) {
+        if (!mounted) return;
+        if (d.session?.connectionName) {
           setSessionConnName(d.session.connectionName);
+        }
+        if (d.session?.username) {
+          setSessionUser({
+            name: d.session.userName || d.session.username,
+            username: d.session.username,
+            role: d.session.role === 'ADMIN' ? 'ADMIN' : 'ANALISTA',
+          });
         }
       })
       .catch(() => {});
@@ -187,21 +202,69 @@ export function Topbar({ onOpenMobileMenu, onOpenSearch }: TopbarProps) {
           <span className="hidden sm:inline">Catálogo</span>
         </Link>
 
+        {/* Usuário Logado & Perfil */}
+        {sessionUser && (
+          sessionUser.role === 'ADMIN' ? (
+            <Link
+              href="/configuracoes/usuarios"
+              title={`Gerenciar usuários (${sessionUser.name} • ADMIN)`}
+              className="hidden xl:inline-flex items-center gap-2 h-10 px-3 rounded-full sylva-pill text-[11.5px] font-medium text-[var(--foreground-secondary)] hover:text-[var(--foreground)]"
+            >
+              <UserCheck size={13} className="text-[var(--accent-ink)] shrink-0" />
+              <span className="truncate max-w-[110px] font-semibold text-[var(--foreground)]">
+                {sessionUser.name}
+              </span>
+              <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[var(--accent)] text-[var(--accent-ink)] border border-[var(--tint-olive-border)]">
+                ADMIN
+              </span>
+            </Link>
+          ) : (
+            <div
+              title={`${sessionUser.name} • ANALISTA`}
+              className="hidden xl:inline-flex items-center gap-2 h-10 px-3 rounded-full sylva-pill text-[11.5px] font-medium text-[var(--foreground-secondary)]"
+            >
+              <UserCheck size={13} className="text-[var(--muted)] shrink-0" />
+              <span className="truncate max-w-[110px] font-semibold text-[var(--foreground)]">
+                {sessionUser.name}
+              </span>
+              <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border tone-info">
+                ANALISTA
+              </span>
+            </div>
+          )
+        )}
+
         {/* Indicador Oracle / Instância */}
-        <Link
-          href="/configuracoes/conexoes"
-          title={sessionConnName ? `${status.title} — ${sessionConnName}` : status.title}
-          className={cn(
-            "relative h-10 px-3 rounded-full sylva-pill flex items-center gap-2 text-[11.5px] font-medium text-[var(--foreground-secondary)] hover:text-[var(--foreground)]",
-            status.ring
-          )}
-        >
-          <span className={cn("w-2 h-2 rounded-full shrink-0", status.dot)} />
-          <Database size={13} className="hidden md:inline text-[var(--muted)]" />
-          <span className="hidden md:inline font-mono text-[11px] max-w-[110px] truncate">
-            {sessionConnName || (oracleStatus === 'active' ? 'Oracle' : 'DB')}
-          </span>
-        </Link>
+        {sessionUser?.role === 'ADMIN' ? (
+          <Link
+            href="/configuracoes/conexoes"
+            title={sessionConnName ? `${status.title} — ${sessionConnName}` : status.title}
+            className={cn(
+              "relative h-10 px-3 rounded-full sylva-pill flex items-center gap-2 text-[11.5px] font-medium text-[var(--foreground-secondary)] hover:text-[var(--foreground)]",
+              status.ring
+            )}
+          >
+            <span className={cn("w-2 h-2 rounded-full shrink-0", status.dot)} />
+            <Database size={13} className="hidden md:inline text-[var(--muted)]" />
+            <span className="hidden md:inline font-mono text-[11px] max-w-[110px] truncate">
+              {sessionConnName || (oracleStatus === 'active' ? 'Oracle' : 'DB')}
+            </span>
+          </Link>
+        ) : (
+          <div
+            title={sessionConnName ? `${status.title} — ${sessionConnName}` : status.title}
+            className={cn(
+              "relative h-10 px-3 rounded-full sylva-pill flex items-center gap-2 text-[11.5px] font-medium text-[var(--foreground-secondary)]",
+              status.ring
+            )}
+          >
+            <span className={cn("w-2 h-2 rounded-full shrink-0", status.dot)} />
+            <Database size={13} className="hidden md:inline text-[var(--muted)]" />
+            <span className="hidden md:inline font-mono text-[11px] max-w-[110px] truncate">
+              {sessionConnName || (oracleStatus === 'active' ? 'Oracle' : 'DB')}
+            </span>
+          </div>
+        )}
 
         <button
           type="button"

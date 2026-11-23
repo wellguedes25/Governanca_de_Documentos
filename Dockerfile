@@ -4,8 +4,8 @@
 FROM node:20-bookworm-slim AS deps
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-RUN npm ci
+COPY package.json package-lock.json* .npmrc* ./
+RUN npm ci --legacy-peer-deps
 
 # ==========================================
 # Estágio 2: Build Next.js (Standalone)
@@ -43,7 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && ln -s /opt/oracle/instantclient_* /opt/oracle/instantclient \
     && echo /opt/oracle/instantclient > /etc/ld.so.conf.d/oracle-instantclient.conf \
     && ldconfig \
-    && apt-get purge -y --auto-remove unzip \
+    && apt-get purge -y unzip \
     && rm -rf /var/lib/apt/lists/*
 
 ENV LD_LIBRARY_PATH=/opt/oracle/instantclient

@@ -62,6 +62,7 @@ function ConnectPageContent() {
   const [authenticating, setAuthenticating] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginSuccessBanner, setLoginSuccessBanner] = useState(false);
+  const [enteringDemo, setEnteringDemo] = useState(false);
   const [authUser, setAuthUser] = useState<AuthenticatedUser | null>(null);
 
   // Estado da etapa 2 (Conexões Oracle / Sandbox & Motor)
@@ -164,6 +165,37 @@ function ConnectPageContent() {
     setErrorInfo(null);
     setConnectionSuccess(false);
     setLoginSuccessBanner(false);
+  };
+
+  const handleEnterDemo = async () => {
+    setLoginError(null);
+    setEnteringDemo(true);
+    try {
+      const res = await fetch('/api/auth/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'DEMO_ACCESS',
+          version: 'V3',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setLoginError(data.error || 'Não foi possível iniciar o ambiente de demonstração.');
+        setEnteringDemo(false);
+        return;
+      }
+
+      setDocVersion('V3');
+      setLoginSuccessBanner(true);
+      setTimeout(() => {
+        router.push(redirectTarget);
+        router.refresh();
+      }, 400);
+    } catch (err: any) {
+      setLoginError(err.message || 'Falha ao iniciar o modo demonstração.');
+      setEnteringDemo(false);
+    }
   };
 
   const handleCreateConnection = async (e: React.FormEvent) => {
@@ -499,34 +531,36 @@ function ConnectPageContent() {
                       </div>
                     </div>
 
-                    {/* Atalhos discretos para testes rápidos locais */}
-                    <div className="p-3 rounded-2xl bg-[var(--card-subtle)] border border-[var(--border)] flex flex-wrap items-center justify-between gap-2 text-[11px]">
-                      <span className="text-[var(--muted)] font-medium">Acesso inicial padrão:</span>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setLoginUsername('admin');
-                            setLoginPassword('admin123');
-                            setLoginError(null);
-                          }}
-                          className="px-2.5 py-1 rounded-full sylva-pill text-[10px] font-bold text-[var(--accent-ink)] hover:border-[var(--lime)] cursor-pointer"
-                        >
-                          Admin (admin)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setLoginUsername('analista');
-                            setLoginPassword('analista123');
-                            setLoginError(null);
-                          }}
-                          className="px-2.5 py-1 rounded-full sylva-pill text-[10px] font-bold text-[var(--foreground-secondary)] hover:border-[var(--border-strong)] cursor-pointer"
-                        >
-                          Analista (analista)
-                        </button>
+                    {/* Atalhos discretos apenas em ambiente local de desenvolvimento */}
+                    {process.env.NODE_ENV !== 'production' && (
+                      <div className="p-3 rounded-2xl bg-[var(--card-subtle)] border border-[var(--border)] flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                        <span className="text-[var(--muted)] font-medium">Acesso inicial padrão (dev):</span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setLoginUsername('admin');
+                              setLoginPassword('admin123');
+                              setLoginError(null);
+                            }}
+                            className="px-2.5 py-1 rounded-full sylva-pill text-[10px] font-bold text-[var(--accent-ink)] hover:border-[var(--lime)] cursor-pointer"
+                          >
+                            Admin (admin)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setLoginUsername('analista');
+                              setLoginPassword('analista123');
+                              setLoginError(null);
+                            }}
+                            className="px-2.5 py-1 rounded-full sylva-pill text-[10px] font-bold text-[var(--foreground-secondary)] hover:border-[var(--border-strong)] cursor-pointer"
+                          >
+                            Analista (analista)
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {loginError && (
                       <div className="p-3.5 rounded-2xl tone-danger border text-xs flex items-center gap-2.5 animate-in fade-in duration-200">
@@ -538,13 +572,17 @@ function ConnectPageContent() {
                     {loginSuccessBanner && (
                       <div className="p-3.5 rounded-2xl tone-success border text-xs flex items-center gap-2.5 animate-in fade-in duration-200">
                         <CheckCircle2 size={16} className="shrink-0" />
-                        <span className="font-bold">Login confirmado! Carregando ambientes...</span>
+                        <span className="font-bold">
+                          {enteringDemo
+                            ? 'Ambiente Sandbox pronto! Entrando na demonstração...'
+                            : 'Login confirmado! Carregando ambientes...'}
+                        </span>
                       </div>
                     )}
 
                     <Button
                       type="submit"
-                      disabled={authenticating || loginSuccessBanner}
+                      disabled={authenticating || enteringDemo || loginSuccessBanner}
                       className="w-full h-12 rounded-full sylva-lime-btn font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-60"
                     >
                       {authenticating ? (
@@ -559,6 +597,50 @@ function ConnectPageContent() {
                         </>
                       )}
                     </Button>
+
+                    {/* Acesso Direto ao Sandbox (Sem Login) */}
+                    <div className="pt-1 space-y-3">
+                      <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                        <span className="h-[1px] flex-1 bg-[var(--border-subtle)]" />
+                        <span>ou acesse sem cadastro</span>
+                        <span className="h-[1px] flex-1 bg-[var(--border-subtle)]" />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleEnterDemo}
+                        disabled={authenticating || enteringDemo || loginSuccessBanner}
+                        className="w-full p-3.5 rounded-2xl bg-[var(--card-subtle)] hover:bg-[var(--card-hover)] border border-[var(--border)] hover:border-[var(--tone-info-border)] text-left transition-all flex items-center justify-between gap-3 cursor-pointer group disabled:opacity-60"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-9 h-9 rounded-xl tone-info border flex items-center justify-center shrink-0">
+                            {enteringDemo ? (
+                              <RotateCw size={16} className="animate-spin" />
+                            ) : (
+                              <Sparkles size={16} />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-extrabold text-[var(--foreground)]">
+                                Explorar Demonstração (Sem Login)
+                              </span>
+                              <span className="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border tone-info">
+                                SANDBOX • DADOS FICTÍCIOS
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-[var(--muted)] truncate mt-0.5">
+                              2 unidades e 10 documentos fictícios • Sem expor dados reais
+                            </p>
+                          </div>
+                        </div>
+
+                        <ArrowRight
+                          size={15}
+                          className="shrink-0 text-[var(--muted)] group-hover:text-[var(--foreground)] group-hover:translate-x-0.5 transition-all"
+                        />
+                      </button>
+                    </div>
                   </form>
                 </div>
 

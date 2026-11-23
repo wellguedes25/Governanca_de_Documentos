@@ -3,7 +3,7 @@ import { getData, saveData } from '@/lib/storage';
 import { testConnection } from '@/lib/oracle';
 import { createSessionToken, SESSION_COOKIE_NAME, SESSION_DURATION_MS } from '@/lib/session';
 import { formatDatabaseError } from '@/lib/error-formatter';
-import { isDemoConnection } from '@/lib/demo-mock';
+import { isDemoConnection, DEMO_CONNECTION, DEMO_CONNECTION_ID } from '@/lib/demo-mock';
 import { encrypt } from '@/lib/encryption';
 import { authenticateUser } from '@/lib/users';
 
@@ -35,6 +35,50 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+
+    if (body.action === 'DEMO_ACCESS') {
+      const docVersion: 'V2' | 'V3' = body.version === 'V2' ? 'V2' : 'V3';
+      const data = await getData();
+      if (data.activeConnectionId !== DEMO_CONNECTION_ID) {
+        data.activeConnectionId = DEMO_CONNECTION_ID;
+        await saveData(data);
+      }
+
+      const token = await createSessionToken({
+        userId: 'usr-demo-guest',
+        username: 'visitante',
+        userName: 'Visitante Demo',
+        role: 'ANALISTA',
+        connectionId: DEMO_CONNECTION_ID,
+        connectionName: DEMO_CONNECTION.name,
+        version: docVersion,
+      });
+
+      const response = NextResponse.json({
+        success: true,
+        user: {
+          id: 'usr-demo-guest',
+          username: 'visitante',
+          name: 'Visitante Demo',
+          role: 'ANALISTA',
+        },
+        connection: {
+          id: DEMO_CONNECTION_ID,
+          name: DEMO_CONNECTION.name,
+        },
+        version: docVersion,
+      });
+
+      response.cookies.set(SESSION_COOKIE_NAME, token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: Math.floor(SESSION_DURATION_MS / 1000),
+      });
+
+      return response;
+    }
 
     if (body.action === 'LOGIN') {
       const authUser = authenticateUser(body.username, body.password);

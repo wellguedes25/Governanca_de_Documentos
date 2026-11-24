@@ -197,7 +197,7 @@ export function DocumentosTable({
                         rowPadding
                       )}
                       onClick={() => onOpenModal(docId, docName, 'profiles')}
-                      title="Clique para inspecionar Perfis Ambulatoriais deste documento"
+                      title="Clique para inspecionar Perfis Vinculados deste documento"
                     >
                       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-mono font-bold bg-[var(--card-subtle)] border border-[var(--border)] text-[var(--foreground-secondary)] group-hover:text-[var(--accent-ink)] group-hover:border-[var(--tint-olive-border)] transition-colors">
                         <Layers size={11} className="shrink-0" />
@@ -270,9 +270,9 @@ export function DocumentosTable({
                       <div className="flex items-center justify-center gap-1">
                         <button
                           type="button"
-                          aria-label="Abrir Perfis Ambulatoriais deste Documento"
+                          aria-label="Abrir Perfis Vinculados deste Documento"
                           onClick={() => onOpenModal(docId, docName, 'profiles')}
-                          title="Abrir Perfis Ambulatoriais deste Documento"
+                          title="Abrir Perfis Vinculados deste Documento"
                           className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] opacity-60 group-hover:opacity-100 transition-all cursor-pointer"
                         >
                           <Layers size={14} />

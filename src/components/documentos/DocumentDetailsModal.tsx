@@ -471,7 +471,7 @@ export function DocumentDetailsModal({
         { Campo: 'Qtd. Regras (Versão Ativa)', Valor: activeSpecs?.QUANTIDADE_REGRAS ?? rules.length },
         { Campo: 'Qtd. Campos (Tela)', Valor: activeSpecs?.QUANTIDADE_CAMPOS ?? 0 },
         { Campo: 'Qtd. Vínculos SQL', Valor: actions.length },
-        { Campo: 'Qtd. Perfis Ambulatoriais', Valor: profiles.length },
+        { Campo: 'Qtd. Perfis Vinculados', Valor: profiles.length },
         { Campo: 'Data da Exportação', Valor: new Date().toLocaleString('pt-BR') }
       ]);
       XLSX.utils.book_append_sheet(wb, specsSheet, 'Especificacoes');
@@ -533,15 +533,15 @@ export function DocumentDetailsModal({
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(fieldRows), 'Campos');
       }
 
-      // 6. Perfis Ambulatoriais
+      // 6. Perfis Vinculados
       if (profiles.length > 0) {
         const profRows = profiles.map(p => ({
           Documento_ID: docId || '',
-          Perfil_Ambulatorial: p.DS_PERFIL_AMBULATORIAL || '',
+          Perfil_Vinculado: p.DS_PERFIL_AMBULATORIAL || '',
           Modulo_Titulo: p.NM_TITULO || '',
           Unidade_Empresa: p.EMPRESA || ''
         }));
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(profRows), 'Perfis_Ambulatoriais');
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(profRows), 'Perfis_Vinculados');
       }
 
       XLSX.writeFile(wb, `Dossie_Doc_${docId}_${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -558,7 +558,7 @@ export function DocumentDetailsModal({
     { key: 'actions', label: 'Vínculos SQL', icon: Code2, count: filteredActions.length },
     { key: 'rules', label: 'Regras', icon: ListFilter, count: rules.length },
     { key: 'fields', label: 'Campos', icon: TableProperties, count: layoutCountsForVersion.all || fields.length },
-    { key: 'profiles', label: 'Perfis Ambulatoriais', icon: Users, count: profiles.length },
+    { key: 'profiles', label: 'Perfis Vinculados', icon: Users, count: profiles.length },
   ];
 
   if (!open) return null;
@@ -780,7 +780,7 @@ export function DocumentDetailsModal({
                   <div className="sylva-glass rounded-[20px] p-4 flex flex-col justify-between">
                     <div>
                       <span className="text-[11px] font-medium text-[var(--muted)] block">
-                        Perfis Ambulatoriais
+                        Perfis Vinculados
                       </span>
                       <span className="text-2xl font-bold font-mono text-[var(--foreground)] mt-1 block">
                         {profilesLoading ? '...' : profiles.length}
@@ -1627,7 +1627,7 @@ export function DocumentDetailsModal({
                       <thead>
                         <tr className="border-b border-[var(--border)] bg-[var(--card-subtle)] text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
                           <th className="py-2.5 px-4 w-24">Código</th>
-                          <th className="py-2.5 px-4">Perfil Ambulatorial</th>
+                          <th className="py-2.5 px-4">Perfil Vinculado</th>
                           <th className="py-2.5 px-4">Módulo / Título</th>
                           <th className="py-2.5 px-4 text-center w-32">Unidade / Empresa</th>
                         </tr>
@@ -1705,7 +1705,7 @@ export function DocumentDetailsModal({
               ) : (
                 <div className="py-14 text-center text-[var(--muted)] sylva-glass rounded-2xl border border-dashed border-[var(--border)]">
                   <Users size={34} className="mx-auto mb-2 opacity-35" />
-                  <p className="text-sm font-bold text-[var(--foreground)]">Nenhum perfil ambulatorial vinculado</p>
+                  <p className="text-sm font-bold text-[var(--foreground)]">Nenhum perfil vinculado encontrado</p>
                   <p className="text-xs mt-1">
                     Não foram encontrados perfis ativos vinculados ao documento #{docId} no Motor {docVersion}.
                   </p>

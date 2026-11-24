@@ -185,7 +185,7 @@ export function DocumentosCardsGrid({
                   size="sm"
                   onClick={() => onOpenModal(docId, docName, 'profiles')}
                   className="h-8 px-3 text-[11px] gap-1.5"
-                  title="Abrir Perfis Ambulatoriais Vinculados"
+                  title="Abrir Perfis Vinculados"
                 >
                   <Layers size={12} className="text-[var(--accent-ink)]" />
                   <span>Perfis</span>

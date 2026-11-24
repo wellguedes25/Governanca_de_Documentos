@@ -87,7 +87,7 @@ export function DocumentosToolbar({
                 : "text-[var(--foreground-secondary)] hover:text-[var(--foreground)]"
             )}
           >
-            <span>Perfis Ambulatoriais</span>
+            <span>Perfis Vinculados</span>
           </button>
         </div>
 

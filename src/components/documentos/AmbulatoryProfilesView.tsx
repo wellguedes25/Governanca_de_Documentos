@@ -196,7 +196,7 @@ export function AmbulatoryProfilesView({
         {!selectedPerfilId ? (
           <div className="flex-1 flex flex-col items-center justify-center text-[var(--muted)] py-16">
             <Database size={40} className="mb-3 opacity-35 text-[var(--muted)]" />
-            <p className="text-xs font-semibold">Selecione um perfil ambulatorial ao lado para visualizar módulos e parâmetros</p>
+            <p className="text-xs font-semibold">Selecione um perfil vinculado ao lado para visualizar módulos e parâmetros</p>
           </div>
         ) : selectedPerfil ? (
           <div className="space-y-5">

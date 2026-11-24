@@ -217,7 +217,7 @@ function DocumentosContent() {
       });
       const result = await res.json();
       if (!res.ok || result.error) {
-        setProfileError(result.error || `Erro HTTP ${res.status} ao carregar perfis ambulatoriais.`);
+        setProfileError(result.error || `Erro HTTP ${res.status} ao carregar perfis vinculados.`);
         setProfileData([]);
       } else {
         const rows = result.rows || [];
@@ -677,7 +677,7 @@ function DocumentosContent() {
       <div className="pb-3 border-b border-[var(--border)]">
         <PageHeader
           title="Catálogo Mestre de Documentos Clínicos"
-          subtitle="Matriz de Adesão e Utilização em Todas as Unidades ACSC (Oracle DBAMV)"
+          subtitle="Matriz de Adesão e Utilização em Todas as Unidades"
           icon={FileText}
           badge={
             <Badge

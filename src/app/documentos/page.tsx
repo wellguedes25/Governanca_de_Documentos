@@ -53,7 +53,7 @@ function DocumentosContent() {
     key: docVersion === 'V3' ? 'ULT. GERAL' : 'ÚLTIMO USO',
     direction: 'desc'
   });
-  const pageSize = 25;
+  const [pageSize, setPageSize] = useState<number>(25);
 
   // Estados de Abas
   const [activeMainTab, setActiveMainTab] = useState<'documentos' | 'perfis'>('documentos');
@@ -96,35 +96,15 @@ function DocumentosContent() {
   // Controle de redimensionamento de colunas
   const resizingCol = useRef<{ name: string; startX: number; startWidth: number } | null>(null);
 
-  // Carregamento inicial de conexões e hospitais
+  // Carregamento inicial de conexões e hospitais sempre atualizado
   useEffect(() => {
     const currentVersion = docVersion || 'V3';
-    const cacheKey = `oracle_documentos_data_${currentVersion}`;
-    const cached = typeof window !== 'undefined' ? sessionStorage.getItem(cacheKey) : null;
-    
-    if (cached) {
-      try {
-        setOracleData(JSON.parse(cached));
-      } catch (e) {
-        console.error('Erro ao ler cache:', e);
-      }
-    } else {
-      setOracleData(null);
-    }
-    
-    // Se já temos a conexão em cache no contexto, reaproveita sem disparar fetch
-    if (activeConnInfo) {
-      setActiveConnName(activeConnInfo.name);
-      setActiveHospitals(activeConnInfo.activeHospitals);
-      if (!cached) {
-        fetchInitialData(true, currentVersion);
-      }
-      return;
-    }
+    let isCurrent = true;
 
     fetch('/api/connections')
       .then(res => res.json())
       .then(storage => {
+        if (!isCurrent) return;
         const active = storage.connections?.find((c: any) => c.id === storage.activeConnectionId);
         const hospitals = storage.hospitalsMapping ? storage.hospitalsMapping.filter((h: any) => h.ativo) : [];
         if (active) {
@@ -136,12 +116,44 @@ function DocumentosContent() {
           });
         }
         setActiveHospitals(hospitals);
-        if (!cached) {
-          fetchInitialData(true, currentVersion);
+
+        // Verifica cache com chave isolada pela conexão ativa
+        const connId = active?.id || storage.activeConnectionId || 'default';
+        const cacheKey = `oracle_documentos_data_${connId}_${currentVersion}`;
+        const cached = typeof window !== 'undefined' ? sessionStorage.getItem(cacheKey) : null;
+
+        if (cached) {
+          try {
+            const rawCached = JSON.parse(cached);
+            const normalized = Array.isArray(rawCached) ? rawCached.map((r: any) => {
+              if (!r || typeof r !== 'object') return r;
+              const clean: Record<string, any> = {};
+              for (const [k, v] of Object.entries(r)) {
+                let key = k.replace(/"/g, '').trim();
+                if (key === 'CÃ“DIGO' || key === 'CODIGO' || key === 'CD_DOCUMENTO') key = 'CÓDIGO';
+                else if (key === 'DOCUMENTO CLÍNICO' || key === 'DS_DOCUMENTO' || key === 'NM_TITULO') key = 'NOME';
+                else if (key === 'ÃšLTIMO USO' || key === 'ULTIMO USO' || key === 'LTIMO USO') key = 'ÚLTIMO USO';
+                clean[key] = v;
+              }
+              return clean;
+            }) : rawCached;
+            setOracleData(normalized);
+          } catch {
+            fetchInitialData(true, currentVersion);
+          }
+        } else {
+          fetchInitialData(false, currentVersion);
         }
       })
-      .catch(err => console.error('Erro ao carregar conexões:', err));
-  }, [docVersion, activeConnInfo, setActiveConnInfo]);
+      .catch(err => {
+        console.error('Erro ao carregar conexões:', err);
+        fetchInitialData(false, currentVersion);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [docVersion]);
 
   // Carrega documentos do Oracle
   async function fetchInitialData(isManual = false, versionOverride?: 'V2' | 'V3') {
@@ -158,6 +170,15 @@ function DocumentosContent() {
       
       const active = storage.connections?.find((c: any) => c.id === storage.activeConnectionId);
       if (active) setActiveConnName(active.name);
+      const hospitals = storage.hospitalsMapping ? storage.hospitalsMapping.filter((h: any) => h.ativo) : [];
+      setActiveHospitals(hospitals);
+      if (active) {
+        setActiveConnInfo({
+          id: active.id,
+          name: active.name,
+          activeHospitals: hospitals
+        });
+      }
 
       if (!storage.activeConnectionId) {
         setError('Nenhuma conexão ativa configurada. Vá em Configurações > Conexões.');
@@ -170,7 +191,8 @@ function DocumentosContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           query: 'DOCUMENTOS',
-          version: targetVersion
+          version: targetVersion,
+          forceRefresh: isManual
         })
       });
 
@@ -179,9 +201,22 @@ function DocumentosContent() {
         setError(execData.error || 'Falha ao executar consulta no Oracle.');
         setOracleData([]);
       } else {
-        const rows = execData.rows || [];
+        const rawRows = execData.rows || [];
+        const rows = rawRows.map((r: any) => {
+          if (!r || typeof r !== 'object') return r;
+          const clean: Record<string, any> = {};
+          for (const [k, v] of Object.entries(r)) {
+            let key = k.replace(/"/g, '').trim();
+            if (key === 'CÃ“DIGO' || key === 'CODIGO' || key === 'CD_DOCUMENTO') key = 'CÓDIGO';
+            else if (key === 'DOCUMENTO CLÍNICO' || key === 'DS_DOCUMENTO' || key === 'NM_TITULO') key = 'NOME';
+            else if (key === 'ÃšLTIMO USO' || key === 'ULTIMO USO' || key === 'LTIMO USO') key = 'ÚLTIMO USO';
+            clean[key] = v;
+          }
+          return clean;
+        });
         setOracleData(rows);
-        sessionStorage.setItem(`oracle_documentos_data_${targetVersion}`, JSON.stringify(rows));
+        const connId = active?.id || storage.activeConnectionId || 'default';
+        sessionStorage.setItem(`oracle_documentos_data_${connId}_${targetVersion}`, JSON.stringify(rows));
       }
     } catch (err: any) {
       setError(err.message || 'Erro de conexão com a API.');
@@ -561,11 +596,22 @@ function DocumentosContent() {
   // Colunas disponíveis
   const columns = useMemo(() => {
     if (!oracleData || oracleData.length === 0) return ['CÓDIGO', 'NOME', 'TOTAL', 'ÚLTIMO USO'];
-    const cols = Object.keys(oracleData[0]).map(k => k.replace(/"/g, ''));
-    // Ordena para garantir CÓDIGO e NOME no início
-    const fixed = ['CÓDIGO', 'NOME'];
-    const remaining = cols.filter(c => !fixed.includes(c));
-    return [...fixed, ...remaining];
+    const rawKeys = Object.keys(oracleData[0]).map(k => k.replace(/"/g, '').trim());
+    const fixedOrder = ['CÓDIGO', 'NOME'];
+    const standardMetricCols = ['TOTAL', 'ÚLTIMO USO'];
+
+    const hospitalAndOtherCols = rawKeys.filter(c => 
+      !fixedOrder.includes(c) && 
+      c !== 'DOCUMENTO CLÍNICO' && 
+      c !== 'CD_DOCUMENTO' && 
+      c !== 'DS_DOCUMENTO' &&
+      c !== 'NM_TITULO' &&
+      !standardMetricCols.includes(c)
+    );
+
+    const metricsPresent = standardMetricCols.filter(m => rawKeys.includes(m));
+
+    return [...fixedOrder, ...metricsPresent, ...hospitalAndOtherCols];
   }, [oracleData]);
 
   // Handler de Ordenação
@@ -735,6 +781,8 @@ function DocumentosContent() {
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
             totalFiltered={filteredData.length}
             columnWidths={columnWidths}
             onResizeStart={handleResizeStart}
@@ -748,6 +796,8 @@ function DocumentosContent() {
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
             totalFiltered={filteredData.length}
           />
         )

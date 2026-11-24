@@ -31,7 +31,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Configuração de queries analíticas não encontrada' }, { status: 500 });
     }
 
-    const safeExecute = async (conn: any, sql: string, queryKey?: string, fallbackRows: any[] = []) => {
+    const safeExecute = async (conn: any, sql: string, queryKey?: string, fallbackRows: any[] = []): Promise<any> => {
       // Se a query estiver desativada, não executa
       if (queryKey && enabledQueries[queryKey] === false) {
         return fallbackRows;
@@ -50,8 +50,8 @@ export async function GET(request: Request) {
         case 'top10': result = await safeExecute(activeConn, analyticQueries.top10, 'top10'); break;
         case 'idle': result = await safeExecute(activeConn, analyticQueries.idle, 'idle'); break;
         case 'volume3m': 
-          const volRes = await safeExecute(activeConn, analyticQueries.volume3m, 'volume3m', [{ TOTAL: 0 }]);
-          result = volRes?.[0]?.[Object.keys(volRes[0])[0]] || 0;
+          const volRes = await safeExecute(activeConn, analyticQueries.volume3m, 'volume3m', [{ TOTAL: 0 }]) as any[];
+          result = (Array.isArray(volRes) && volRes[0]) ? (volRes[0][Object.keys(volRes[0])[0]] ?? 0) : 0;
           break;
         case 'unitAdherence': result = await safeExecute(activeConn, analyticQueries.unitAdherence, 'unitAdherence'); break;
         case 'unitInactivity': result = await safeExecute(activeConn, analyticQueries.unitInactivity, 'unitInactivity'); break;
@@ -76,11 +76,11 @@ export async function GET(request: Request) {
     return NextResponse.json({
       top10: top10Res || [],
       idle: idleRes || [],
-      volume3m: volume3mRes?.[0]?.[Object.keys(volume3mRes[0])[0]] || 0,
+      volume3m: (Array.isArray(volume3mRes) && volume3mRes[0]) ? ((volume3mRes as any[])[0][Object.keys((volume3mRes as any[])[0])[0]] ?? 0) : 0,
       unitAdherence: adherenceRes || [],
       unitInactivity: inactivityRes || [],
       volumeTurno: turnoRes || [],
-      slaAssinatura: slaRes?.[0] || {},
+      slaAssinatura: (Array.isArray(slaRes) && slaRes[0]) ? slaRes[0] : (slaRes || {}),
     });
   } catch (error: any) {
     console.error('Erro ao buscar Analytics do Dashboard:', error);

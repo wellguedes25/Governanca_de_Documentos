@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Sparkles, RotateCcw, X, Globe2 } from 'lucide-react';
+import { Sparkles, RotateCcw, RotateCw, X, Globe2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface LineageToolbarProps {
@@ -12,6 +12,7 @@ interface LineageToolbarProps {
   onSelectFocusDoc: (docId: number | null) => void;
   availableDocs: { id: number; title: string; totalLinks: number }[];
   onResetLayout: () => void;
+  onRefresh?: () => void;
   loading: boolean;
 }
 
@@ -23,6 +24,7 @@ export function LineageToolbar({
   onSelectFocusDoc,
   availableDocs,
   onResetLayout,
+  onRefresh,
   loading
 }: LineageToolbarProps) {
   return (
@@ -113,6 +115,20 @@ export function LineageToolbar({
             <b>{totalFieldsLinked}</b> Metadados
           </span>
         </div>
+
+        {/* Botão de Atualizar do Oracle */}
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={loading}
+            className="py-1 px-3.5 text-xs font-semibold text-[var(--text-primary)] bg-[var(--card-bg)] hover:bg-[var(--dock-bg)] border border-[var(--border-subtle)] hover:border-[#CCF352]/40 rounded-full transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            title="Recarregar Linhagem Diretamente do Oracle"
+          >
+            <RotateCw size={13} className={cn("text-[#CCF352]", loading && "animate-spin")} />
+            <span>Atualizar</span>
+          </button>
+        )}
 
         {/* Botão de Centralizar / Reorganizar Layout */}
         <button

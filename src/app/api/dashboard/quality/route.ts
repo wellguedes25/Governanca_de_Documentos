@@ -57,17 +57,18 @@ export async function GET(request: Request) {
   try {
     const query = getGlobalSlaQuery(version);
     const slaRes = await executeQuery(activeConn, query, {}, { ttlSeconds: 600, forceRefresh: force });
+    const slaRows: any[] = Array.isArray(slaRes) ? slaRes : [];
 
     // Calcular SLA Global (< 24h)
-    const totalSigned = (slaRes || []).reduce((acc: number, r: any) => acc + Number(r.TOTAL), 0);
-    const within24h = (slaRes || [])
+    const totalSigned = slaRows.reduce((acc: number, r: any) => acc + Number(r.TOTAL), 0);
+    const within24h = slaRows
       .filter((r: any) => r.FAIXA_SLA !== 'Mais de 24h')
       .reduce((acc: number, r: any) => acc + Number(r.TOTAL), 0);
     const slaPercent = totalSigned > 0 ? ((within24h / totalSigned) * 100).toFixed(1) : '100.0';
 
     return NextResponse.json({
       sla24h: slaPercent,
-      faixas: slaRes || [],
+      faixas: slaRows,
       versionApplied: version
     });
   } catch (error: any) {

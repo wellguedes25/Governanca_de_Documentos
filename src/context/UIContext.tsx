@@ -71,21 +71,22 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // Cache helper: lê da memória ou sessionStorage
+  // Cache helper: lê da memória ou sessionStorage com escopo da conexão ativa
   const getCached = useCallback(<T,>(key: string): T | null => {
+    const scopedKey = activeConnInfo?.id ? `${activeConnInfo.id}_${key}` : key;
     // 1. Tenta memória viva
-    const inMem = memoryCache.get(key);
+    const inMem = memoryCache.get(scopedKey);
     if (inMem && Date.now() - inMem.timestamp < 1000 * 60 * 30) {
       return inMem.value as T;
     }
     // 2. Tenta sessionStorage
     if (typeof window !== 'undefined') {
       try {
-        const item = sessionStorage.getItem(`sylva_cache_${key}`);
+        const item = sessionStorage.getItem(`sylva_cache_${scopedKey}`);
         if (item) {
           const parsed = JSON.parse(item);
           if (parsed && Date.now() - parsed.timestamp < 1000 * 60 * 30) {
-            memoryCache.set(key, parsed);
+            memoryCache.set(scopedKey, parsed);
             return parsed.value as T;
           }
         }
@@ -94,26 +95,27 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
       }
     }
     return null;
-  }, [memoryCache]);
+  }, [memoryCache, activeConnInfo?.id]);
 
-  // Cache helper: salva na memória e no sessionStorage
+  // Cache helper: salva na memória e no sessionStorage com escopo da conexão ativa
   const setCached = useCallback(<T,>(key: string, value: T): void => {
+    const scopedKey = activeConnInfo?.id ? `${activeConnInfo.id}_${key}` : key;
     const payload = { value, timestamp: Date.now() };
-    memoryCache.set(key, payload);
+    memoryCache.set(scopedKey, payload);
     if (typeof window !== 'undefined') {
       try {
-        sessionStorage.setItem(`sylva_cache_${key}`, JSON.stringify(payload));
+        sessionStorage.setItem(`sylva_cache_${scopedKey}`, JSON.stringify(payload));
       } catch {
         // Storage pode estar cheio
       }
     }
-  }, [memoryCache]);
+  }, [memoryCache, activeConnInfo?.id]);
 
-  // Limpa cache seletivo ou total
+  // Limpa cache seletivo ou total (remove tanto sylva_cache_ quanto oracle_ e lineage_)
   const clearCache = useCallback((prefix?: string) => {
     if (prefix) {
       for (const key of Array.from(memoryCache.keys())) {
-        if (key.startsWith(prefix)) {
+        if (key.includes(prefix)) {
           memoryCache.delete(key);
         }
       }
@@ -121,7 +123,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         const toRemove: string[] = [];
         for (let i = 0; i < sessionStorage.length; i++) {
           const k = sessionStorage.key(i);
-          if (k && k.startsWith(`sylva_cache_${prefix}`)) {
+          if (k && k.includes(prefix)) {
             toRemove.push(k);
           }
         }
@@ -129,11 +131,22 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
       }
     } else {
       memoryCache.clear();
+      setOracleData(null);
       if (typeof window !== 'undefined') {
         const toRemove: string[] = [];
         for (let i = 0; i < sessionStorage.length; i++) {
           const k = sessionStorage.key(i);
-          if (k && k.startsWith('sylva_cache_')) {
+          if (
+            k &&
+            (k.startsWith('sylva_cache_') ||
+              k.startsWith('oracle_') ||
+              k.startsWith('lineage_') ||
+              k.startsWith('profile_') ||
+              k.startsWith('meta_') ||
+              k.startsWith('actions_') ||
+              k.startsWith('rules_') ||
+              k.startsWith('fields_'))
+          ) {
             toRemove.push(k);
           }
         }

@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react';
 import { Database, Save, Loader2, CircleX, CircleCheck, BarChart3, Clock, TrendingUp, Search, FileText, LayoutIcon, Settings2, Terminal, Printer, Check } from 'lucide-react';
 import { AIQueryAssistant } from '@/components/AIQueryAssistant';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { useUI } from '@/context/UIContext';
 
 export default function ConfigConsultasPage() {
+  const { clearCache, setActiveConnInfo, activeConnInfo } = useUI();
   // Queries Padrão V2
   const [query, setQuery] = useState('');
   const [profileQuery, setProfileQuery] = useState('');
@@ -79,11 +81,23 @@ export default function ConfigConsultasPage() {
       });
       if (!res.ok) throw new Error('Falha no salvamento');
       
-      // Invalidate frontend cache so the dashboard fetches the new hospitals
-      sessionStorage.removeItem('dashboard_stats_V2');
-      sessionStorage.removeItem('dashboard_analytics_V2');
-      sessionStorage.removeItem('dashboard_stats_V3');
-      sessionStorage.removeItem('dashboard_analytics_V3');
+      // Invalidate frontend cache so all pages (documentos, dashboard, linhagem) fetch the new hospitals
+      clearCache();
+      const activeHospList = newMapping.filter((h: any) => h.ativo);
+      if (activeConnInfo) {
+        setActiveConnInfo({
+          ...activeConnInfo,
+          activeHospitals: activeHospList
+        });
+      }
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('oracle_documentos_data_V2');
+        sessionStorage.removeItem('oracle_documentos_data_V3');
+        sessionStorage.removeItem('dashboard_stats_V2');
+        sessionStorage.removeItem('dashboard_analytics_V2');
+        sessionStorage.removeItem('dashboard_stats_V3');
+        sessionStorage.removeItem('dashboard_analytics_V3');
+      }
 
       setMessage(`Mapeamento salvo com sucesso!`);
       setTimeout(() => setMessage(''), 3000);

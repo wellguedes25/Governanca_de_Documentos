@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getData, saveData, DbConnection } from '@/lib/storage';
+import { clearQueryCache } from '@/lib/cache';
+import { resetOraclePool } from '@/lib/oracle';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
@@ -48,8 +50,12 @@ export async function POST(request: Request) {
     if (data.activeConnectionId === body.id) {
         data.activeConnectionId = null;
     }
+    clearQueryCache();
+    await resetOraclePool();
   } else if (body.type === 'SET_ACTIVE') {
     data.activeConnectionId = body.id;
+    clearQueryCache();
+    await resetOraclePool();
   } else if (body.type === 'SAVE_QUERY') {
     data.activeQuery = body.query;
   } else if (body.type === 'SAVE_QUERY_V3') {
@@ -102,6 +108,7 @@ export async function POST(request: Request) {
     if (body.auditDocId !== undefined) data.auditDocId = body.auditDocId;
   } else if (body.type === 'SAVE_HOSPITALS_MAPPING') {
     data.hospitalsMapping = body.hospitalsMapping;
+    clearQueryCache();
   }
 
   if (body.enabledQueries) {

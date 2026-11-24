@@ -440,6 +440,7 @@ function upsertLineageFieldItem(
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const rootDocId = searchParams.get('rootDocId');
+  const force = searchParams.get('force') === 'true' || searchParams.get('forceRefresh') === 'true';
 
   const data = await getData();
   const connection = data.connections.find((c) => c.id === data.activeConnectionId);
@@ -479,7 +480,7 @@ export async function GET(request: Request) {
          )
     `;
 
-    const actionRows = await executeQuery(connection, actionsSql, {}, { ttlSeconds: 120 });
+    const actionRows = await executeQuery(connection, actionsSql, {}, { ttlSeconds: 120, forceRefresh: force });
 
     // Coleta pares contextuais por branch UNION / bloco NOT EXISTS
     const rawPairs: Array<{
@@ -592,7 +593,7 @@ export async function GET(request: Request) {
        ORDER BY ed.cd_documento, ec.ds_identificador
     `;
 
-    const docDetailRows = await executeQuery(connection, docsDetailsSql, {}, { ttlSeconds: 120 });
+    const docDetailRows = await executeQuery(connection, docsDetailsSql, {}, { ttlSeconds: 120, forceRefresh: force });
 
     const docMap = new Map<number, DocMapEntry>();
 
@@ -650,7 +651,7 @@ export async function GET(request: Request) {
          ORDER BY ed.cd_documento, ec.ds_identificador
       `;
 
-      const v2DocDetailRows = await executeQuery(connection, v2DocsDetailsSql, {}, { ttlSeconds: 120 });
+      const v2DocDetailRows = await executeQuery(connection, v2DocsDetailsSql, {}, { ttlSeconds: 120, forceRefresh: force });
       registerDocRows(v2DocDetailRows as DocDetailQueryRow[], { tech: 'FLEX V2', isLegacyV2: true });
 
       // Fallback para documentos V2 publicados sem layout/campos ou cujo cd_tipo_versao difere
@@ -662,7 +663,7 @@ export async function GET(request: Request) {
             FROM dbamv.editor_documento
            WHERE cd_documento IN (${stillMissingHeaderCheck.join(', ')})
         `;
-        const v2HeaderRows = await executeQuery(connection, v2HeaderSql, {}, { ttlSeconds: 120 });
+        const v2HeaderRows = await executeQuery(connection, v2HeaderSql, {}, { ttlSeconds: 120, forceRefresh: force });
         (v2HeaderRows as V2HeaderQueryRow[]).forEach((r) => {
           const docId = Number(r.CD_DOCUMENTO);
           if (!docMap.has(docId)) {

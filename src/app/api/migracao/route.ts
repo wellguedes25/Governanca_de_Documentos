@@ -14,9 +14,15 @@ function getDemoDemands(): DocumentoMigracao[] {
   return demoDemandsMemory!;
 }
 
-const DEMANDS_FILE = path.join(process.cwd(), 'data', 'migration-demands.json');
-const V2_CACHE_FILE = path.join(process.cwd(), 'data', 'v2-catalog-cache.json');
-const V3_CACHE_FILE = path.join(process.cwd(), 'data', 'v3-catalog-cache.json');
+function getDemandsFilePath(connectionId: string | null): string {
+  const safeId = (connectionId || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
+  return path.join(process.cwd(), 'data', `migration-demands-${safeId}.json`);
+}
+
+function getCatalogCachePath(connectionId: string | null, version: 'v2' | 'v3'): string {
+  const safeId = (connectionId || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
+  return path.join(process.cwd(), 'data', `${version}-catalog-cache-${safeId}.json`);
+}
 
 const CACHE_MAX_AGE_MS = 15 * 60 * 1000; // 15 minutos de TTL para catálogo Oracle
 
@@ -30,25 +36,27 @@ function isCacheStale(filePath: string): boolean {
   }
 }
 
-function getStoredDemands(): DocumentoMigracao[] {
+function getStoredDemands(connectionId: string | null): DocumentoMigracao[] {
   try {
-    if (!fs.existsSync(DEMANDS_FILE)) {
+    const filePath = getDemandsFilePath(connectionId);
+    if (!fs.existsSync(filePath)) {
       return [];
     }
-    const raw = fs.readFileSync(DEMANDS_FILE, 'utf8').trim();
+    const raw = fs.readFileSync(filePath, 'utf8').trim();
     if (!raw) return [];
     return JSON.parse(raw);
   } catch (err) {
-    console.error('Erro ao ler migration-demands.json:', err);
+    console.error(`Erro ao ler ${getDemandsFilePath(connectionId)}:`, err);
     return [];
   }
 }
 
-function saveStoredDemands(demands: DocumentoMigracao[]) {
+function saveStoredDemands(connectionId: string | null, demands: DocumentoMigracao[]) {
   try {
-    fs.writeFileSync(DEMANDS_FILE, JSON.stringify(demands, null, 2), 'utf8');
+    const filePath = getDemandsFilePath(connectionId);
+    fs.writeFileSync(filePath, JSON.stringify(demands, null, 2), 'utf8');
   } catch (err) {
-    console.error('Erro ao salvar migration-demands.json:', err);
+    console.error(`Erro ao salvar ${getDemandsFilePath(connectionId)}:`, err);
     throw err;
   }
 }
@@ -80,9 +88,10 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const forceSync = searchParams.get('sync') === 'true';
     const storageData = await getData();
-    const isDemo = storageData.activeConnectionId === DEMO_CONNECTION_ID;
+    const connId = storageData.activeConnectionId;
+    const isDemo = connId === DEMO_CONNECTION_ID;
 
-    const demands = isDemo ? getDemoDemands() : getStoredDemands();
+    const demands = isDemo ? getDemoDemands() : getStoredDemands(connId);
     let docsFlexTotal: DocumentoFlexItem[] = [];
     let docsHtml5Total: DocumentoFlexItem[] = [];
 
@@ -91,15 +100,17 @@ export async function GET(request: Request) {
       docsFlexTotal = demoCatalog.docsFlexTotal;
       docsHtml5Total = demoCatalog.docsHtml5Total;
     } else {
-      docsFlexTotal = readCachedDocs(V2_CACHE_FILE, 'FLEX');
-      docsHtml5Total = readCachedDocs(V3_CACHE_FILE, 'HTML5');
+      const v2CacheFile = getCatalogCachePath(connId, 'v2');
+      const v3CacheFile = getCatalogCachePath(connId, 'v3');
+      docsFlexTotal = readCachedDocs(v2CacheFile, 'FLEX');
+      docsHtml5Total = readCachedDocs(v3CacheFile, 'HTML5');
 
       // Se o cache estiver vazio, expirado ou for solicitado sync=true, consulta Oracle diretamente
-      const shouldSyncV2 = forceSync || docsFlexTotal.length === 0 || isCacheStale(V2_CACHE_FILE);
-      const shouldSyncV3 = forceSync || docsHtml5Total.length === 0 || isCacheStale(V3_CACHE_FILE);
+      const shouldSyncV2 = forceSync || docsFlexTotal.length === 0 || isCacheStale(v2CacheFile);
+      const shouldSyncV3 = forceSync || docsHtml5Total.length === 0 || isCacheStale(v3CacheFile);
 
       if (shouldSyncV2 || shouldSyncV3) {
-        const connection = storageData.connections.find(c => c.id === storageData.activeConnectionId);
+        const connection = storageData.connections.find(c => c.id === connId);
         if (connection) {
           try {
             if (shouldSyncV2) {
@@ -108,8 +119,8 @@ export async function GET(request: Request) {
                 const resV2 = await executeQuery(connection, sqlV2, {}, { ttlSeconds: 300, forceRefresh: forceSync });
                 const rowsV2 = Array.isArray(resV2) ? resV2 : ((resV2 as any)?.rows || []);
                 if (rowsV2.length > 0) {
-                  fs.writeFileSync(V2_CACHE_FILE, JSON.stringify(rowsV2, null, 2), 'utf8');
-                  docsFlexTotal = readCachedDocs(V2_CACHE_FILE, 'FLEX');
+                  fs.writeFileSync(v2CacheFile, JSON.stringify(rowsV2, null, 2), 'utf8');
+                  docsFlexTotal = readCachedDocs(v2CacheFile, 'FLEX');
                 }
               }
             }
@@ -120,8 +131,8 @@ export async function GET(request: Request) {
                 const resV3 = await executeQuery(connection, sqlV3, {}, { ttlSeconds: 300, forceRefresh: forceSync });
                 const rowsV3 = Array.isArray(resV3) ? resV3 : ((resV3 as any)?.rows || []);
                 if (rowsV3.length > 0) {
-                  fs.writeFileSync(V3_CACHE_FILE, JSON.stringify(rowsV3, null, 2), 'utf8');
-                  docsHtml5Total = readCachedDocs(V3_CACHE_FILE, 'HTML5');
+                  fs.writeFileSync(v3CacheFile, JSON.stringify(rowsV3, null, 2), 'utf8');
+                  docsHtml5Total = readCachedDocs(v3CacheFile, 'HTML5');
                 }
               }
             }
@@ -197,8 +208,9 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const storageData = await getData();
-    const isDemo = storageData.activeConnectionId === DEMO_CONNECTION_ID;
-    const demands = isDemo ? getDemoDemands() : getStoredDemands();
+    const connId = storageData.activeConnectionId;
+    const isDemo = connId === DEMO_CONNECTION_ID;
+    const demands = isDemo ? getDemoDemands() : getStoredDemands(connId);
 
     if (!body.documento_flex_id) {
       return NextResponse.json({ error: 'Documento Flex de origem é obrigatório' }, { status: 400 });
@@ -208,12 +220,14 @@ export async function POST(request: Request) {
     const now = new Date().toISOString();
 
     const demoCatalog = isDemo ? getDemoMigrationCatalog() : null;
-    const flexDocs = demoCatalog ? demoCatalog.docsFlexTotal : readCachedDocs(V2_CACHE_FILE, 'FLEX');
+    const v2CacheFile = getCatalogCachePath(connId, 'v2');
+    const v3CacheFile = getCatalogCachePath(connId, 'v3');
+    const flexDocs = demoCatalog ? demoCatalog.docsFlexTotal : readCachedDocs(v2CacheFile, 'FLEX');
     const flexDoc = flexDocs.find(d => String(d.cd_documento_mv) === String(body.documento_flex_id));
 
     let html5Doc = null;
     if (body.documento_html5_id) {
-      const html5Docs = demoCatalog ? demoCatalog.docsHtml5Total : readCachedDocs(V3_CACHE_FILE, 'HTML5');
+      const html5Docs = demoCatalog ? demoCatalog.docsHtml5Total : readCachedDocs(v3CacheFile, 'HTML5');
       html5Doc = html5Docs.find(d => String(d.cd_documento_mv) === String(body.documento_html5_id));
     }
 
@@ -254,7 +268,7 @@ export async function POST(request: Request) {
     }
 
     if (!isDemo) {
-      saveStoredDemands(demands);
+      saveStoredDemands(connId, demands);
     }
 
     return NextResponse.json({
@@ -277,8 +291,9 @@ export async function PATCH(request: Request) {
     }
 
     const storageData = await getData();
-    const isDemo = storageData.activeConnectionId === DEMO_CONNECTION_ID;
-    const demands = isDemo ? getDemoDemands() : getStoredDemands();
+    const connId = storageData.activeConnectionId;
+    const isDemo = connId === DEMO_CONNECTION_ID;
+    const demands = isDemo ? getDemoDemands() : getStoredDemands(connId);
     const demandIndex = demands.findIndex(d => d.id === id);
 
     if (demandIndex === -1) {
@@ -293,7 +308,7 @@ export async function PATCH(request: Request) {
     }
 
     if (!isDemo) {
-      saveStoredDemands(demands);
+      saveStoredDemands(connId, demands);
     }
 
     return NextResponse.json({
@@ -316,8 +331,9 @@ export async function DELETE(request: Request) {
     }
 
     const storageData = await getData();
-    const isDemo = storageData.activeConnectionId === DEMO_CONNECTION_ID;
-    const demands = isDemo ? getDemoDemands() : getStoredDemands();
+    const connId = storageData.activeConnectionId;
+    const isDemo = connId === DEMO_CONNECTION_ID;
+    const demands = isDemo ? getDemoDemands() : getStoredDemands(connId);
     const filtered = demands.filter(d => d.id !== id);
 
     if (filtered.length === demands.length) {
@@ -327,7 +343,7 @@ export async function DELETE(request: Request) {
     if (isDemo) {
       demoDemandsMemory = filtered;
     } else {
-      saveStoredDemands(filtered);
+      saveStoredDemands(connId, filtered);
     }
 
     return NextResponse.json({ success: true, message: 'Demanda excluída com sucesso' });

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getData, saveData } from '@/lib/storage';
-import { testConnection } from '@/lib/oracle';
+import { testConnection, resetOraclePool } from '@/lib/oracle';
+import { clearQueryCache } from '@/lib/cache';
 import { createSessionToken, SESSION_COOKIE_NAME, SESSION_DURATION_MS } from '@/lib/session';
 import { formatDatabaseError } from '@/lib/error-formatter';
 import { isDemoConnection, DEMO_CONNECTION, DEMO_CONNECTION_ID } from '@/lib/demo-mock';
@@ -43,6 +44,8 @@ export async function POST(request: Request) {
         if (data.activeConnectionId !== DEMO_CONNECTION_ID) {
           data.activeConnectionId = DEMO_CONNECTION_ID;
           await saveData(data);
+          clearQueryCache();
+          await resetOraclePool();
         }
       } catch (persistErr) {
         console.warn('[Auth/Connect] Aviso ao persistir modo sandbox em storage:', persistErr);
@@ -194,9 +197,24 @@ export async function POST(request: Request) {
     }
 
     // Se OK, define como conexão ativa no storage.json
+    let changed = false;
     if (data.activeConnectionId !== connection.id) {
       data.activeConnectionId = connection.id;
+      changed = true;
+    }
+
+    // Se o storage tiver apenas hospitais de demonstração (901, 902), limpa para o banco real carregar suas empresas
+    const hasOnlyDemoHospitals = (data.hospitalsMapping || []).length > 0 && 
+      (data.hospitalsMapping || []).every(h => h.id === 901 || h.id === 902);
+    if (hasOnlyDemoHospitals) {
+      data.hospitalsMapping = [];
+      changed = true;
+    }
+
+    if (changed) {
       await saveData(data);
+      clearQueryCache();
+      await resetOraclePool();
     }
 
     // Cria o token assinado de sessão com os dados do usuário autenticado

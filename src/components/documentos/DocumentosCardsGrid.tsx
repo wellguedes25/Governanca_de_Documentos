@@ -14,6 +14,8 @@ interface DocumentosCardsGridProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  pageSize?: number;
+  onPageSizeChange?: (size: number) => void;
   totalFiltered: number;
 }
 
@@ -25,6 +27,8 @@ export function DocumentosCardsGrid({
   currentPage,
   totalPages,
   onPageChange,
+  pageSize,
+  onPageSizeChange,
   totalFiltered,
 }: DocumentosCardsGridProps) {
   if (loading) {
@@ -198,36 +202,51 @@ export function DocumentosCardsGrid({
 
       {/* Paginação */}
       <div className="p-3.5 rounded-[22px] sylva-glass flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[var(--foreground-secondary)]">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4 flex-wrap">
           <span>
             Exibindo <b className="text-[var(--foreground)]">{data.length}</b> de{' '}
             <b className="text-[var(--foreground)]">{totalFiltered}</b> documentos em Cards
           </span>
+
+          {onPageSizeChange && (
+            <div className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
+              <span>Linhas:</span>
+              <select
+                aria-label="Cards por página"
+                value={pageSize || 25}
+                onChange={(e) => onPageSizeChange(Number(e.target.value))}
+                className="bg-[var(--card-bg)] border border-[var(--border)] text-xs rounded-lg px-2 py-0.5 text-[var(--foreground)] font-semibold cursor-pointer focus:outline-none focus:border-[var(--lime)]"
+              >
+                <option value={12}>12</option>
+                <option value={24}>24</option>
+                <option value={48}>48</option>
+                <option value={96}>96</option>
+              </select>
+            </div>
+          )}
         </div>
 
-        {totalPages > 1 && (
-          <div className="flex items-center gap-1.5 self-center sm:self-auto">
-            <button
-              type="button"
-              onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className="h-8 px-3.5 rounded-full sylva-pill text-xs font-semibold text-[var(--foreground)] disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-            >
-              Anterior
-            </button>
-            <span className="px-3 py-1 rounded-full bg-[var(--card-subtle)] border border-[var(--border)] font-mono font-bold text-[var(--foreground)] text-xs">
-              {currentPage} / {totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className="h-8 px-3.5 rounded-full sylva-pill text-xs font-semibold text-[var(--foreground)] disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-            >
-              Próxima
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-1.5 self-center sm:self-auto">
+          <button
+            type="button"
+            onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+            disabled={currentPage <= 1}
+            className="h-8 px-3.5 rounded-full sylva-pill text-xs font-semibold text-[var(--foreground)] disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+          >
+            Anterior
+          </button>
+          <span className="px-3 py-1 rounded-full bg-[var(--card-subtle)] border border-[var(--border)] font-mono font-bold text-[var(--foreground)] text-xs">
+            {currentPage} / {Math.max(1, totalPages)}
+          </span>
+          <button
+            type="button"
+            onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage >= totalPages || totalPages <= 1}
+            className="h-8 px-3.5 rounded-full sylva-pill text-xs font-semibold text-[var(--foreground)] disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+          >
+            Próxima
+          </button>
+        </div>
       </div>
     </div>
   );

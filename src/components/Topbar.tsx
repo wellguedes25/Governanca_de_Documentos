@@ -39,7 +39,7 @@ const ROUTE_LABELS: Record<string, string> = {
 export function Topbar({ onOpenMobileMenu, onOpenSearch }: TopbarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { sidebarOpen, docVersion, setDocVersion } = useUI();
+  const { sidebarOpen, docVersion, setDocVersion, clearCache, setActiveConnInfo } = useUI();
   const [oracleStatus, setOracleStatus] = useState<OracleStatus>('unknown');
   const [sessionConnName, setSessionConnName] = useState<string>('');
   const [sessionUser, setSessionUser] = useState<{
@@ -107,6 +107,8 @@ export function Topbar({ onOpenMobileMenu, onOpenSearch }: TopbarProps) {
     try {
       await fetch('/api/auth/disconnect', { method: 'POST' });
     } catch {}
+    clearCache();
+    setActiveConnInfo(null);
     setDocVersion(null);
     router.push('/connect');
     router.refresh();

@@ -69,7 +69,7 @@ export function MigracaoKanban({
   }, [migracoes, searchTerm, filtroResponsavel, apenasMinhas]);
 
   return (
-    <div className="flex gap-4 items-start w-full overflow-hidden">
+    <div className="flex gap-4 items-start w-full min-w-0 overflow-hidden">
       
       {/* 1. Backlog Lateral de Documentos Flex V2 (Todos os 680+ documentos do Oracle) */}
       <KanbanBacklogRail
@@ -80,7 +80,7 @@ export function MigracaoKanban({
       />
 
       {/* 2. Esteira Kanban com Rolagem Horizontal Suave */}
-      <div className="flex-1 overflow-x-auto pb-4 scrollbar-thin">
+      <div className="flex-1 min-w-0 overflow-x-auto pb-4 scrollbar-thin">
         <div className="flex gap-3.5 min-w-max pb-2">
           {COLUNAS_KANBAN.map(col => {
             const itemsInCol = filteredItems.filter(m => m.status === col.id);

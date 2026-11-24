@@ -511,23 +511,40 @@ body {
   border-radius: 12px;
 }
 
-/* === Custom Precision Scrollbar === */
+/* === Custom Precision Scrollbar (Accessible in Light & Dark Mode) === */
 .scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.14);
-  border-radius: 999px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.24);
+  width: 8px;
+  height: 8px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 999px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  background-clip: padding-box;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.48);
+}
+
+:root[data-theme="dark"] .scrollbar-thin::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+:root[data-theme="dark"] .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border: 1.5px solid transparent;
+  background-clip: padding-box;
+}
+
+:root[data-theme="dark"] .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.45);
 }
 
 @media (prefers-reduced-motion: reduce) {

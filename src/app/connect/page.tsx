@@ -64,7 +64,7 @@ async function parseJsonSafe(res: Response): Promise<any> {
 function ConnectPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { setDocVersion, theme, toggleTheme } = useUI();
+  const { setDocVersion, theme, toggleTheme, clearCache, setActiveConnInfo } = useUI();
   const redirectTarget = searchParams.get('redirect') || '/dashboard';
 
   // Etapa horizontal: 'login' (Slide 1) <-> 'connect' (Slide 2)
@@ -171,6 +171,8 @@ function ConnectPageContent() {
   };
 
   const handleSwitchUser = () => {
+    clearCache();
+    setActiveConnInfo(null);
     setStep('login');
     setAuthUser(null);
     setShowCreateForm(false);
@@ -183,6 +185,8 @@ function ConnectPageContent() {
   const handleEnterDemo = async () => {
     setLoginError(null);
     setEnteringDemo(true);
+    clearCache();
+    setActiveConnInfo(null);
     try {
       const res = await fetch('/api/auth/connect', {
         method: 'POST',
@@ -291,6 +295,8 @@ function ConnectPageContent() {
 
       setConnectionSuccess(true);
       setDocVersion(selectedVersion);
+      clearCache();
+      setActiveConnInfo(null);
 
       setTimeout(() => {
         router.push(redirectTarget);

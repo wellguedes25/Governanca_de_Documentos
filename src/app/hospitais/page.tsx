@@ -618,8 +618,8 @@ export default function HospitaisPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--border-subtle)]">
-                      {data?.details?.slice(0, 8).map((item: DetailItem) => (
-                        <tr key={item.CD_DOCUMENTO} className="group hover:bg-[var(--hover-bg)] transition-colors">
+                      {data?.details?.slice(0, 8).map((item: DetailItem, idx: number) => (
+                        <tr key={`${item.CD_DOCUMENTO}-${item.VERSAO || ''}-${idx}`} className="group hover:bg-[var(--hover-bg)] transition-colors">
                           <td className="py-3">
                             <div className="cursor-pointer" onClick={() => fetchDocDetails(item.CD_DOCUMENTO)}>
                               <p className="font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent-ink)] transition-colors">{item.NOME}</p>

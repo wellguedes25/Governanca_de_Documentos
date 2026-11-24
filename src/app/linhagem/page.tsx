@@ -207,6 +207,9 @@ function LineageFlowContent() {
       if (targetFocusId) {
         params.set('rootDocId', String(targetFocusId));
       }
+      if (force) {
+        params.set('force', 'true');
+      }
 
       const res = await fetch(`/api/oracle/lineage?${params.toString()}`);
       if (!res.ok) {
@@ -404,6 +407,7 @@ function LineageFlowContent() {
         onSelectFocusDoc={handleSelectFocus}
         availableDocs={availableDocs}
         onResetLayout={handleResetLayout}
+        onRefresh={() => fetchLineage(focusDocId, true)}
         loading={loading}
       />
 

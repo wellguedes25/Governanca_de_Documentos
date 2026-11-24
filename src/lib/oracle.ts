@@ -93,18 +93,23 @@ async function fetchActiveHospitals(pool: CustomPool): Promise<HospitalMapping[]
 
 // Handler de shutdown gracioso — fecha o pool ao encerrar o servidor
 // Garante que conexões Oracle não fiquem abertas após hot-reload ou SIGTERM
+export async function resetOraclePool(): Promise<void> {
+  if (globalThis.oraclePool) {
+    try {
+      console.log('[Oracle] Resetando pool de conexões Oracle...');
+      await globalThis.oraclePool.close(5);
+      globalThis.oraclePool = undefined;
+      console.log('[Oracle] Pool resetado com sucesso.');
+    } catch (err) {
+      console.error('[Oracle] Erro ao resetar pool Oracle:', err);
+      globalThis.oraclePool = undefined;
+    }
+  }
+}
+
 if (typeof process !== 'undefined' && !globalThis.__oracleShutdownRegistered) {
   const closePool = async () => {
-    if (globalThis.oraclePool) {
-      try {
-        console.log('[Oracle] Fechando pool de conexões (shutdown)...');
-        await globalThis.oraclePool.close(5);
-        globalThis.oraclePool = undefined;
-        console.log('[Oracle] Pool fechado com sucesso.');
-      } catch (err) {
-        console.error('[Oracle] Erro ao fechar pool no shutdown:', err);
-      }
-    }
+    await resetOraclePool();
   };
   process.on('SIGTERM', closePool);
   process.on('SIGINT', closePool);
@@ -205,20 +210,28 @@ export async function getPool(connection: DbConnection): Promise<CustomPool> {
     const updatedMappings: HospitalMapping[] = [];
     let changed = false;
 
-    dbHospitals.forEach(dbH => {
+    dbHospitals.forEach((dbH, idx) => {
       const match = existingMappings.find(h => h.id === dbH.id);
       if (match) {
+        const validSigla = (match.sigla && match.sigla.trim()) ? match.sigla.trim() : (dbH.sigla || generateAcronym(dbH.nome));
         updatedMappings.push({
           id: dbH.id,
           nome: dbH.nome,
-          sigla: match.sigla || dbH.sigla,
+          sigla: validSigla,
           ativo: match.ativo
         });
-        if (match.nome !== dbH.nome || !match.sigla) {
+        if (match.nome !== dbH.nome || match.sigla !== validSigla) {
           changed = true;
         }
       } else {
-        updatedMappings.push(dbH);
+        // Se for uma nova conexão ou empresa nova, ativa por padrão apenas a primeira empresa
+        // para não poluir a interface com dezenas de colunas automáticas
+        const defaultAtivo = existingMappings.length === 0 ? idx === 0 : false;
+        updatedMappings.push({
+          ...dbH,
+          sigla: dbH.sigla || generateAcronym(dbH.nome),
+          ativo: defaultAtivo
+        });
         changed = true;
       }
     });
@@ -260,12 +273,32 @@ export function assertReadOnlySql(sql: string): void {
   }
 }
 
+export function normalizeRowKeys(rows: any[] | undefined): any[] {
+  if (!rows || !Array.isArray(rows)) return [];
+  return rows.map(row => {
+    if (!row || typeof row !== 'object') return row;
+    const cleanRow: Record<string, any> = {};
+    for (const [k, v] of Object.entries(row)) {
+      let cleanKey = k.replace(/"/g, '').trim();
+      if (cleanKey === 'CÃ“DIGO' || cleanKey === 'CODIGO' || cleanKey === 'CD_DOCUMENTO') {
+        cleanKey = 'CÓDIGO';
+      } else if (cleanKey === 'ÃšLTIMO USO' || cleanKey === 'ULTIMO USO' || cleanKey === 'LTIMO USO') {
+        cleanKey = 'ÚLTIMO USO';
+      } else if (cleanKey === 'NM_TITULO' || cleanKey === 'DS_DOCUMENTO') {
+        cleanKey = 'NOME';
+      }
+      cleanRow[cleanKey] = v;
+    }
+    return cleanRow;
+  });
+}
+
 export async function executeQuery(
   connection: DbConnection, 
   sql: string, 
   binds: Record<string, unknown> | unknown[] = {},
   options?: { ttlSeconds?: number, forceRefresh?: boolean }
-) {
+): Promise<any[]> {
   assertReadOnlySql(sql);
 
   if (isDemoConnection(connection)) {
@@ -273,23 +306,11 @@ export async function executeQuery(
   }
   let conn;
   try {
-    const cacheKey = generateCacheKey(connection.id, sql, binds);
-    
-    // Check cache first
-    if (options?.ttlSeconds && options.ttlSeconds > 0 && !options?.forceRefresh) {
-      const cached = queryCache.get(cacheKey);
-      if (cached !== undefined) {
-        console.log(`[Oracle Cache Hit] Returning cached result for query.`);
-        return cached;
-      }
-    }
-
-    const pool = await getPool(connection);
-    conn = await pool.getConnection();
-
     if (!sql) {
       throw new Error('A query SQL fornecida é nula ou indefinida. Verifique o arquivo storage.json.');
     }
+
+    const pool = await getPool(connection);
 
     // Process SQL Macros for dynamic hospitals
     let finalSql = sql;
@@ -298,18 +319,27 @@ export async function executeQuery(
     // Mescla os dados do banco (pool) com as preferências de ativação/siglas do storage.json
     const dbHospitals = pool.activeHospitals || [];
     let activeHospitals: HospitalMapping[] = [];
+    const configuredMappings = data.hospitalsMapping || [];
+    const hasConfigured = configuredMappings.length > 0;
+
     if (dbHospitals.length > 0) {
-      activeHospitals = dbHospitals.map(dbH => {
-        const match = (data.hospitalsMapping || []).find(h => h.id === dbH.id);
+      activeHospitals = dbHospitals.map((dbH, idx) => {
+        const match = configuredMappings.find(h => h.id === dbH.id);
+        const sigla = (match?.sigla && match.sigla.trim()) ? match.sigla.trim() : (dbH.sigla || generateAcronym(dbH.nome));
+        // Se já existem configurações salvas no storage, só ativa o que estiver com ativo === true
+        const ativo = match ? Boolean(match.ativo) : (!hasConfigured && idx === 0);
         return {
           id: dbH.id,
           nome: dbH.nome,
-          sigla: match ? (match.sigla || dbH.sigla) : dbH.sigla,
-          ativo: match ? match.ativo : true
+          sigla,
+          ativo
         };
       }).filter(h => h.ativo);
     } else {
-      activeHospitals = (data.hospitalsMapping || []).filter(h => h.ativo);
+      activeHospitals = configuredMappings.filter(h => h.ativo).map(h => ({
+        ...h,
+        sigla: (h.sigla && h.sigla.trim()) ? h.sigla.trim() : generateAcronym(h.nome)
+      }));
     }
     
     // Legacy support for older variables if any still exist
@@ -351,6 +381,18 @@ export async function executeQuery(
     // Remove ponto e vírgula final se houver
     const cleanSql = finalSql.trim().replace(/;$/, '');
 
+    // Verifica o cache DEPOIS das macros para garantir que mudanças de empresas reflitam na chave de cache
+    const cacheKey = generateCacheKey(connection.id, cleanSql, binds);
+    if (options?.ttlSeconds && options.ttlSeconds > 0 && !options?.forceRefresh) {
+      const cached = queryCache.get<any[]>(cacheKey);
+      if (cached !== undefined) {
+        console.log(`[Oracle Cache Hit] Returning cached result for query.`);
+        return cached;
+      }
+    }
+
+    conn = await pool.getConnection();
+
     const oracledb = await loadOracleDb();
     const start = Date.now();
     const result = await conn.execute(cleanSql, binds, {
@@ -364,12 +406,14 @@ export async function executeQuery(
       console.warn(`[Oracle] Slow query (${elapsed}ms): ${cleanSql.substring(0, 100)}...`);
     }
 
+    const rows = normalizeRowKeys(result.rows as any[]);
+
     // Save to cache if requested
     if (options?.ttlSeconds && options.ttlSeconds > 0) {
-      queryCache.set(cacheKey, result.rows, options.ttlSeconds);
+      queryCache.set(cacheKey, rows, options.ttlSeconds);
     }
 
-    return result.rows;
+    return rows;
   } catch (err) {
     console.error('[Oracle] Database error:', err);
     // Se a sessão foi morta ou a conexão caiu, limpa o pool para que a próxima tentativa abra conexões limpas

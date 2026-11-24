@@ -13,6 +13,15 @@ if (process.env.NODE_ENV !== 'production') {
   globalThis._oracleCache = queryCache;
 }
 
+export function clearQueryCache(): void {
+  try {
+    queryCache.flushAll();
+    console.log('[Cache] Backend query cache flushed successfully.');
+  } catch (err) {
+    console.error('[Cache] Error flushing backend query cache:', err);
+  }
+}
+
 export function generateCacheKey(connectionId: string, sql: string, binds: any): string {
   // Uma hash simples baseada na string. 
   // O stringify de binds precisa ser determinístico se for objeto, mas para Oracle via API normalmente é simples.

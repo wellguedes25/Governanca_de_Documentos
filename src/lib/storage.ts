@@ -105,6 +105,7 @@ export interface StorageData {
   docMetadataQueryV3?: string;
   docActionsQuery: string;
   docActionsQueryV3?: string;
+  docRulesQuery?: string;
   docRulesQueryV3?: string;
   ambulatoryProfilesQuery: string;
   ambulatoryProfileDetailsQuery: string;
@@ -375,8 +376,20 @@ ORDER BY
        etl.ds_tipo_layout           AS Descricao_Tipo_Layout,
        evd.vl_versao                AS Valor_Versao,
        evd.sn_ativo                 AS Status_Ativo,
+       CASE WHEN evd.cd_tipo_versao = 3 THEN 1 ELSE 0 END AS Sn_Publicado,
+       CASE evd.cd_tipo_versao
+         WHEN 3 THEN 'PUBLISHED'
+         WHEN 1 THEN 'EDITABLE'
+         WHEN 2 THEN 'HISTORY'
+         ELSE 'INACTIVE'
+       END                          AS Tp_Versao,
        evd.cd_tipo_versao           AS Codigo_Tipo_Versao,
-       etv.ds_tipo_versao           AS Descricao_Tipo_Versao,
+       CASE evd.cd_tipo_versao
+         WHEN 3 THEN 'Publicada'
+         WHEN 1 THEN 'Editável'
+         WHEN 2 THEN 'Histórico'
+         ELSE NVL(etv.ds_tipo_versao, 'Inativa')
+       END                          AS Descricao_Tipo_Versao,
        edl.cd_layout_cabecalho      AS Codigo_Layout_Cabecalho,
        (SELECT evdo.cd_documento
           FROM dbamv.editor_layout el
@@ -388,12 +401,12 @@ ORDER BY
        (SELECT COUNT(DISTINCT elc.cd_campo) FROM dbamv.editor_layout_campo elc WHERE elc.cd_layout = edl.cd_layout) AS Quantidade_Campos
   FROM dbamv.editor_documento edo
  INNER JOIN dbamv.editor_versao_documento evd ON edo.cd_documento = evd.cd_documento
- INNER JOIN dbamv.editor_tipo_versao etv      ON etv.cd_tipo_versao = evd.cd_tipo_versao
- INNER JOIN dbamv.editor_layout edl           ON evd.cd_versao_documento = edl.cd_versao_documento
- INNER JOIN dbamv.editor_tipo_layout etl      ON edl.cd_tipo_layout = etl.cd_tipo_layout
- WHERE etl.ds_identificador NOT IN ('CABECALHO', 'RODAPE')
+  LEFT JOIN dbamv.editor_tipo_versao etv      ON etv.cd_tipo_versao = evd.cd_tipo_versao
+  LEFT JOIN dbamv.editor_layout edl           ON evd.cd_versao_documento = edl.cd_versao_documento
+  LEFT JOIN dbamv.editor_tipo_layout etl      ON edl.cd_tipo_layout = etl.cd_tipo_layout
+ WHERE (etl.ds_identificador IS NULL OR etl.ds_identificador NOT IN ('CABECALHO', 'RODAPE'))
    AND edo.cd_documento = :CD_DOCUMENTO
- ORDER BY Codigo_Documento`,
+ ORDER BY evd.vl_versao DESC, etl.cd_tipo_layout ASC`,
   docMetadataQueryV3: `SELECT DISTINCT
        edo.cd_documento             AS "CODIGO_DOCUMENTO",
        edo.ds_documento             AS "DESCRICAO_DOCUMENTO",
@@ -404,8 +417,20 @@ ORDER BY
        etl.ds_tipo_layout           AS "DESCRICAO_TIPO_LAYOUT",
        evd.vl_versao                AS "VALOR_VERSAO",
        evd.sn_ativo                 AS "STATUS_ATIVO",
-       CASE WHEN evd.sn_ativo = 1 THEN 3 ELSE 1 END AS "CODIGO_TIPO_VERSAO",
-       CASE WHEN evd.sn_ativo = 1 THEN 'Publicado' ELSE 'Rascunho' END AS "DESCRICAO_TIPO_VERSAO",
+       evd.sn_publicado             AS "SN_PUBLICADO",
+       evd.tp_versao                AS "TP_VERSAO",
+       CASE
+         WHEN evd.sn_publicado = 1 OR UPPER(evd.tp_versao) = 'PUBLISHED' THEN 3
+         WHEN UPPER(evd.tp_versao) = 'TEST' THEN 1
+         WHEN UPPER(evd.tp_versao) = 'HISTORY' THEN 2
+         ELSE 0
+       END                          AS "CODIGO_TIPO_VERSAO",
+       CASE
+         WHEN evd.sn_publicado = 1 OR UPPER(evd.tp_versao) = 'PUBLISHED' THEN 'Publicada'
+         WHEN UPPER(evd.tp_versao) = 'TEST' THEN 'Teste'
+         WHEN UPPER(evd.tp_versao) = 'HISTORY' THEN 'Histórico'
+         ELSE NVL(evd.tp_versao, 'Inativa')
+       END                          AS "DESCRICAO_TIPO_VERSAO",
        edl.cd_layout_cabecalho      AS "CODIGO_LAYOUT_CABECALHO",
        (SELECT evdo.cd_documento
           FROM editor.editor_layout el
@@ -417,9 +442,9 @@ ORDER BY
        (SELECT COUNT(DISTINCT elc.cd_campo) FROM editor.editor_layout_campo elc WHERE elc.cd_layout = edl.cd_layout) AS "QUANTIDADE_CAMPOS"
   FROM editor.editor_documento edo
  INNER JOIN editor.editor_versao_documento evd ON edo.cd_documento = evd.cd_documento
- INNER JOIN editor.editor_layout edl           ON evd.cd_versao_documento = edl.cd_versao_documento
- INNER JOIN editor.editor_tipo_layout etl      ON edl.cd_tipo_layout = etl.cd_tipo_layout
- WHERE etl.ds_identificador NOT IN ('CABECALHO', 'RODAPE')
+  LEFT JOIN editor.editor_layout edl           ON evd.cd_versao_documento = edl.cd_versao_documento
+  LEFT JOIN editor.editor_tipo_layout etl      ON edl.cd_tipo_layout = etl.cd_tipo_layout
+ WHERE (etl.ds_identificador IS NULL OR etl.ds_identificador NOT IN ('CABECALHO', 'RODAPE'))
    AND edo.cd_documento = :CD_DOCUMENTO
  ORDER BY evd.vl_versao DESC, etl.cd_tipo_layout ASC`,
   docActionsQuery: `SELECT DISTINCT
@@ -483,6 +508,66 @@ ORDER BY
    AND ev.cd_propriedade = 4
    AND ev.lo_valor IS NOT NULL
  ORDER BY ec.ds_identificador`,
+  docRulesQuery: `SELECT ed.cd_documento                         AS "CD_DOCUMENTO",
+       ed.ds_documento                         AS "DS_DOCUMENTO",
+       evd.cd_versao_documento                 AS "CD_VERSAO_DOCUMENTO",
+       evd.vl_versao                           AS "VL_VERSAO",
+       CASE evd.cd_tipo_versao
+         WHEN 3 THEN 'PUBLISHED'
+         WHEN 1 THEN 'EDITABLE'
+         WHEN 2 THEN 'HISTORY'
+         ELSE 'INACTIVE'
+       END                                     AS "TP_VERSAO",
+       CASE WHEN evd.cd_tipo_versao = 3 THEN 1 ELSE 0 END AS "SN_PUBLICADO",
+       er.cd_regra                             AS "CD_REGRA",
+       elr.nr_ordem                            AS "NUM_ORDEM",
+       er.ds_regra                             AS "DS_REGRA",
+       CASE WHEN UPPER(er.sn_ativo) = 'S' THEN 1 ELSE 0 END AS "ATIVA",
+       etr.ds_identificador                    AS "TIPO_REGRA",
+       er.ds_mensagem                          AS "DS_ALERTA",
+       (
+         SELECT LISTAGG(
+                  NVL2(etc.ds_identificador, etc.ds_identificador || ' ', '') ||
+                  ec_cond.ds_identificador || ' ' ||
+                  NVL(eto.ds_identificador, '') ||
+                  NVL2(erc_sub.vl_inicial, ' "' || erc_sub.vl_inicial || '"', '') ||
+                  NVL2(erc_sub.vl_final, ' .. "' || erc_sub.vl_final || '"', ''),
+                  ' '
+                ) WITHIN GROUP (ORDER BY erc_sub.cd_regra_condicao ASC)
+           FROM dbamv.editor_regra_condicao erc_sub
+           LEFT JOIN dbamv.editor_tipo_conector etc ON erc_sub.cd_tipo_conector = etc.cd_tipo_conector
+           LEFT JOIN dbamv.editor_tipo_operacao eto ON erc_sub.cd_tipo_operacao = eto.cd_tipo_operacao
+           LEFT JOIN dbamv.editor_campo ec_cond ON erc_sub.cd_campo = ec_cond.cd_campo
+          WHERE erc_sub.cd_regra = er.cd_regra
+       ) AS "CONDICAO",
+       (
+         SELECT COUNT(DISTINCT erc_sub.cd_campo)
+           FROM dbamv.editor_regra_campo erc_sub
+          WHERE erc_sub.cd_regra = er.cd_regra
+       ) AS "QTD_CAMPOS",
+       (
+         SELECT LISTAGG(ec_sub.ds_identificador, ', ') WITHIN GROUP (ORDER BY ec_sub.ds_identificador)
+           FROM dbamv.editor_regra_campo erc_sub
+           JOIN dbamv.editor_campo ec_sub ON erc_sub.cd_campo = ec_sub.cd_campo
+          WHERE erc_sub.cd_regra = er.cd_regra
+       ) AS "CAMPOS_AFETADOS",
+       er.ds_acao_sql                          AS "SCRIPT"
+  FROM dbamv.editor_documento ed
+  JOIN dbamv.editor_versao_documento evd ON ed.cd_documento = evd.cd_documento
+  JOIN dbamv.editor_layout el            ON el.cd_versao_documento = evd.cd_versao_documento
+  JOIN dbamv.editor_layout_regra elr     ON elr.cd_layout = el.cd_layout
+  JOIN dbamv.editor_regra er             ON er.cd_regra = elr.cd_regra
+  LEFT JOIN dbamv.editor_tipo_regra etr  ON er.cd_tipo_regra = etr.cd_tipo_regra
+ WHERE ed.cd_documento = :CD_DOCUMENTO
+   AND (
+     evd.cd_tipo_versao IN (1, 3)
+     OR evd.vl_versao = (
+       SELECT MAX(evd2.vl_versao)
+         FROM dbamv.editor_versao_documento evd2
+        WHERE evd2.cd_documento = ed.cd_documento
+     )
+   )
+ ORDER BY evd.vl_versao DESC, elr.nr_ordem ASC, er.cd_regra ASC`,
   docRulesQueryV3: `SELECT ed.cd_documento                         AS "CD_DOCUMENTO",
        ed.ds_documento                         AS "DS_DOCUMENTO",
        evd.cd_versao_documento                 AS "CD_VERSAO_DOCUMENTO",
@@ -640,14 +725,27 @@ export async function getData(): Promise<StorageData> {
   const fileContent = fs.readFileSync(storageFile, 'utf-8');
   try {
     const data = JSON.parse(fileContent);
+    const savedV3Meta = typeof data.docMetadataQueryV3 === 'string' ? data.docMetadataQueryV3 : '';
+    const isLegacyV3Meta =
+      !savedV3Meta ||
+      savedV3Meta.includes('CASE WHEN evd.sn_ativo = 1 THEN 3 ELSE 1 END') ||
+      (savedV3Meta.includes('editor.editor_versao_documento') && !savedV3Meta.toLowerCase().includes('sn_publicado'));
+
+    const savedV2Meta = typeof data.docMetadataQuery === 'string' ? data.docMetadataQuery : '';
+    const isLegacyV2Meta =
+      !savedV2Meta ||
+      (savedV2Meta.includes('ORDER BY Codigo_Documento') && !savedV2Meta.toLowerCase().includes('sn_publicado'));
+
     return withDemoInjected({
       ...INITIAL_DATA,
       ...data,
       activeQueryV3: data.activeQueryV3 || INITIAL_DATA.activeQueryV3,
       profileQuery: data.profileQuery || INITIAL_DATA.profileQuery,
       profileQueryV3: data.profileQueryV3 || INITIAL_DATA.profileQueryV3,
-      docMetadataQueryV3: data.docMetadataQueryV3 || INITIAL_DATA.docMetadataQueryV3,
+      docMetadataQuery: isLegacyV2Meta ? INITIAL_DATA.docMetadataQuery : savedV2Meta,
+      docMetadataQueryV3: isLegacyV3Meta ? INITIAL_DATA.docMetadataQueryV3 : savedV3Meta,
       docActionsQueryV3: data.docActionsQueryV3 || INITIAL_DATA.docActionsQueryV3,
+      docRulesQuery: data.docRulesQuery || INITIAL_DATA.docRulesQuery,
       docRulesQueryV3: data.docRulesQueryV3 || INITIAL_DATA.docRulesQueryV3,
       kpiQueries: mergeNonEmptyQueries(data.kpiQueries, INITIAL_DATA.kpiQueries),
       kpiQueriesV3: mergeNonEmptyQueries(data.kpiQueriesV3, INITIAL_DATA.kpiQueriesV3!),

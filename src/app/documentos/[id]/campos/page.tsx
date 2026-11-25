@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, use } from 'react';
+import React, { useState, useEffect, useMemo, use, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { 
   ArrowLeft, Search, Download, TableProperties, Sparkles, Zap, 
   Copy, Check, SlidersHorizontal, AlertTriangle, Layers, Eye
 } from 'lucide-react';
+import { useUI } from '@/context/UIContext';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
@@ -54,7 +56,19 @@ const getFieldTypeBadge = (tipo?: string) => {
 
 export default function DocumentCamposPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
-  const docId = resolvedParams.id;
+  return (
+    <Suspense fallback={<div className="py-12 text-center text-xs text-[var(--muted)]">Carregando campos do documento...</div>}>
+      <DocumentCamposContent docId={resolvedParams.id} />
+    </Suspense>
+  );
+}
+
+function DocumentCamposContent({ docId }: { docId: string }) {
+  const searchParams = useSearchParams();
+  const { docVersion } = useUI();
+  const urlVersion = searchParams.get('version');
+  const resolvedVersion: 'V2' | 'V3' =
+    (urlVersion || docVersion || 'V3').toUpperCase() === 'V2' ? 'V2' : 'V3';
 
   const [loading, setLoading] = useState(true);
   const [fields, setFields] = useState<FieldRecord[]>([]);
@@ -80,6 +94,7 @@ export default function DocumentCamposPage({ params }: { params: Promise<{ id: s
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             query: 'FIELDS',
+            version: resolvedVersion,
             params: { CD_DOCUMENTO: docId }
           })
         });
@@ -107,6 +122,7 @@ export default function DocumentCamposPage({ params }: { params: Promise<{ id: s
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             query: 'METADATA',
+            version: resolvedVersion,
             params: { CD_DOCUMENTO: docId }
           })
         });
@@ -122,16 +138,21 @@ export default function DocumentCamposPage({ params }: { params: Promise<{ id: s
     if (docId) {
       loadFields();
     }
-  }, [docId]);
+  }, [docId, resolvedVersion]);
 
   // Versões disponíveis
   const versions = useMemo(() => {
-    const map = new Map<number, { version: number; published: number; count: number }>();
+    const map = new Map<number, { version: number; type: string; published: number; count: number }>();
     fields.forEach(f => {
       const v = f.VL_VERSAO;
       if (v !== undefined && v !== null) {
         if (!map.has(v)) {
-          map.set(v, { version: v, published: f.SN_PUBLICADO ?? 0, count: 0 });
+          map.set(v, {
+            version: v,
+            type: f.TP_VERSAO || (f.SN_PUBLICADO === 1 ? 'PUBLISHED' : 'HISTORY'),
+            published: f.SN_PUBLICADO ?? 0,
+            count: 0
+          });
         }
         map.get(v)!.count++;
       }
@@ -373,11 +394,22 @@ export default function DocumentCamposPage({ params }: { params: Promise<{ id: s
                 className="text-xs font-bold bg-[#F7FAF9] border border-[#D5E4E0] rounded-lg px-3 py-2 text-[#0F2426] focus:outline-hidden focus:ring-2 focus:ring-[#074E52]/20 focus:border-[#074E52] cursor-pointer"
               >
                 <option value="ALL">Todas as Versões ({fields.length} campos)</option>
-                {versions.map(v => (
-                  <option key={v.version} value={v.version}>
-                    v{v.version} {v.published === 1 ? '★ Publicada' : ''} ({v.count} campos)
-                  </option>
-                ))}
+                {versions.map(v => {
+                  const verType = String(v.type || '').toUpperCase();
+                  const statusLabel =
+                    verType === 'PUBLISHED' || v.published === 1
+                      ? '★ Publicada'
+                      : ['EDITABLE', 'EDITAVEL'].includes(verType)
+                        ? 'Editável'
+                        : verType === 'TEST' || verType === 'DRAFT'
+                          ? 'Em Teste'
+                          : 'Histórico';
+                  return (
+                    <option key={v.version} value={v.version}>
+                      v{v.version} — {statusLabel} ({v.count} campos)
+                    </option>
+                  );
+                })}
               </select>
             </div>
           </div>

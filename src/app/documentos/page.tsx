@@ -300,10 +300,11 @@ function DocumentosContent() {
 
   async function fetchMetadata(docId: string, force = false) {
     const activeVersion = docVersion || 'V3';
-    const cacheKey = `meta_${docId}_${activeVersion}`;
+    const cacheKey = `meta_v2_${docId}_${activeVersion}`;
     if (!force) {
       const cached = getCached<any[]>(cacheKey);
-      if (cached) {
+      const isValidCache = Array.isArray(cached) && (cached.length === 0 || ('SN_PUBLICADO' in cached[0] && 'TP_VERSAO' in cached[0]));
+      if (isValidCache) {
         setMetadata(cached);
         setMetadataError(null);
         return;
@@ -380,7 +381,7 @@ function DocumentosContent() {
 
   async function fetchRules(docId: string, force = false) {
     const activeVersion = docVersion || 'V3';
-    const cacheKey = `rules_${docId}_${activeVersion}`;
+    const cacheKey = `rules_v2_${docId}_${activeVersion}`;
     if (!force) {
       const cached = getCached<any[]>(cacheKey);
       if (cached) {
@@ -418,7 +419,8 @@ function DocumentosContent() {
   }
 
   async function fetchFields(docId: string, force = false) {
-    const cacheKey = `fields_${docId}`;
+    const activeVersion = docVersion || 'V3';
+    const cacheKey = `fields_v2_${docId}_${activeVersion}`;
     if (!force) {
       const cached = getCached<any[]>(cacheKey);
       if (cached) {
@@ -435,6 +437,7 @@ function DocumentosContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: 'FIELDS',
+          version: activeVersion,
           params: { CD_DOCUMENTO: String(docId).trim() },
           forceRefresh: force
         })

@@ -125,10 +125,10 @@ export default function HospitaisPage() {
     setSidebarDoc(docId);
     setSidebarOpen(true);
 
-    const metaKey = `meta_${docId}_${resolvedVersion}`;
+    const metaKey = `meta_v2_${docId}_${resolvedVersion}`;
     const actionsKey = `actions_${docId}_${resolvedVersion}`;
-    const rulesKey = `rules_${docId}_${resolvedVersion}`;
-    const fieldsKey = `fields_${docId}`;
+    const rulesKey = `rules_v2_${docId}_${resolvedVersion}`;
+    const fieldsKey = `fields_v2_${docId}_${resolvedVersion}`;
     const profileKey = `profile_${docId}_${resolvedVersion}`;
 
     if (!force) {
@@ -137,8 +137,9 @@ export default function HospitaisPage() {
       const cachedRules = getCached<any[]>(rulesKey);
       const cachedFields = getCached<any[]>(fieldsKey);
       const cachedProfiles = getCached<any[]>(profileKey);
+      const isValidMetaCache = Array.isArray(cachedMeta) && (cachedMeta.length === 0 || ('SN_PUBLICADO' in cachedMeta[0] && 'TP_VERSAO' in cachedMeta[0]));
 
-      if (cachedMeta && cachedActions && cachedRules && cachedFields && cachedProfiles) {
+      if (isValidMetaCache && cachedActions && cachedRules && cachedFields && cachedProfiles) {
         setMetadata(cachedMeta);
         setMetadataActions(cachedActions);
         setMetadataRules(cachedRules);
@@ -191,7 +192,7 @@ export default function HospitaisPage() {
         fetch('/api/oracle/execute', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: 'FIELDS', params: { CD_DOCUMENTO: cleanId }, forceRefresh: force })
+          body: JSON.stringify({ query: 'FIELDS', version: resolvedVersion, params: { CD_DOCUMENTO: cleanId }, forceRefresh: force })
         }).then(r => r.json()),
         fetch('/api/oracle/execute', {
           method: 'POST',

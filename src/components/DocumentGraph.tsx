@@ -12,6 +12,7 @@ import {
   Filter,
   Loader2
 } from "lucide-react";
+import { resolveVersionLifecycle, getVersionLifecycleMeta } from "@/lib/version-status";
 
 interface DocumentGraphProps {
   documentId: string;
@@ -107,11 +108,14 @@ export default function DocumentGraph({
         if (!addedVersions.has(verNum)) {
           addedVersions.add(verNum);
           const verNodeId = `ver-${verNum}`;
+          const lifecycle = resolveVersionLifecycle(v);
+          const lifecycleMeta = getVersionLifecycleMeta(lifecycle);
           addNode(verNodeId, `Versão ${verNum}`, "version", {
             "Número Versão": verNum,
-            "Layout": v.DESCRICAO_TIPO_LAYOUT,
-            "Tipo": v.DESCRICAO_TIPO_VERSION,
-            "Ativo": v.STATUS_ATIVO === "S" ? "Sim" : "Não",
+            "Layout": v.DESCRICAO_TIPO_LAYOUT || "Sem layout compilado",
+            "Tipo": v.DESCRICAO_TIPO_VERSAO || lifecycleMeta.label,
+            "Status": lifecycleMeta.label,
+            "Publicada": lifecycle === "published" ? "Sim" : "Não",
           });
           linksList.push({
             source: docNodeId,

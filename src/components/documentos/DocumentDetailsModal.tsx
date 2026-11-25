@@ -8,9 +8,16 @@ import {
   Layers, Code2, Unlink, Copy, Check, ChevronDown, ChevronUp, ExternalLink,
   Search, ListFilter, Zap, SlidersHorizontal, TableProperties,
   Download, Sparkles, RefreshCw, Printer, ChevronLeft, ChevronRight,
-  ChevronsLeft, ChevronsRight, Users
+  ChevronsLeft, ChevronsRight, Users, CheckCircle2, FlaskConical, History
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  resolveVersionLifecycle,
+  getVersionLifecycleMeta,
+  groupMetadataByVersion,
+  GroupedDocumentVersion,
+  VersionLifecycle,
+} from '@/lib/version-status';
 import toast from 'react-hot-toast';
 
 export interface ProfileItem {
@@ -77,36 +84,59 @@ export const getRuleTypeBadge = (tipo?: string) => {
   const t = String(tipo || '').toUpperCase();
   switch (t) {
     case 'ENABLE':
+    case 'HABILITAR':
       return { label: 'Habilitar', color: 'tone-success border' };
     case 'DISABLE':
+    case 'DESABILITAR':
       return { label: 'Desabilitar', color: 'tone-danger border' };
     case 'ANSWER':
+    case 'RESPONDER':
       return { label: 'Preencher / Responder', color: 'bg-[var(--accent)] text-[var(--accent-ink)] border-[var(--tint-olive-border)]' };
     case 'VALIDATE':
+    case 'VALIDAR':
       return { label: 'Validar', color: 'tone-warning border' };
     case 'CLEAR':
+    case 'LIMPAR':
       return { label: 'Limpar', color: 'tone-neutral border' };
     case 'VISIBLE':
+    case 'VISIVEL':
       return { label: 'Visível', color: 'tone-info border' };
     case 'INVISIBLE':
+    case 'INVISIVEL':
       return { label: 'Invisível', color: 'tone-neutral border' };
     case 'REQUIRED':
+    case 'OBRIGATORIO':
       return { label: 'Obrigatório', color: 'tone-warning border' };
     case 'REFRESH':
     case 'REFRESH_FIELD':
+    case 'ATUALIZAR':
       return { label: 'Atualizar', color: 'bg-[var(--card-subtle)] text-[var(--accent-ink)] border-[var(--tint-olive-border)]' };
     case 'ON_CLONE':
     case 'ON_CLOSE':
     case 'ON_COPY':
-      return { label: 'Ao Finalizar', color: 'tone-info border' };
+    case 'AO_FINALIZAR':
+    case 'AO_COPIAR':
+      return { label: t === 'AO_COPIAR' ? 'Ao Copiar' : 'Ao Finalizar', color: 'tone-info border' };
     case 'ON_SAVE':
+    case 'AO_SALVAR':
       return { label: 'Ao Salvar', color: 'bg-[var(--accent)] text-[var(--accent-ink)] border-[var(--tint-olive-border)]' };
+    case 'AO_CRIAR':
+      return { label: 'Ao Criar', color: 'tone-info border' };
+    case 'AO_IMPRIMIR':
+      return { label: 'Ao Imprimir', color: 'tone-neutral border' };
+    case 'AO_CARREGAR':
+      return { label: 'Ao Carregar', color: 'tone-info border' };
     case 'RUN':
     case 'RUN_SET':
+    case 'EXECUTAR':
       return { label: 'Executar', color: 'tone-success border' };
     case 'FILTER':
+    case 'FILTRAR':
       return { label: 'Filtrar', color: 'tone-warning border' };
+    case 'FORMATAR':
+      return { label: 'Formatar', color: 'tone-info border' };
     case 'INVALIDATE':
+    case 'INVALIDAR':
       return { label: 'Invalidar', color: 'tone-danger border' };
     default:
       return { label: tipo || 'Ação', color: 'tone-neutral border' };
@@ -152,12 +182,16 @@ export function DocumentDetailsModal({
   const [selectedFieldVersion, setSelectedFieldVersion] = useState<number | 'ALL'>('ALL');
   const [selectedFieldStatus, setSelectedFieldStatus] = useState<'ALL' | '1' | '0'>('ALL');
   const [selectedFieldHasRules, setSelectedFieldHasRules] = useState<'ALL' | 'WITH_RULES' | 'WITHOUT_RULES'>('ALL');
+  const [selectedFieldType, setSelectedFieldType] = useState<string>('ALL');
 
   // Estados específicos para a aba de Perfis Ambulatoriais
   const [profileSearchTerm, setProfileSearchTerm] = useState('');
   const [selectedProfileHospital, setSelectedProfileHospital] = useState<string>('ALL');
   const [profilePage, setProfilePage] = useState(1);
   const profilePageSize = 12;
+
+  // Filtro da aba de Histórico de Versões
+  const [historyFilter, setHistoryFilter] = useState<'ALL' | VersionLifecycle>('ALL');
 
   // Sincroniza aba inicial quando o modal abre ou troca de documento
   useEffect(() => {
@@ -169,6 +203,8 @@ export function DocumentDetailsModal({
       setActionsFilterDoc(null);
       setRulesSearchTerm('');
       setFieldsSearchTerm('');
+      setSelectedFieldType('ALL');
+      setHistoryFilter('ALL');
     }
   }, [open, docId, initialTab]);
 
@@ -257,10 +293,27 @@ export function DocumentDetailsModal({
     });
   }, [rules, selectedRuleVersion, selectedRuleType, rulesSearchTerm]);
 
+  const groupedVersions = useMemo(() => groupMetadataByVersion(metadata), [metadata]);
+  const publishedVersions = useMemo(
+    () => groupedVersions.filter(v => v.lifecycle === 'published'),
+    [groupedVersions]
+  );
+  const testVersions = useMemo(
+    () => groupedVersions.filter(v => v.lifecycle === 'test'),
+    [groupedVersions]
+  );
+  const historyVersions = useMemo(
+    () => groupedVersions.filter(v => v.lifecycle === 'history' || v.lifecycle === 'inactive'),
+    [groupedVersions]
+  );
+
+  const hasPublishedVersion = publishedVersions.length > 0;
+  const testVersion = testVersions[0];
+  const hasTestVersion = Boolean(testVersion);
+
   const activePublishedVersion = useMemo(() => {
-    return metadata.find(m =>
-      m.CODIGO_TIPO_VERSAO === 3 || m.STATUS_ATIVO === 1 || m.STATUS_ATIVO === 'S'
-    )?.VALOR_VERSAO;
+    const pubRow = metadata.find(m => resolveVersionLifecycle(m) === 'published');
+    return pubRow?.VALOR_VERSAO;
   }, [metadata]);
 
   const fieldVersions = useMemo(() => {
@@ -292,6 +345,36 @@ export function DocumentDetailsModal({
     }
   }, [fieldVersions]);
 
+  const fieldTypeStats = useMemo(() => {
+    if (!fields || fields.length === 0) {
+      return { all: 0, entries: [] as Array<[string, { count: number; color: string }]> };
+    }
+    const baseFields = fields.filter(f => {
+      if (selectedFieldVersion !== 'ALL' && f.VL_VERSAO !== selectedFieldVersion) return false;
+      if (selectedFieldLayout !== 'ALL' && f.CD_TIPO_LAYOUT !== selectedFieldLayout) return false;
+      if (selectedFieldStatus !== 'ALL' && String(f.SN_ATIVO) !== selectedFieldStatus) return false;
+      if (selectedFieldHasRules === 'WITH_RULES' && (!f.QTD_REGRAS || f.QTD_REGRAS === 0)) return false;
+      if (selectedFieldHasRules === 'WITHOUT_RULES' && f.QTD_REGRAS > 0) return false;
+      return true;
+    });
+
+    const byLabel: Record<string, { count: number; color: string }> = {};
+    baseFields.forEach(f => {
+      const badge = getFieldTypeBadge(f.DS_TIPO_VISUALIZACAO);
+      if (!byLabel[badge.label]) {
+        byLabel[badge.label] = { count: 0, color: badge.color };
+      }
+      byLabel[badge.label].count++;
+    });
+
+    const entries = Object.entries(byLabel).sort((a, b) => {
+      if (b[1].count !== a[1].count) return b[1].count - a[1].count;
+      return a[0].localeCompare(b[0], 'pt-BR');
+    });
+
+    return { all: baseFields.length, entries };
+  }, [fields, selectedFieldVersion, selectedFieldLayout, selectedFieldStatus, selectedFieldHasRules]);
+
   const filteredFields = useMemo(() => {
     if (!fields) return [];
     return fields.filter(f => {
@@ -300,6 +383,10 @@ export function DocumentDetailsModal({
       if (selectedFieldStatus !== 'ALL' && String(f.SN_ATIVO) !== selectedFieldStatus) return false;
       if (selectedFieldHasRules === 'WITH_RULES' && (!f.QTD_REGRAS || f.QTD_REGRAS === 0)) return false;
       if (selectedFieldHasRules === 'WITHOUT_RULES' && f.QTD_REGRAS > 0) return false;
+      if (selectedFieldType !== 'ALL') {
+        const badge = getFieldTypeBadge(f.DS_TIPO_VISUALIZACAO);
+        if (badge.label !== selectedFieldType) return false;
+      }
 
       if (fieldsSearchTerm) {
         const term = fieldsSearchTerm.toLowerCase();
@@ -312,7 +399,7 @@ export function DocumentDetailsModal({
       }
       return true;
     });
-  }, [fields, selectedFieldVersion, selectedFieldLayout, selectedFieldStatus, selectedFieldHasRules, fieldsSearchTerm]);
+  }, [fields, selectedFieldVersion, selectedFieldLayout, selectedFieldStatus, selectedFieldHasRules, selectedFieldType, fieldsSearchTerm]);
 
   const fieldsKpis = useMemo(() => {
     const total = filteredFields.length;
@@ -334,22 +421,24 @@ export function DocumentDetailsModal({
     return { all: list.length, tela, relatorio, targetVer };
   }, [fields, selectedFieldVersion, activePublishedVersion, fieldVersions]);
 
-  const telaSpecs = metadata.find(m =>
-    (m.CODIGO_TIPO_VERSAO === 3 || m.STATUS_ATIVO === 1 || m.STATUS_ATIVO === 'S') &&
+  const publishedMetadataRows = useMemo(
+    () => metadata.filter(m => resolveVersionLifecycle(m) === 'published'),
+    [metadata]
+  );
+
+  const telaSpecs = publishedMetadataRows.find(m =>
     m.CODIGO_TIPO_LAYOUT === 1 &&
     (activePublishedVersion !== undefined ? m.VALOR_VERSAO === activePublishedVersion : true)
   );
 
-  const relatorioSpecs = metadata.find(m =>
-    (m.CODIGO_TIPO_VERSAO === 3 || m.STATUS_ATIVO === 1 || m.STATUS_ATIVO === 'S') &&
+  const relatorioSpecs = publishedMetadataRows.find(m =>
     m.CODIGO_TIPO_LAYOUT === 2 &&
     (activePublishedVersion !== undefined ? m.VALOR_VERSAO === activePublishedVersion : true)
   );
 
-  const fallbackSpecs = metadata.find(m =>
-    (m.CODIGO_TIPO_VERSAO === 3 || m.STATUS_ATIVO === 1 || m.STATUS_ATIVO === 'S') &&
-    (activePublishedVersion !== undefined ? m.VALOR_VERSAO === activePublishedVersion : true)
-  ) || metadata[0];
+  const fallbackSpecs = publishedMetadataRows.find(m =>
+    activePublishedVersion !== undefined ? m.VALOR_VERSAO === activePublishedVersion : true
+  ) || (!hasPublishedVersion ? (groupedVersions[0]?.primaryRow || metadata[0]) : undefined);
 
   const activeSpecs = (telaSpecs || relatorioSpecs || fallbackSpecs) ? {
     ...(telaSpecs || relatorioSpecs || fallbackSpecs),
@@ -357,8 +446,6 @@ export function DocumentDetailsModal({
     DOCUMENTO_CABECALHO: relatorioSpecs?.DOCUMENTO_CABECALHO || (telaSpecs || fallbackSpecs)?.DOCUMENTO_CABECALHO,
     CODIGO_LAYOUT_RODAPE: relatorioSpecs?.CODIGO_LAYOUT_RODAPE || (telaSpecs || fallbackSpecs)?.CODIGO_LAYOUT_RODAPE,
   } : undefined;
-
-  const hasTestVersion = metadata.some(m => m.CODIGO_TIPO_VERSAO === 1 && m.STATUS_ATIVO !== 1 && m.STATUS_ATIVO !== 'S');
 
   const uniqueRelatedDocs = useMemo(() => {
     const docs = new Set<string>();
@@ -463,9 +550,10 @@ export function DocumentDetailsModal({
         { Campo: 'Código MV', Valor: docId || '' },
         { Campo: 'Nome do Documento', Valor: resolvedDocTitle },
         { Campo: 'Motor', Valor: docVersion },
-        { Campo: 'Versão Ativa', Valor: activeSpecs?.VALOR_VERSAO ? `v${activeSpecs.VALOR_VERSAO}` : 'N/A' },
-        { Campo: 'Tipo de Versão', Valor: activeSpecs?.DESCRICAO_TIPO_VERSAO || 'N/A' },
-        { Campo: 'Layout Base', Valor: activeSpecs?.DESCRICAO_TIPO_LAYOUT || 'N/A' },
+        { Campo: hasPublishedVersion ? 'Versão Publicada (Ativa)' : 'Última Versão (Sem Publicação)', Valor: activeSpecs?.VALOR_VERSAO ? `v${activeSpecs.VALOR_VERSAO}` : 'N/A' },
+        { Campo: docVersion === 'V2' ? 'Versão Editável' : 'Versão de Teste', Valor: testVersion ? `v${testVersion.versionNumber}` : 'Nenhuma' },
+        { Campo: 'Tipo de Versão', Valor: activeSpecs ? getVersionLifecycleMeta(resolveVersionLifecycle(activeSpecs), docVersion).label : 'N/A' },
+        { Campo: 'Layout Base', Valor: activeSpecs?.DESCRICAO_TIPO_LAYOUT || 'Editor Clínico' },
         { Campo: 'Cabeçalho', Valor: activeSpecs?.DOCUMENTO_CABECALHO ? `Doc ${activeSpecs.DOCUMENTO_CABECALHO}` : (activeSpecs?.CODIGO_LAYOUT_CABECALHO || 'Padrão') },
         { Campo: 'Rodapé', Valor: activeSpecs?.CODIGO_LAYOUT_RODAPE || 'Padrão' },
         { Campo: 'Qtd. Regras (Versão Ativa)', Valor: activeSpecs?.QUANTIDADE_REGRAS ?? rules.length },
@@ -478,15 +566,20 @@ export function DocumentDetailsModal({
 
       // 2. Histórico de Versões
       if (metadata.length > 0) {
-        const histRows = metadata.map(m => ({
-          Versao: m.VALOR_VERSAO,
-          Status: m.STATUS_ATIVO === 1 || m.STATUS_ATIVO === 'S' ? 'Ativa' : 'Inativa',
-          Tipo_Versao: m.DESCRICAO_TIPO_VERSAO || '',
-          Layout: m.DESCRICAO_TIPO_LAYOUT || '',
-          ID_Versao: m.CODIGO_VERSAO_DOCUMENTO || '',
-          Qtd_Regras: m.QUANTIDADE_REGRAS ?? 0,
-          Qtd_Campos: m.QUANTIDADE_CAMPOS ?? 0
-        }));
+        const histRows = metadata.map(m => {
+          const lifecycle = resolveVersionLifecycle(m);
+          const meta = getVersionLifecycleMeta(lifecycle, docVersion);
+          return {
+            Versao: m.VALOR_VERSAO,
+            Status: meta.label,
+            Versao_Publicada: lifecycle === 'published' ? 'Sim' : 'Não',
+            Tipo_Versao: m.DESCRICAO_TIPO_VERSAO || meta.label,
+            Layout: m.DESCRICAO_TIPO_LAYOUT || 'Sem layout compilado',
+            ID_Versao: m.CODIGO_VERSAO_DOCUMENTO || '',
+            Qtd_Regras: m.QUANTIDADE_REGRAS ?? 0,
+            Qtd_Campos: m.QUANTIDADE_CAMPOS ?? 0
+          };
+        });
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(histRows), 'Historico');
       }
 
@@ -554,7 +647,7 @@ export function DocumentDetailsModal({
 
   const modalTabs: { key: DocumentDetailsTab; label: string; icon: React.ElementType; count?: number }[] = [
     { key: 'specs', label: 'Especificações', icon: FileText },
-    { key: 'history', label: 'Histórico', icon: Layers, count: metadata.length },
+    { key: 'history', label: 'Histórico', icon: Layers, count: groupedVersions.length },
     { key: 'actions', label: 'Vínculos SQL', icon: Code2, count: filteredActions.length },
     { key: 'rules', label: 'Regras', icon: ListFilter, count: rules.length },
     { key: 'fields', label: 'Campos', icon: TableProperties, count: layoutCountsForVersion.all || fields.length },
@@ -583,10 +676,19 @@ export function DocumentDetailsModal({
               <span className="px-2.5 py-0.5 tone-success border text-[10px] font-bold rounded-full uppercase tracking-wider">
                 Motor {docVersion}
               </span>
-              {hasTestVersion && (
-                <span className="px-2.5 py-0.5 tone-warning border text-[10px] font-bold rounded-full flex items-center gap-1">
-                  <AlertTriangle size={11} /> Versão de Teste
-                </span>
+              {hasTestVersion && testVersion && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHistoryFilter('test');
+                    setActiveTab('history');
+                  }}
+                  className="px-2.5 py-0.5 tone-warning border text-[10px] font-bold rounded-full flex items-center gap-1 cursor-pointer hover:brightness-105 transition-all"
+                  title="Ver versão em desenvolvimento na aba Histórico"
+                >
+                  <FlaskConical size={11} />
+                  <span>{docVersion === 'V2' ? 'Versão Editável' : 'Versão de Teste'} v{testVersion.versionNumber}</span>
+                </button>
               )}
             </div>
             <h3 className="text-lg sm:text-xl font-bold text-[var(--foreground)] tracking-tight leading-snug truncate">
@@ -720,15 +822,30 @@ export function DocumentDetailsModal({
                   <div className="sylva-card-slate rounded-[20px] p-4 flex flex-col justify-between">
                     <div>
                       <span className="text-[11px] font-medium text-[var(--tint-slate-muted)] block">
-                        Versão ativa
+                        {hasPublishedVersion ? 'Versão publicada (ativa)' : 'Última versão (sem publicação)'}
                       </span>
                       <span className="text-2xl font-bold font-mono text-[var(--tint-slate-fg)] mt-1 block">
                         v{activeSpecs.VALOR_VERSAO || '1.0'}
                       </span>
                     </div>
-                    <span className="text-[11px] text-[var(--tint-slate-muted)] mt-2 truncate block">
-                      {activeSpecs.DESCRICAO_TIPO_VERSAO || 'Publicada'}
-                    </span>
+                    <div className="mt-2 space-y-1.5">
+                      <span className="text-[11px] text-[var(--tint-slate-muted)] truncate block">
+                        {getVersionLifecycleMeta(resolveVersionLifecycle(activeSpecs), docVersion).label} • ID {activeSpecs.CODIGO_VERSAO_DOCUMENTO || '—'}
+                      </span>
+                      {hasTestVersion && testVersion && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setHistoryFilter('test');
+                            setActiveTab('history');
+                          }}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full tone-warning border text-[10px] font-bold cursor-pointer hover:brightness-105"
+                        >
+                          <FlaskConical size={10} />
+                          <span>+{docVersion === 'V2' ? 'Editável' : 'Teste'} v{testVersion.versionNumber} →</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="sylva-card-olive rounded-[20px] p-4 flex flex-col justify-between">
@@ -812,7 +929,7 @@ export function DocumentDetailsModal({
                     <div className="text-xs flex justify-between items-center py-2 border-b border-[var(--border-subtle)]">
                       <span className="text-[var(--muted)]">Tipo de versão</span>
                       <span className="text-[var(--foreground)] font-medium">
-                        {activeSpecs.DESCRICAO_TIPO_VERSAO || 'Publicada'}
+                        {getVersionLifecycleMeta(resolveVersionLifecycle(activeSpecs), docVersion).label}
                       </span>
                     </div>
                     <div className="text-xs flex justify-between items-center py-2 border-b border-[var(--border-subtle)]">
@@ -866,42 +983,179 @@ export function DocumentDetailsModal({
           {activeTab === 'history' && (
             loading ? (
               <div className="space-y-3 py-4">
-                <div className="skeleton h-16 w-full rounded-xl" />
-                <div className="skeleton h-16 w-full rounded-xl" />
+                <div className="skeleton h-14 w-full rounded-2xl" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="skeleton h-24 w-full rounded-2xl" />
+                  <div className="skeleton h-24 w-full rounded-2xl" />
+                </div>
               </div>
-            ) : metadata.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {metadata.map((ver, idx) => (
+            ) : groupedVersions.length > 0 ? (() => {
+              const testLabel = docVersion === 'V2' ? 'Editável' : 'Em Teste';
+              const showHighlight =
+                historyFilter === 'ALL' || historyFilter === 'published' || historyFilter === 'test';
+              const highlightItems = [
+                ...(historyFilter === 'ALL' || historyFilter === 'published' ? publishedVersions : []),
+                ...(historyFilter === 'ALL' || historyFilter === 'test' ? testVersions : []),
+              ];
+              const showHistory =
+                historyFilter === 'ALL' || historyFilter === 'history' || historyFilter === 'inactive';
+              const historyItems =
+                historyFilter === 'inactive'
+                  ? historyVersions.filter(v => v.lifecycle === 'inactive')
+                  : historyVersions;
+
+              const renderVersionCard = (ver: GroupedDocumentVersion) => {
+                const meta = getVersionLifecycleMeta(ver.lifecycle, docVersion);
+                const LifecycleIcon =
+                  ver.lifecycle === 'published'
+                    ? CheckCircle2
+                    : ver.lifecycle === 'test'
+                      ? FlaskConical
+                      : History;
+
+                return (
                   <div
-                    key={idx}
-                    className={cn(
-                      "p-4 rounded-2xl border transition-all",
-                      ver.STATUS_ATIVO === 'S' || ver.STATUS_ATIVO === 1
-                        ? "tone-success border"
-                        : "bg-[var(--card-subtle)] border-[var(--border)]"
-                    )}
+                    key={ver.versionKey}
+                    className={cn("p-4 rounded-2xl transition-all flex flex-col gap-3", meta.cardClass)}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono font-bold text-sm text-[var(--foreground)]">
-                        Versão {ver.VALOR_VERSAO}
-                      </span>
-                      <span className={cn(
-                        "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase",
-                        ver.STATUS_ATIVO === 'S' || ver.STATUS_ATIVO === 1
-                          ? "tone-success border"
-                          : "tone-neutral border"
-                      )}>
-                        {ver.STATUS_ATIVO === 'S' || ver.STATUS_ATIVO === 1 ? 'Ativa' : 'Inativa'}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <LifecycleIcon size={15} className="shrink-0 opacity-85" />
+                        <span className="font-mono font-bold text-sm text-[var(--foreground)] truncate">
+                          Versão {ver.versionNumber}
+                        </span>
+                      </div>
+                      <span className={cn("px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0", meta.badgeClass)}>
+                        {meta.badgeLabel}
                       </span>
                     </div>
-                    <div className="mt-2.5 text-xs text-[var(--foreground-secondary)] flex items-center justify-between">
-                      <span>{ver.DESCRICAO_TIPO_LAYOUT || 'Layout'}</span>
-                      <span className="font-mono text-[var(--muted)]">ID: {ver.CODIGO_VERSAO_DOCUMENTO}</span>
+
+                    <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {ver.layouts.length > 0 ? (
+                          ver.layouts.map((lay, lIdx) => {
+                            const hasCounts = lay.fieldsCount > 0 || lay.rulesCount > 0;
+                            return (
+                              <span
+                                key={`${ver.versionKey}_lay_${lIdx}`}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-[var(--card-solid)]/80 border border-[var(--border)] text-[var(--foreground-secondary)]"
+                              >
+                                <span>{lay.layoutName}</span>
+                                {hasCounts && (
+                                  <span className="font-mono text-[10px] text-[var(--muted)]">
+                                    • {lay.fieldsCount}c / {lay.rulesCount}r
+                                  </span>
+                                )}
+                              </span>
+                            );
+                          })
+                        ) : (
+                          <span className="text-[11px] italic text-[var(--muted)]">
+                            Layout ainda não compilado
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-mono text-[11px] text-[var(--muted)] ml-auto">
+                        ID: {ver.versionId}
+                      </span>
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
+                );
+              };
+
+              return (
+                <div className="space-y-5">
+                  {/* Barra de Resumo e Filtros */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 bg-[var(--card-subtle)] p-3 rounded-2xl border border-[var(--border)]">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {[
+                        { key: 'ALL' as const, label: 'Todas', count: groupedVersions.length },
+                        { key: 'published' as const, label: 'Publicada', count: publishedVersions.length },
+                        { key: 'test' as const, label: testLabel, count: testVersions.length },
+                        { key: 'history' as const, label: 'Histórico', count: historyVersions.length },
+                      ].map(pill => {
+                        const isSelected = historyFilter === pill.key;
+                        return (
+                          <button
+                            key={pill.key}
+                            type="button"
+                            onClick={() => setHistoryFilter(pill.key)}
+                            className={cn(
+                              "px-3 py-1 rounded-full text-[11px] font-semibold border flex items-center gap-1.5 transition-all cursor-pointer",
+                              isSelected
+                                ? "bg-[var(--glass-pill-active)] text-[var(--glass-pill-active-ink)] border-transparent font-bold"
+                                : "bg-[var(--card-solid)] text-[var(--foreground-secondary)] border-[var(--border)] hover:bg-[var(--card-hover)]"
+                            )}
+                          >
+                            <span>{pill.label}</span>
+                            <span
+                              className={cn(
+                                "px-1.5 py-0.2 rounded-full text-[9.5px] font-mono font-bold",
+                                isSelected
+                                  ? "bg-[var(--lime)] text-[var(--lime-ink)]"
+                                  : "bg-[var(--card-hover)] text-[var(--foreground-secondary)]"
+                              )}
+                            >
+                              {pill.count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <span className="text-[11px] text-[var(--muted)] font-mono px-2">
+                      {groupedVersions.length} {groupedVersions.length === 1 ? 'versão' : 'versões'}
+                    </span>
+                  </div>
+
+                  {!hasPublishedVersion && (
+                    <div className="p-3 tone-warning border rounded-2xl flex items-center gap-2.5 text-xs">
+                      <AlertTriangle size={15} className="shrink-0" />
+                      <span>Este documento não possui nenhuma versão marcada como publicada no momento.</span>
+                    </div>
+                  )}
+
+                  {/* Seção 1: Destaque Atual (Publicada e Teste/Editável) */}
+                  {showHighlight && highlightItems.length > 0 && (
+                    <section className="space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-[10.5px] font-bold text-[var(--muted)] uppercase tracking-wider flex items-center gap-1.5">
+                          <Sparkles size={12} className="text-[var(--accent-ink)]" />
+                          <span>Em Destaque (Produção e {testLabel})</span>
+                        </h4>
+                      </div>
+                      <div className={cn("grid grid-cols-1 gap-3", highlightItems.length > 1 && "md:grid-cols-2")}>
+                        {highlightItems.map(renderVersionCard)}
+                      </div>
+                    </section>
+                  )}
+
+                  {/* Seção 2: Versões de Histórico */}
+                  {showHistory && historyItems.length > 0 && (
+                    <section className="space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-[10.5px] font-bold text-[var(--muted)] uppercase tracking-wider flex items-center gap-1.5">
+                          <History size={12} />
+                          <span>Versões de Histórico ({historyItems.length})</span>
+                        </h4>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {historyItems.map(renderVersionCard)}
+                      </div>
+                    </section>
+                  )}
+
+                  {((showHighlight && highlightItems.length === 0 && !showHistory) ||
+                    (showHistory && historyItems.length === 0 && !showHighlight) ||
+                    (highlightItems.length === 0 && historyItems.length === 0)) && (
+                    <div className="py-12 text-center text-[var(--muted)] bg-[var(--card-subtle)] rounded-2xl border border-dashed border-[var(--border)]">
+                      <Layers size={28} className="mx-auto mb-2 opacity-40" />
+                      <p className="text-xs font-semibold">Nenhuma versão encontrada para este filtro</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })() : (
               <div className="py-14 text-center text-[var(--muted)]">
                 <Layers size={32} className="mx-auto mb-2 opacity-40" />
                 <p className="text-xs font-semibold">Nenhum histórico de versão encontrado</p>
@@ -1055,11 +1309,22 @@ export function DocumentDetailsModal({
                           }}
                           className="text-xs bg-[var(--card-solid)] border border-[var(--border)] rounded-xl px-3 py-1.5 font-medium text-[var(--foreground)] focus:outline-none focus:border-[var(--lime)] cursor-pointer"
                         >
-                          {ruleVersions.map(v => (
-                            <option key={v.version} value={v.version}>
-                              v{v.version} — {v.type === 'PUBLISHED' ? 'Publicada' : v.type === 'TEST' ? 'Teste' : 'Histórico'} ({v.count} regras)
-                            </option>
-                          ))}
+                          {ruleVersions.map(v => {
+                            const verType = String(v.type || '').toUpperCase();
+                            const statusLabel =
+                              verType === 'PUBLISHED' || v.published === 1
+                                ? 'Publicada'
+                                : ['EDITABLE', 'EDITAVEL'].includes(verType)
+                                  ? 'Editável'
+                                  : verType === 'TEST' || verType === 'DRAFT'
+                                    ? 'Em Teste'
+                                    : 'Histórico';
+                            return (
+                              <option key={v.version} value={v.version}>
+                                v{v.version} — {statusLabel} ({v.count} regras)
+                              </option>
+                            );
+                          })}
                           <option value="ALL">Todas as Versões ({rules.length} regras)</option>
                         </select>
                       </div>
@@ -1306,19 +1571,31 @@ export function DocumentDetailsModal({
                       <span className="text-xs font-semibold text-[var(--foreground-secondary)]">Versão:</span>
                       <select
                         value={selectedFieldVersion}
-                        onChange={(e) => setSelectedFieldVersion(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value))}
+                        onChange={(e) => {
+                          setSelectedFieldVersion(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value));
+                          setSelectedFieldType('ALL');
+                        }}
                         className="text-xs font-bold bg-[var(--card-solid)] border border-[var(--border)] rounded-xl px-3 py-1.5 text-[var(--foreground)] focus:outline-none focus:border-[var(--lime)] cursor-pointer"
                       >
                         <option value="ALL">Todas as Versões ({fields.length})</option>
-                        {fieldVersions.map(v => (
-                          <option key={v.version} value={v.version}>
-                            v{v.version} {v.published === 1 ? '★ Publicada' : ''} ({v.count} campos)
-                          </option>
-                        ))}
+                        {fieldVersions.map(v => {
+                          const verType = String(v.type || '').toUpperCase();
+                          const statusLabel =
+                            verType === 'PUBLISHED' || v.published === 1
+                              ? '★ Publicada'
+                              : ['TEST', 'EDITABLE', 'EDITAVEL', 'DRAFT'].includes(verType)
+                                ? (docVersion === 'V2' ? 'Editável' : 'Em Teste')
+                                : 'Histórico';
+                          return (
+                            <option key={v.version} value={v.version}>
+                              v{v.version} — {statusLabel} ({v.count} campos)
+                            </option>
+                          );
+                        })}
                       </select>
 
                       <Link
-                        href={`/documentos/${docId}/campos`}
+                        href={`/documentos/${docId}/campos?version=${docVersion}`}
                         target="_blank"
                         className="px-3 py-1.5 text-[11px] font-bold text-[var(--accent-ink)] bg-[var(--accent)] hover:bg-[var(--card-hover)] border border-[var(--tint-olive-border)] rounded-full flex items-center gap-1 transition-all"
                       >
@@ -1442,6 +1719,55 @@ export function DocumentDetailsModal({
                       <span>Apenas com Regras</span>
                     </button>
                   </div>
+
+                  {/* Filtros por Tipo de Campo */}
+                  {fieldTypeStats.entries.length > 0 && (
+                    <div className="bg-[var(--card-subtle)] px-3.5 py-2.5 rounded-2xl border border-[var(--border)] flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[11px] font-bold text-[var(--muted)] uppercase tracking-wide mr-1">
+                        Tipo:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedFieldType('ALL')}
+                        className={cn(
+                          "px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all border cursor-pointer",
+                          selectedFieldType === 'ALL'
+                            ? "bg-[var(--glass-pill-active)] text-[var(--glass-pill-active-ink)] border-transparent"
+                            : "bg-[var(--card-solid)] text-[var(--foreground-secondary)] border-[var(--border)] hover:bg-[var(--card-hover)]"
+                        )}
+                      >
+                        Todos ({fieldTypeStats.all})
+                      </button>
+                      {fieldTypeStats.entries.map(([label, info]) => {
+                        const isSelected = selectedFieldType === label;
+                        return (
+                          <button
+                            key={label}
+                            type="button"
+                            onClick={() => setSelectedFieldType(isSelected ? 'ALL' : label)}
+                            className={cn(
+                              "px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all border flex items-center gap-1.5 cursor-pointer",
+                              isSelected
+                                ? "bg-[var(--glass-pill-active)] text-[var(--glass-pill-active-ink)] border-transparent"
+                                : "bg-[var(--card-solid)] text-[var(--foreground-secondary)] border-[var(--border)] hover:bg-[var(--card-hover)]"
+                            )}
+                          >
+                            <span>{label}</span>
+                            <span
+                              className={cn(
+                                "px-1.5 py-0.2 rounded-full text-[9.5px] font-bold font-mono",
+                                isSelected
+                                  ? "bg-[var(--lime)] text-[var(--lime-ink)]"
+                                  : "bg-[var(--card-hover)] text-[var(--foreground-secondary)]"
+                              )}
+                            >
+                              {info.count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {/* Grid of Fields */}
                   {filteredFields.length > 0 ? (

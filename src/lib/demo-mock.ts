@@ -982,15 +982,29 @@ export function executeDemoQuery(
     const doc = DEMO_DOCS.find((d) => d.id === cdDoc);
     if (!doc || doc.rules.length === 0) return [];
 
+    const isV2 = upperSql.includes('DBAMV.EDITOR_REGRA') && !upperSql.includes('EDITOR.EDITOR_REGRA');
+    const v2RuleTypeMap: Record<string, string> = {
+      ENABLE: 'HABILITAR',
+      DISABLE: 'DESABILITAR',
+      ANSWER: 'RESPONDER',
+      VALIDATE: 'VALIDAR',
+      REQUIRED: 'VALIDAR',
+      ON_CLOSE: 'AO_FINALIZAR',
+      ON_SAVE: 'AO_SALVAR',
+      RUN: 'RESPONDER',
+      VISIBLE: 'HABILITAR',
+      FILTER: 'FILTRAR',
+    };
+
     const mapRuleRow = (
       r: DemoDocDef['rules'][number],
       version: number,
-      tpVersao: 'PUBLISHED' | 'HISTORY',
+      tpVersao: 'PUBLISHED' | 'TEST' | 'EDITABLE' | 'HISTORY',
       snPublicado: number
     ) => ({
       CD_DOCUMENTO: doc.id,
       DS_DOCUMENTO: doc.name,
-      CD_VERSAO_DOCUMENTO: doc.id * 10 + version,
+      CD_VERSAO_DOCUMENTO: doc.id * 100 + version,
       VL_VERSAO: version,
       TP_VERSAO: tpVersao,
       SN_PUBLICADO: snPublicado,
@@ -998,7 +1012,7 @@ export function executeDemoQuery(
       NUM_ORDEM: r.numOrdem,
       DS_REGRA: r.dsRegra,
       ATIVA: r.ativa,
-      TIPO_REGRA: r.tipoRegra,
+      TIPO_REGRA: isV2 ? (v2RuleTypeMap[r.tipoRegra] || r.tipoRegra) : r.tipoRegra,
       DS_ALERTA: r.dsAlerta,
       CONDICAO: r.condicao,
       QTD_CAMPOS: r.camposAfetados.split(',').filter(Boolean).length,
@@ -1006,7 +1020,10 @@ export function executeDemoQuery(
       SCRIPT: r.script,
     });
 
-    const rows = doc.rules.map((r) => mapRuleRow(r, doc.version, 'PUBLISHED', 1));
+    const rows = [
+      ...doc.rules.map((r) => mapRuleRow(r, doc.version + 1, isV2 ? 'EDITABLE' : 'TEST', 0)),
+      ...doc.rules.map((r) => mapRuleRow(r, doc.version, 'PUBLISHED', 1)),
+    ];
     if (doc.version > 1) {
       const prevVersion = doc.version - 1;
       doc.rules.slice(0, 1).forEach((r) => {
@@ -1116,19 +1133,46 @@ export function executeDemoQuery(
   if (upperSql.includes('CODIGO_DOCUMENTO') && upperSql.includes('VALOR_VERSAO')) {
     const cdDoc = Number(getBindValue(binds, 'CD_DOCUMENTO')) || 9002;
     const doc = DEMO_DOCS.find((d) => d.id === cdDoc) || DEMO_DOCS[1];
-    return [
+    const isV2 =
+      upperSql.includes('DBAMV.EDITOR_VERSAO_DOCUMENTO') &&
+      !upperSql.includes('EDITOR.EDITOR_VERSAO_DOCUMENTO');
+    const statusAtivo = isV2 ? 'S' : 1;
+    const baseId = doc.id * 100;
+    const rows = [
       {
         CODIGO_DOCUMENTO: doc.id,
         DESCRICAO_DOCUMENTO: doc.name,
         IDENTIFICADOR_DOCUMENTO: doc.identifier,
-        CODIGO_VERSAO_DOCUMENTO: doc.id * 10 + doc.version,
+        CODIGO_VERSAO_DOCUMENTO: baseId + doc.version + 1,
+        CODIGO_TIPO_LAYOUT: null,
+        IDENTIFICADOR_LAYOUT: null,
+        DESCRICAO_TIPO_LAYOUT: null,
+        VALOR_VERSAO: doc.version + 1,
+        STATUS_ATIVO: statusAtivo,
+        SN_PUBLICADO: 0,
+        TP_VERSAO: isV2 ? 'EDITABLE' : 'TEST',
+        CODIGO_TIPO_VERSAO: 1,
+        DESCRICAO_TIPO_VERSAO: isV2 ? 'Editável' : 'Teste',
+        CODIGO_LAYOUT_CABECALHO: null,
+        DOCUMENTO_CABECALHO: null,
+        CODIGO_LAYOUT_RODAPE: null,
+        QUANTIDADE_REGRAS: 0,
+        QUANTIDADE_CAMPOS: 0,
+      },
+      {
+        CODIGO_DOCUMENTO: doc.id,
+        DESCRICAO_DOCUMENTO: doc.name,
+        IDENTIFICADOR_DOCUMENTO: doc.identifier,
+        CODIGO_VERSAO_DOCUMENTO: baseId + doc.version,
         CODIGO_TIPO_LAYOUT: 1,
-        IDENTIFICADOR_LAYOUT: 'CORPO_SANDBOX',
-        DESCRICAO_TIPO_LAYOUT: 'Corpo Principal do Documento (Demo)',
+        IDENTIFICADOR_LAYOUT: 'TELA',
+        DESCRICAO_TIPO_LAYOUT: 'Tela',
         VALOR_VERSAO: doc.version,
-        STATUS_ATIVO: 1,
+        STATUS_ATIVO: statusAtivo,
+        SN_PUBLICADO: 1,
+        TP_VERSAO: 'PUBLISHED',
         CODIGO_TIPO_VERSAO: 3,
-        DESCRICAO_TIPO_VERSAO: 'Publicado',
+        DESCRICAO_TIPO_VERSAO: 'Publicada',
         CODIGO_LAYOUT_CABECALHO: 9901,
         DOCUMENTO_CABECALHO: 9000,
         CODIGO_LAYOUT_RODAPE: 9902,
@@ -1139,21 +1183,68 @@ export function executeDemoQuery(
         CODIGO_DOCUMENTO: doc.id,
         DESCRICAO_DOCUMENTO: doc.name,
         IDENTIFICADOR_DOCUMENTO: doc.identifier,
-        CODIGO_VERSAO_DOCUMENTO: doc.id * 10 + Math.max(1, doc.version - 1),
-        CODIGO_TIPO_LAYOUT: 1,
-        IDENTIFICADOR_LAYOUT: 'CORPO_SANDBOX',
-        DESCRICAO_TIPO_LAYOUT: 'Versão Anterior (Histórico Demo)',
-        VALOR_VERSAO: Math.max(1, doc.version - 1),
-        STATUS_ATIVO: 0,
-        CODIGO_TIPO_VERSAO: 2,
-        DESCRICAO_TIPO_VERSAO: 'Histórico',
+        CODIGO_VERSAO_DOCUMENTO: baseId + doc.version,
+        CODIGO_TIPO_LAYOUT: 2,
+        IDENTIFICADOR_LAYOUT: 'RELATORIO',
+        DESCRICAO_TIPO_LAYOUT: 'Relatório',
+        VALOR_VERSAO: doc.version,
+        STATUS_ATIVO: statusAtivo,
+        SN_PUBLICADO: 1,
+        TP_VERSAO: 'PUBLISHED',
+        CODIGO_TIPO_VERSAO: 3,
+        DESCRICAO_TIPO_VERSAO: 'Publicada',
         CODIGO_LAYOUT_CABECALHO: 9901,
         DOCUMENTO_CABECALHO: 9000,
         CODIGO_LAYOUT_RODAPE: 9902,
-        QUANTIDADE_REGRAS: doc.rules.length > 0 ? 1 : 0,
-        QUANTIDADE_CAMPOS: Math.max(1, doc.fields.length - 1),
+        QUANTIDADE_REGRAS: doc.rules.length,
+        QUANTIDADE_CAMPOS: doc.fields.length || 2,
       },
     ];
+    if (doc.version > 1) {
+      rows.push(
+        {
+          CODIGO_DOCUMENTO: doc.id,
+          DESCRICAO_DOCUMENTO: doc.name,
+          IDENTIFICADOR_DOCUMENTO: doc.identifier,
+          CODIGO_VERSAO_DOCUMENTO: baseId + doc.version - 1,
+          CODIGO_TIPO_LAYOUT: 1,
+          IDENTIFICADOR_LAYOUT: 'TELA',
+          DESCRICAO_TIPO_LAYOUT: 'Tela',
+          VALOR_VERSAO: doc.version - 1,
+          STATUS_ATIVO: statusAtivo,
+          SN_PUBLICADO: 0,
+          TP_VERSAO: 'HISTORY',
+          CODIGO_TIPO_VERSAO: 2,
+          DESCRICAO_TIPO_VERSAO: 'Histórico',
+          CODIGO_LAYOUT_CABECALHO: 9901,
+          DOCUMENTO_CABECALHO: 9000,
+          CODIGO_LAYOUT_RODAPE: 9902,
+          QUANTIDADE_REGRAS: doc.rules.length > 0 ? 1 : 0,
+          QUANTIDADE_CAMPOS: Math.max(1, doc.fields.length - 1),
+        },
+        {
+          CODIGO_DOCUMENTO: doc.id,
+          DESCRICAO_DOCUMENTO: doc.name,
+          IDENTIFICADOR_DOCUMENTO: doc.identifier,
+          CODIGO_VERSAO_DOCUMENTO: baseId + doc.version - 1,
+          CODIGO_TIPO_LAYOUT: 2,
+          IDENTIFICADOR_LAYOUT: 'RELATORIO',
+          DESCRICAO_TIPO_LAYOUT: 'Relatório',
+          VALOR_VERSAO: doc.version - 1,
+          STATUS_ATIVO: statusAtivo,
+          SN_PUBLICADO: 0,
+          TP_VERSAO: 'HISTORY',
+          CODIGO_TIPO_VERSAO: 2,
+          DESCRICAO_TIPO_VERSAO: 'Histórico',
+          CODIGO_LAYOUT_CABECALHO: 9901,
+          DOCUMENTO_CABECALHO: 9000,
+          CODIGO_LAYOUT_RODAPE: 9902,
+          QUANTIDADE_REGRAS: doc.rules.length > 0 ? 1 : 0,
+          QUANTIDADE_CAMPOS: Math.max(1, doc.fields.length - 1),
+        }
+      );
+    }
+    return rows;
   }
 
   // 10. Document Actions (SQL Queries on fields)
@@ -1180,29 +1271,50 @@ export function executeDemoQuery(
   if (upperSql.includes('DS_TIPO_VISUALIZACAO') && upperSql.includes('CD_CAMPO')) {
     const cdDoc = Number(getBindValue(binds, 'CD_DOCUMENTO')) || 9002;
     const doc = DEMO_DOCS.find((d) => d.id === cdDoc);
-    const fields = doc?.fields.length
+    const isV2 = upperSql.includes('DBAMV.EDITOR_CAMPO') && !upperSql.includes('EDITOR.EDITOR_CAMPO');
+    const baseFields = doc?.fields.length
       ? doc.fields
       : [
           { cdCampo: cdDoc * 100 + 1, cdMetadado: 99901, tag: 'REGISTRO_CLINICO', name: 'Registro Clínico Principal', visualType: 'Editor Rico', rulesCount: 0 },
           { cdCampo: cdDoc * 100 + 2, cdMetadado: 99902, tag: 'DATA_REGISTRO', name: 'Data/Hora da Avaliação', visualType: 'Data/Hora', rulesCount: 0 },
         ];
     const targetDoc = doc || { id: cdDoc, version: 1 };
-    return fields.map((f) => ({
-      CD_CAMPO: f.cdCampo,
-      DS_IDENTIFICADOR: f.tag,
-      DS_CAMPO: f.name,
-      CD_METADADO: f.cdMetadado,
-      SN_ATIVO: 1,
-      CD_TIPO_VISUALIZACAO: 1,
-      DS_TIPO_VISUALIZACAO: f.visualType,
-      CD_LAYOUT: targetDoc.id * 10 + 1,
-      CD_TIPO_LAYOUT: 1,
-      DS_TIPO_LAYOUT: 'Corpo Principal (Demo)',
-      VL_VERSAO: targetDoc.version,
-      TP_VERSAO: 'PUBLISHED',
-      SN_PUBLICADO: 1,
-      QTD_REGRAS: f.rulesCount,
-    }));
+
+    const buildVersionLayoutFields = (
+      version: number,
+      tpVersao: 'PUBLISHED' | 'TEST' | 'EDITABLE' | 'HISTORY',
+      snPublicado: number,
+      list: typeof baseFields
+    ) =>
+      [
+        { typeId: 1, typeName: 'Tela' },
+        { typeId: 2, typeName: 'Relatório' },
+      ].flatMap((layout) =>
+        list.map((f) => ({
+          CD_CAMPO: f.cdCampo,
+          DS_IDENTIFICADOR: f.tag,
+          DS_CAMPO: f.name,
+          CD_METADADO: f.cdMetadado,
+          SN_ATIVO: 1,
+          CD_TIPO_VISUALIZACAO: 1,
+          DS_TIPO_VISUALIZACAO: f.visualType,
+          CD_LAYOUT: targetDoc.id * 100 + version * 10 + layout.typeId,
+          CD_TIPO_LAYOUT: layout.typeId,
+          DS_TIPO_LAYOUT: layout.typeName,
+          VL_VERSAO: version,
+          TP_VERSAO: tpVersao,
+          SN_PUBLICADO: snPublicado,
+          QTD_REGRAS: layout.typeId === 1 ? f.rulesCount : 0,
+        }))
+      );
+
+    return [
+      ...buildVersionLayoutFields(targetDoc.version + 1, isV2 ? 'EDITABLE' : 'TEST', 0, baseFields),
+      ...buildVersionLayoutFields(targetDoc.version, 'PUBLISHED', 1, baseFields),
+      ...(targetDoc.version > 1
+        ? buildVersionLayoutFields(targetDoc.version - 1, 'HISTORY', 0, baseFields.slice(0, Math.max(1, baseFields.length - 1)))
+        : []),
+    ];
   }
 
   // 13. Hospital KPIs (/api/hospitals/stats)

@@ -18,6 +18,9 @@ const manrope = Manrope({
 export const metadata: Metadata = {
   title: "Goverdoc Pro — Governança Clínica",
   description: "Monitoramento e Auditoria Inteligente de Documentos Clínicos",
+  icons: {
+    icon: "/brand/goverdoc-icon.png",
+  },
 };
 
 export default function RootLayout({

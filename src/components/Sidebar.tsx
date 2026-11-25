@@ -1,6 +1,7 @@
 "use client";
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   LayoutGrid,
@@ -18,7 +19,6 @@ import {
   Moon,
   Sparkles,
   Layers,
-  ShieldCheck,
   BarChart3,
   Users
 } from 'lucide-react';
@@ -94,9 +94,13 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
             className="flex items-center gap-2.5 min-w-0 group"
             title="Voltar à Seleção de Editor (V2 / V3)"
           >
-            <div className="w-8 h-8 rounded-[10px] bg-[var(--lime)] text-[var(--lime-ink)] flex items-center justify-center shadow-[0_4px_14px_rgba(204,243,82,0.28)] group-hover:scale-105 transition-transform shrink-0">
-              <ShieldCheck size={18} strokeWidth={2.4} />
-            </div>
+            <Image
+              src="/brand/goverdoc-icon.png"
+              alt="Goverdoc Pro"
+              width={32}
+              height={32}
+              className="w-8 h-8 rounded-[9px] object-contain shadow-[0_4px_14px_rgba(204,243,82,0.22)] ring-1 ring-[var(--border-strong)] group-hover:scale-105 transition-transform shrink-0"
+            />
             <div className="flex items-baseline gap-1.5 truncate">
               <span className="text-[15px] font-bold tracking-tight text-[var(--foreground)] font-[family-name:var(--font-manrope)]">
                 Goverdoc

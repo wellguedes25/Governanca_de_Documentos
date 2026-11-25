@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from 'react';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Database,
@@ -321,7 +322,7 @@ function ConnectPageContent() {
   const isAdmin = authUser?.role === 'ADMIN';
 
   return (
-    <div className="min-h-screen sylva-canvas text-[var(--foreground)] flex flex-col items-center justify-center p-4 sm:p-6 md:p-10 relative overflow-hidden">
+    <div className="min-h-screen sylva-canvas text-[var(--foreground)] flex flex-col items-center justify-center p-4 sm:p-6 md:p-10 relative overflow-x-hidden">
       {/* Alternador Flutuante Light / Dark Mode */}
       <button
         type="button"
@@ -343,13 +344,17 @@ function ConnectPageContent() {
       </button>
 
       {/* Main Executive Asymmetric Container */}
-      <div className="w-full max-w-5xl z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
+      <div className="w-full max-w-5xl z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start my-auto">
         {/* Coluna Esquerda: Identidade Sylva & Confiança Clínica */}
-        <div className="lg:col-span-5 space-y-6">
+        <div className="lg:col-span-5 space-y-6 lg:pt-2">
           <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-[var(--lime)] text-[var(--lime-ink)] flex items-center justify-center shadow-[0_6px_22px_rgba(204,243,82,0.32)] shrink-0">
-              <ShieldCheck size={24} strokeWidth={2.4} />
-            </div>
+            <Image
+              src="/brand/goverdoc-icon.png"
+              alt="Goverdoc Pro"
+              width={48}
+              height={48}
+              className="w-12 h-12 rounded-2xl object-contain shadow-[0_6px_22px_rgba(204,243,82,0.25)] ring-1 ring-[var(--border-strong)] shrink-0"
+            />
 
             <div className="space-y-1">
               <div className="flex items-center gap-2 flex-wrap">

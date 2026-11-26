@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getData } from '@/lib/storage';
 import { executeQuery, testConnection } from '@/lib/oracle';
+import { normalizePeriodFilter } from '@/lib/period';
 
 // Validacao rigorosa de seguranca para queries personalizadas (Cloudflare Security Pattern)
 function validateSafeSqlQuery(sql: string): { safe: boolean; reason?: string } {
@@ -224,8 +225,11 @@ export async function POST(request: Request) {
     const binds = body.params && typeof body.params === 'object' ? body.params : {};
     const forceRefresh = body.forceRefresh === true || body.force === true;
     const ttlSeconds = typeof body.ttlSeconds === 'number' ? body.ttlSeconds : 600; // 10 minutos padrão para consultas de leitura
+    const period = normalizePeriodFilter(
+      body.period ?? { days: body.periodDays, startDate: body.startDate, endDate: body.endDate }
+    );
 
-    const rows = await executeQuery(connection, sql, binds, { ttlSeconds, forceRefresh });
+    const rows = await executeQuery(connection, sql, binds, { ttlSeconds, forceRefresh, period });
     return NextResponse.json({ rows, cached: !forceRefresh });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

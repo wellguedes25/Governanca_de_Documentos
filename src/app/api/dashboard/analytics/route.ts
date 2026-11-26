@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server';
 import { getData, INITIAL_DATA, STORAGE_FILE } from '@/lib/storage';
 import { executeQuery } from '@/lib/oracle';
+import { normalizePeriodFilter } from '@/lib/period';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get('type');
   const version = searchParams.get('version') || 'V2';
   const force = searchParams.get('force') === 'true';
+  const period = normalizePeriodFilter({
+    days: searchParams.get('days'),
+    startDate: searchParams.get('startDate'),
+    endDate: searchParams.get('endDate'),
+  });
   
   const data = await getData();
   const activeConn = data.connections.find(c => String(c.id) === String(data.activeConnectionId));
@@ -40,7 +46,7 @@ export async function GET(request: Request) {
       if (!sql || sql.trim() === '' || sql === 'SELECT * FROM DUAL') {
         return fallbackRows;
       }
-      return executeQuery(conn, sql, {}, { ttlSeconds: 900, forceRefresh: force });
+      return executeQuery(conn, sql, {}, { ttlSeconds: 900, forceRefresh: force, period });
     };
 
     // Consultas individuais para economizar recursos e permitir refresh granular

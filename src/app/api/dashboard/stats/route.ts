@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getData, STORAGE_FILE } from '@/lib/storage';
 import { executeQuery } from '@/lib/oracle';
+import { getPeriodCacheKey, normalizePeriodFilter } from '@/lib/period';
 
 // Cache simples em memória para evitar sobrecarga no Oracle em requisições paralelas
 const globalCache = global as any;
@@ -15,16 +16,11 @@ export async function GET(request: Request) {
   const type = searchParams.get('type') || 'all';
   const force = searchParams.get('force') === 'true';
   const version = searchParams.get('version') || 'V2';
-
-  const cacheKey = `${type}_${version}`;
-
-  // Verifica cache (se não for force refresh)
-  if (!force) {
-    const cached = globalCache.dashboardCache.get(cacheKey);
-    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
-      return NextResponse.json(cached.data);
-    }
-  }
+  const period = normalizePeriodFilter({
+    days: searchParams.get('days'),
+    startDate: searchParams.get('startDate'),
+    endDate: searchParams.get('endDate'),
+  });
 
   const data = await getData();
   const activeConn = data.connections.find(c => String(c.id) === String(data.activeConnectionId));
@@ -40,6 +36,16 @@ export async function GET(request: Request) {
     }, { status: 400 });
   }
 
+  const cacheKey = `${activeConn.id}_${type}_${version}_${getPeriodCacheKey(period)}`;
+
+  // Verifica cache (se não for force refresh)
+  if (!force) {
+    const cached = globalCache.dashboardCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+      return NextResponse.json(cached.data);
+    }
+  }
+
   try {
     const kpiQueries = version === 'V3' ? (data.kpiQueriesV3 || data.kpiQueries) : data.kpiQueries;
     const enabledQueries = data.enabledQueries || {};
@@ -51,7 +57,7 @@ export async function GET(request: Request) {
       if (!sql || sql.trim() === '') {
         return [{ TOTAL: 0 }];
       }
-      return executeQuery(conn, sql, {}, { ttlSeconds: 300, forceRefresh: force });
+      return executeQuery(conn, sql, {}, { ttlSeconds: 300, forceRefresh: force, period });
     };
 
     const getCol = (row: any, colName: string) => {

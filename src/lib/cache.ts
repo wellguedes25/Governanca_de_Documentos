@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import NodeCache from 'node-cache';
 
 // Tipagem explícita para o cache global no Node.js
@@ -16,15 +17,15 @@ if (process.env.NODE_ENV !== 'production') {
 export function clearQueryCache(): void {
   try {
     queryCache.flushAll();
+    (globalThis as { dashboardCache?: Map<string, unknown> }).dashboardCache?.clear();
     console.log('[Cache] Backend query cache flushed successfully.');
   } catch (err) {
     console.error('[Cache] Error flushing backend query cache:', err);
   }
 }
 
-export function generateCacheKey(connectionId: string, sql: string, binds: any): string {
-  // Uma hash simples baseada na string. 
-  // O stringify de binds precisa ser determinístico se for objeto, mas para Oracle via API normalmente é simples.
+export function generateCacheKey(connectionId: string, sql: string, binds: unknown): string {
+  const sqlHash = createHash('sha256').update(sql).digest('hex');
   const bindsString = typeof binds === 'object' ? JSON.stringify(binds) : String(binds);
-  return `${connectionId}|${sql.length}|${sql.slice(0, 50)}|${bindsString}`;
+  return `${connectionId}|${sqlHash}|${bindsString}`;
 }

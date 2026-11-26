@@ -20,6 +20,8 @@ import { safeSessionSetItem } from '@/lib/safe-storage';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDatabaseError } from '@/lib/error-formatter';
+import { PeriodSelector } from '@/components/ui/PeriodSelector';
+import { formatPeriodLabel, getPeriodCacheKey, getPeriodQueryParams } from '@/lib/period';
 
 interface Top10Item {
   CD_DOCUMENTO: number;
@@ -77,9 +79,10 @@ function formatCompactNumber(val: number): string {
 }
 
 export default function Dashboard() {
-  const { docVersion } = useUI();
+  const { docVersion, periodFilter, setPeriodFilter } = useUI();
   const router = useRouter();
   const resolvedVersion = docVersion || 'V3';
+  const periodLabel = useMemo(() => formatPeriodLabel(periodFilter), [periodFilter]);
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [analytics, setAnalytics] = useState<DashboardAnalytics | null>(null);
@@ -116,7 +119,7 @@ export default function Dashboard() {
   }, []);
 
   const fetchDashboardData = useCallback(async (force = false) => {
-    const cacheKey = `dashboard_unified_${activeConnId || 'default'}_${resolvedVersion}`;
+    const cacheKey = `dashboard_unified_v2_${activeConnId || 'default'}_${resolvedVersion}_${getPeriodCacheKey(periodFilter)}`;
 
     if (!force && typeof window !== 'undefined') {
       const cached = sessionStorage.getItem(cacheKey);
@@ -139,9 +142,10 @@ export default function Dashboard() {
 
     try {
       const forceParam = force ? '&force=true' : '';
+      const periodParams = getPeriodQueryParams(periodFilter);
       const [resStats, resAnalytics, resQuality] = await Promise.all([
-        fetch(`/api/dashboard/stats?version=${resolvedVersion}${forceParam}`).then((r) => r.json()),
-        fetch(`/api/dashboard/analytics?version=${resolvedVersion}${forceParam}`).then((r) => r.json()),
+        fetch(`/api/dashboard/stats?version=${resolvedVersion}&${periodParams}${forceParam}`).then((r) => r.json()),
+        fetch(`/api/dashboard/analytics?version=${resolvedVersion}&${periodParams}${forceParam}`).then((r) => r.json()),
         fetch(`/api/dashboard/quality?version=${resolvedVersion}${forceParam}`).then((r) => r.json()),
       ]);
 
@@ -170,7 +174,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [resolvedVersion, activeConnId]);
+  }, [resolvedVersion, periodFilter, activeConnId]);
 
   useEffect(() => {
     fetchDashboardData(false);
@@ -264,7 +268,9 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+          <PeriodSelector value={periodFilter} onChange={setPeriodFilter} disabled={loading} />
+
           <button
             type="button"
             onClick={() => router.push('/hospitais')}
@@ -344,7 +350,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Slate Blue Glass — Volume Geral */}
         <div className="sylva-card-slate rounded-[22px] p-5 flex flex-col justify-between min-h-[144px] hover:-translate-y-0.5 transition-transform">
-          <div className="text-[12px] font-medium text-[var(--tint-slate-muted)]">Volume geral (90d)</div>
+          <div className="text-[12px] font-medium text-[var(--tint-slate-muted)]">Volume geral ({periodLabel.short})</div>
           <div className="my-2">
             <div className="text-[30px] font-bold font-[family-name:var(--font-manrope)] tabular-nums text-[var(--tint-slate-fg)] tracking-tight leading-none">
               {loading ? <Skeleton className="h-8 w-32" /> : stats?.total || '0'}
@@ -416,7 +422,7 @@ export default function Dashboard() {
               </h2>
               <p className="text-[12px] text-[var(--muted)] mt-0.5">
                 {chartMode === 'modelos'
-                  ? 'Top 10 documentos mais preenchidos nos últimos 90 dias'
+                  ? `Top 10 documentos mais preenchidos ${periodLabel.phrase}`
                   : 'Volume consolidado de preenchimentos por hospital'}
               </p>
             </div>
@@ -633,8 +639,8 @@ export default function Dashboard() {
             </h3>
             <p className="text-[12.5px] text-[var(--tint-olive-muted)] leading-relaxed">
               {idleTemplates > 0
-                ? `${idleTemplates} templates sem uso nos últimos 90 dias prontos para revisão ou arquivamento.`
-                : 'Todos os templates clínicos estão com uso saudável nos últimos 90 dias.'}
+                ? `${idleTemplates} templates sem uso ${periodLabel.phrase} prontos para revisão ou arquivamento.`
+                : `Todos os templates clínicos estão com uso saudável ${periodLabel.phrase}.`}
             </p>
           </div>
 

@@ -39,19 +39,21 @@ export function AIQueryAssistant({ currentQuery, onApply, context }: AIQueryAssi
     <div className="flex items-center gap-2">
       {suggestion ? (
         <button
+          type="button"
           onClick={() => {
             onApply(suggestion);
             setSuggestion(null);
           }}
-          className="flex items-center gap-2 px-3 py-1 bg-amber-100 text-amber-700 border border-amber-200 rounded-[var(--radius)] text-[10px] font-black uppercase animate-in zoom-in"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 tone-warning border rounded-full text-[11px] font-bold transition-all cursor-pointer"
         >
           <Wand2 size={12} /> Aplicar Sugestão IA
         </button>
       ) : (
         <button
+          type="button"
           onClick={handleOptimize}
           disabled={loading}
-          className="flex items-center gap-2 px-3 py-1 bg-[#E6F4F1] text-[#074E52] border border-[#CBE5DF] rounded-lg text-[10px] font-black uppercase hover:bg-[#D5ECE6] transition-all disabled:opacity-50 cursor-pointer"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 tone-success border rounded-full text-[11px] font-bold transition-all disabled:opacity-50 cursor-pointer hover:brightness-105"
         >
           {loading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
           {loading ? 'Analisando...' : 'Otimizar com IA'}

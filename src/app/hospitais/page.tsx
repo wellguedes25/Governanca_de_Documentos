@@ -21,6 +21,8 @@ import Link from 'next/link';
 import { cn, formatDateTime } from '@/lib/utils';
 import { useUI } from '@/context/UIContext';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PeriodSelector } from '@/components/ui/PeriodSelector';
+import { formatPeriodLabel, getPeriodCacheKey, getPeriodQueryParams } from '@/lib/period';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DbConnection, HospitalMapping } from '@/lib/storage';
@@ -67,7 +69,8 @@ interface HospitalItem extends HospitalMapping {
 }
 
 export default function HospitaisPage() {
-  const { docVersion, getCached, setCached, activeConnInfo, setActiveConnInfo } = useUI();
+  const { docVersion, periodFilter, setPeriodFilter, getCached, setCached, activeConnInfo, setActiveConnInfo } = useUI();
+  const periodLabel = useMemo(() => formatPeriodLabel(periodFilter), [periodFilter]);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -255,7 +258,7 @@ export default function HospitaisPage() {
 
   // Busca dados de estatísticas e SLA do hospital com cache multinível
   const fetchData = useCallback(async (hId: string, force = false) => {
-    const cacheKey = `hospital_data_${hId}_${resolvedVersion}_${activeConnId || 'default'}`;
+    const cacheKey = `hospital_data_v2_${hId}_${resolvedVersion}_${getPeriodCacheKey(periodFilter)}_${activeConnId || 'default'}`;
 
     if (!force) {
       const cached = getCached<any>(cacheKey);
@@ -272,8 +275,9 @@ export default function HospitaisPage() {
 
     try {
       const forceParam = force ? '&force=true' : '';
+      const periodParams = getPeriodQueryParams(periodFilter);
       const [resStats, resQuality] = await Promise.all([
-        fetch(`/api/hospitals/stats?id=${hId}&version=${resolvedVersion}${forceParam}`),
+        fetch(`/api/hospitals/stats?id=${hId}&version=${resolvedVersion}&${periodParams}${forceParam}`),
         fetch(`/api/hospitals/quality?id=${hId}&version=${resolvedVersion}${forceParam}`)
       ]);
 
@@ -299,7 +303,7 @@ export default function HospitaisPage() {
     } finally {
       setLoading(false);
     }
-  }, [resolvedVersion, activeConnId, getCached, setCached]);
+  }, [resolvedVersion, periodFilter, activeConnId, getCached, setCached]);
 
   // Carrega conexões e lista de hospitais ativos reaproveitando contexto global
   useEffect(() => {
@@ -393,6 +397,8 @@ export default function HospitaisPage() {
           }
           action={
             <div className="flex items-center gap-2 flex-wrap">
+              <PeriodSelector value={periodFilter} onChange={setPeriodFilter} disabled={loading} />
+
               {selectedHospital && (
                 <Button
                   size="sm"
@@ -518,7 +524,7 @@ export default function HospitaisPage() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold uppercase tracking-wider opacity-80">Total Preenchido</span>
                 <Badge variant="outline" className="text-[10px] font-bold bg-[var(--tint-olive-btn)] text-[var(--tint-olive-fg)] border-[var(--tint-olive-border)] rounded-full px-2 py-0.5">
-                  Volume 90d
+                  Volume {periodLabel.short}
                 </Badge>
               </div>
               <div className="text-3xl font-extrabold font-mono text-[var(--tint-olive-fg)] tracking-tight my-1">
@@ -830,7 +836,7 @@ export default function HospitaisPage() {
           <Building2 size={42} className="mx-auto text-[var(--text-muted)]" />
           <h3 className="text-sm font-bold text-[var(--text-primary)]">Nenhum dado encontrado para esta unidade</h3>
           <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto">
-            Não há registros de prontuários clínicos para o hospital selecionado nos últimos 90 dias na conexão ativa.
+            Não há registros de prontuários clínicos para o hospital selecionado {periodLabel.phrase} na conexão ativa.
           </p>
         </div>
       )}

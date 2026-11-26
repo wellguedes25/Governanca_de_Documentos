@@ -10,7 +10,6 @@ import {
   GitFork,
   Building2,
   Activity,
-  Database,
   Settings,
   PanelLeftClose,
   PanelLeftOpen,
@@ -20,7 +19,6 @@ import {
   Sparkles,
   Layers,
   BarChart3,
-  Users,
   Stethoscope
 } from 'lucide-react';
 import { useUI } from '@/context/UIContext';
@@ -44,9 +42,7 @@ const mainMenuItems = [
 ];
 
 const infraMenuItems = [
-  { href: '/configuracoes/consultas', label: 'Motores SQL', icon: Database },
-  { href: '/configuracoes/conexoes', label: 'Conexões Oracle', icon: Settings },
-  { href: '/configuracoes/usuarios', label: 'Usuários & Acesso', icon: Users },
+  { href: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
 const COMPACT_ROUTES = ['/linhagem', '/migracao'];

@@ -3,6 +3,14 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ConfirmModal, ConfirmOptions } from '@/components/ui/ConfirmModal';
 import { safeSessionSetItem } from '@/lib/safe-storage';
+import {
+  DEFAULT_PERIOD_DAYS,
+  DEFAULT_PERIOD_FILTER,
+  normalizePeriodDays,
+  normalizePeriodFilter,
+  type PeriodDays,
+  type PeriodFilter,
+} from '@/lib/period';
 
 export type AppTheme = 'dark' | 'light';
 
@@ -25,6 +33,10 @@ interface UIContextType {
   setColumnWidth: (column: string, width: number) => void;
   docVersion: 'V2' | 'V3' | null;
   setDocVersion: (version: 'V2' | 'V3' | null) => void;
+  periodFilter: PeriodFilter;
+  setPeriodFilter: (filter: PeriodFilter) => void;
+  periodDays: PeriodDays;
+  setPeriodDays: (days: PeriodDays) => void;
   isMounted: boolean;
   activeConnInfo: ActiveConnInfo | null;
   setActiveConnInfo: (info: ActiveConnInfo | null) => void;
@@ -42,6 +54,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const [oracleData, setOracleData] = useState<Record<string, unknown>[] | null>(null);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const [docVersion, setDocVersionState] = useState<'V2' | 'V3' | null>(null);
+  const [periodFilter, setPeriodFilterState] = useState<PeriodFilter>(DEFAULT_PERIOD_FILTER);
   const [isMounted, setIsMounted] = useState(false);
   const [activeConnInfo, setActiveConnInfo] = useState<ActiveConnInfo | null>(null);
   const [memoryCache] = useState<Map<string, { value: any; timestamp: number }>>(() => new Map());
@@ -182,6 +195,8 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         if (savedVersion === 'V2' || savedVersion === 'V3') {
           setDocVersionState(savedVersion);
         }
+
+        localStorage.removeItem('sylva_period_days');
       } catch {
         applyThemeToDom('dark');
       }
@@ -231,6 +246,17 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const setPeriodFilter = useCallback((filter: PeriodFilter) => {
+    setPeriodFilterState(normalizePeriodFilter(filter));
+  }, []);
+
+  const periodDays: PeriodDays =
+    periodFilter.mode === 'preset' ? periodFilter.days : DEFAULT_PERIOD_DAYS;
+
+  const setPeriodDays = useCallback((days: PeriodDays) => {
+    setPeriodFilterState({ mode: 'preset', days: normalizePeriodDays(days) });
+  }, []);
+
   const handleSetSidebarOpen = useCallback((open: boolean) => {
     setSidebarOpen(open);
     try {
@@ -271,6 +297,10 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         setColumnWidth,
         docVersion,
         setDocVersion,
+        periodFilter,
+        setPeriodFilter,
+        periodDays,
+        setPeriodDays,
         isMounted,
         activeConnInfo,
         setActiveConnInfo,

@@ -893,6 +893,34 @@ function parseInIds(sql: string): number[] {
 }
 
 /**
+ * Extracts the active lookback window in days from SQL after applyPeriodMacro runs,
+ * returning a deterministic multiplier relative to the 90-day demo baseline.
+ */
+function extractPeriodScale(sql: string): number {
+  const customDates = [...sql.matchAll(/TO_DATE\s*\(\s*'(\d{4}-\d{2}-\d{2})'\s*,\s*'YYYY-MM-DD'\s*\)/gi)];
+  if (customDates.length >= 2) {
+    const startMs = Date.parse(`${customDates[0][1]}T00:00:00Z`);
+    const endMs = Date.parse(`${customDates[1][1]}T00:00:00Z`);
+    if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs >= startMs) {
+      const spanDays = Math.min(365, Math.max(1, Math.floor((endMs - startMs) / 86_400_000) + 1));
+      return spanDays / 90;
+    }
+  }
+
+  const match = sql.match(/TRUNC\s*\(\s*SYSDATE\s*\)\s*-\s*(\d+)/i);
+  if (match) {
+    const days = Number(match[1]);
+    if (days >= 1 && days <= 365 && days !== 7 && days !== 30) {
+      return days / 90;
+    }
+    if (days === 30) {
+      return 30 / 90;
+    }
+  }
+  return 1;
+}
+
+/**
  * Executes a deterministic synthetic response matching the Oracle SQL query patterns used across Goverdoc Pro.
  * Always uses strictly the 2 fictional companies and 10 fictional documents defined in this module.
  */
@@ -903,6 +931,8 @@ export function executeDemoQuery(
   const upperSql = (sql || '').toUpperCase();
   const effectiveHospitals = DEFAULT_DEMO_HOSPITALS;
   const now = Date.now();
+  const periodScale = extractPeriodScale(sql || '');
+  const scaleVol = (val: number) => Math.max(0, Math.round(val * periodScale));
 
   // 0. Companies List (/api/empresas)
   if ((upperSql.includes('MULTI_EMPRESAS') || upperSql.includes('NM_FANTASIA')) && !upperSql.includes('PERFIL_AMBULATORIAL')) {
@@ -1604,7 +1634,7 @@ export function executeDemoQuery(
     const hIndex = hospId === 902 ? 1 : 0;
     const activeCount = DEMO_DOCS.filter((d) => !d.idle).length;
     const totalPerHosp = DEMO_DOCS.filter((d) => !d.idle).reduce((acc, d) => {
-      const dist = distributeBetweenDemoHospitals(d.total90d, d.weights);
+      const dist = distributeBetweenDemoHospitals(scaleVol(d.total90d), d.weights);
       const sigla = effectiveHospitals[hIndex].sigla;
       return acc + (dist[sigla] ?? 0);
     }, 0);
@@ -1625,7 +1655,7 @@ export function executeDemoQuery(
     const sigla = effectiveHospitals[hIndex].sigla;
     return DEMO_DOCS.filter((d) => !d.idle)
       .map((d) => {
-        const dist = distributeBetweenDemoHospitals(d.total90d, d.weights);
+        const dist = distributeBetweenDemoHospitals(scaleVol(d.total90d), d.weights);
         return {
           CD_DOCUMENTO: d.id,
           NOME: d.name,
@@ -1644,7 +1674,7 @@ export function executeDemoQuery(
     const sigla = effectiveHospitals[hIndex].sigla;
     return DEMO_DOCS.filter((d) => !d.idle)
       .map((d) => {
-        const dist = distributeBetweenDemoHospitals(d.total90d, d.weights);
+        const dist = distributeBetweenDemoHospitals(scaleVol(d.total90d), d.weights);
         return {
           NOME: d.name,
           USO: dist[sigla] ?? 0,
@@ -1687,7 +1717,7 @@ export function executeDemoQuery(
       .map((d) => ({
         CD_DOCUMENTO: d.id,
         DS_DOCUMENTO: d.name,
-        QTD_TOTAL: d.total90d,
+        QTD_TOTAL: scaleVol(d.total90d),
       }));
   }
 
@@ -1696,7 +1726,7 @@ export function executeDemoQuery(
     return DEMO_DOCS.filter((d) => d.idle).map((d) => ({
       CD_DOCUMENTO: d.id,
       DS_DOCUMENTO: d.name,
-      STATUS_OCIOSIDADE: 'SEM USO NOS ÚLTIMOS 3 MESES',
+      STATUS_OCIOSIDADE: 'SEM USO NO PERÍODO',
     }));
   }
 
@@ -1707,7 +1737,7 @@ export function executeDemoQuery(
 
   // 21. Dashboard Signed KPI (assinados - checked BEFORE TOTAL_GERAL_PREENCHIDO)
   if (upperSql.includes('QTD_ASSINADO') || upperSql.includes("TP_STATUS = 'ASSINADO'")) {
-    const sum = DEMO_DOCS.reduce((acc, d) => acc + d.total90d, 0);
+    const sum = DEMO_DOCS.reduce((acc, d) => acc + scaleVol(d.total90d), 0);
     const assinados = Math.round(sum * 0.954);
     const fechados = Math.max(0, sum - assinados);
     return [{ TOTAL_GERAL: sum, QTD_ASSINADO: assinados, QTD_FECHADO: fechados, TOTAL: assinados }];
@@ -1715,7 +1745,7 @@ export function executeDemoQuery(
 
   // 22. Dashboard 3M Volume & Total KPI (volume3m / total / globalTotal)
   if (upperSql.includes('TOTAL_GERAL_PREENCHIDO')) {
-    const sum = DEMO_DOCS.reduce((acc, d) => acc + d.total90d, 0);
+    const sum = DEMO_DOCS.reduce((acc, d) => acc + scaleVol(d.total90d), 0);
     return [{ TOTAL_GERAL_PREENCHIDO: sum, TOTAL_GERAL: sum, TOTAL: sum }];
   }
 
@@ -1723,7 +1753,7 @@ export function executeDemoQuery(
   if (upperSql.includes('QTD_TOTAL_PREENCHIDA')) {
     const totals: Record<number, number> = { 901: 0, 902: 0 };
     DEMO_DOCS.forEach((d) => {
-      const dist = distributeBetweenDemoHospitals(d.total90d, d.weights);
+      const dist = distributeBetweenDemoHospitals(scaleVol(d.total90d), d.weights);
       totals[901] += dist.HVA;
       totals[902] += dist.HSM;
     });
@@ -1750,11 +1780,12 @@ export function executeDemoQuery(
     const isV3 = upperSql.includes('EDITOR.EDITOR_DOCUMENTO');
     const docs = DEMO_DOCS.filter((d) => !d.idle && d.engines.includes(isV3 ? 'V3' : 'V2'));
     return docs.map((d) => {
-      const hospCols = distributeBetweenDemoHospitals(d.total90d, d.weights);
+      const scaledTotal = scaleVol(d.total90d);
+      const hospCols = distributeBetweenDemoHospitals(scaledTotal, d.weights);
       return {
         CÓDIGO: d.id,
         NOME: d.name,
-        TOTAL: d.total90d,
+        TOTAL: scaledTotal,
         'ÚLTIMO USO': new Date(now - d.lastUsedHoursAgo * 3600_000).toISOString(),
         ...hospCols,
       };
@@ -1763,7 +1794,7 @@ export function executeDemoQuery(
 
   // 26. Generic KPI Fallback
   if (upperSql.includes('AS TOTAL') || upperSql.includes('COUNT(')) {
-    const sum = DEMO_DOCS.reduce((acc, d) => acc + d.total90d, 0);
+    const sum = DEMO_DOCS.reduce((acc, d) => acc + scaleVol(d.total90d), 0);
     return [{ TOTAL_GERAL_PREENCHIDO: sum, TOTAL_GERAL: sum, TOTAL: sum }];
   }
 

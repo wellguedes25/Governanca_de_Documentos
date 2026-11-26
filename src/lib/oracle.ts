@@ -2,6 +2,7 @@ import { getData, saveData, DbConnection, HospitalMapping } from './storage';
 import { decrypt } from './encryption';
 import { queryCache, generateCacheKey } from './cache';
 import { isDemoConnection, executeDemoQuery } from './demo-mock';
+import { applyPeriodMacro, DEFAULT_PERIOD_DAYS, type PeriodFilter } from './period';
 
 let cachedOracleDb: any = null;
 async function loadOracleDb(): Promise<any> {
@@ -297,23 +298,26 @@ export async function executeQuery(
   connection: DbConnection, 
   sql: string, 
   binds: Record<string, unknown> | unknown[] = {},
-  options?: { ttlSeconds?: number, forceRefresh?: boolean }
+  options?: { ttlSeconds?: number, forceRefresh?: boolean, periodDays?: number, period?: PeriodFilter }
 ): Promise<any[]> {
   assertReadOnlySql(sql);
 
+  const periodInput = options?.period ?? options?.periodDays ?? DEFAULT_PERIOD_DAYS;
+  const periodSql = applyPeriodMacro(sql, periodInput);
+
   if (isDemoConnection(connection)) {
-    return executeDemoQuery(sql, binds);
+    return executeDemoQuery(periodSql, binds);
   }
   let conn;
   try {
-    if (!sql) {
+    if (!periodSql) {
       throw new Error('A query SQL fornecida é nula ou indefinida. Verifique o arquivo storage.json.');
     }
 
     const pool = await getPool(connection);
 
     // Process SQL Macros for dynamic hospitals
-    let finalSql = sql;
+    let finalSql = periodSql;
     const data = await getData();
     
     // Mescla os dados do banco (pool) com as preferências de ativação/siglas do storage.json

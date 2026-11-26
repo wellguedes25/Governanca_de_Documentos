@@ -32,6 +32,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/hospitais': 'Hospitais & Unidades',
   '/similaridade': 'Auditoria Similaridade',
   '/dependencias-bi': 'Dependências BI & Indicadores',
+  '/configuracoes': 'Central de Configurações',
   '/configuracoes/consultas': 'Motores SQL',
   '/configuracoes/conexoes': 'Conexões Oracle',
   '/configuracoes/usuarios': 'Usuários & Controle de Acesso',
@@ -209,7 +210,7 @@ export function Topbar({ onOpenMobileMenu, onOpenSearch }: TopbarProps) {
         {sessionUser && (
           sessionUser.role === 'ADMIN' ? (
             <Link
-              href="/configuracoes/usuarios"
+              href="/configuracoes?tab=usuarios"
               title={`Gerenciar usuários (${sessionUser.name} • ADMIN)`}
               className="hidden xl:inline-flex items-center gap-2 h-10 px-3 rounded-full sylva-pill text-[11.5px] font-medium text-[var(--foreground-secondary)] hover:text-[var(--foreground)]"
             >
@@ -240,7 +241,7 @@ export function Topbar({ onOpenMobileMenu, onOpenSearch }: TopbarProps) {
         {/* Indicador Oracle / Instância */}
         {sessionUser?.role === 'ADMIN' ? (
           <Link
-            href="/configuracoes/conexoes"
+            href="/configuracoes?tab=conexoes"
             title={sessionConnName ? `${status.title} — ${sessionConnName}` : status.title}
             className={cn(
               "relative h-10 px-3 rounded-full sylva-pill flex items-center gap-2 text-[11.5px] font-medium text-[var(--foreground-secondary)] hover:text-[var(--foreground)]",

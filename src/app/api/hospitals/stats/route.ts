@@ -1,6 +1,7 @@
-﻿import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getData, STORAGE_FILE } from '@/lib/storage';
 import { executeQuery } from '@/lib/oracle';
+import { normalizePeriodFilter } from '@/lib/period';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -8,6 +9,11 @@ export async function GET(request: Request) {
   const force = searchParams.get('force') === 'true';
   const version = (searchParams.get('version') || 'V2').toUpperCase();
   const isV3 = version === 'V3';
+  const period = normalizePeriodFilter({
+    days: searchParams.get('days'),
+    startDate: searchParams.get('startDate'),
+    endDate: searchParams.get('endDate'),
+  });
 
   if (!hospitalId) {
     return NextResponse.json({ error: 'Hospital ID is required' }, { status: 400 });
@@ -65,10 +71,10 @@ export async function GET(request: Request) {
     const numericHospitalId = isNaN(Number(hospitalId)) ? hospitalId : Number(hospitalId);
 
     const [kpisRes, detailRes, top5Res, globalRes] = await Promise.all([
-      executeQuery(activeConn, kpisQuery, { ID: numericHospitalId }, { ttlSeconds: 600, forceRefresh: force }),
-      executeQuery(activeConn, detailQuery, { ID: numericHospitalId }, { ttlSeconds: 600, forceRefresh: force }),
-      executeQuery(activeConn, top5Query, { ID: numericHospitalId }, { ttlSeconds: 600, forceRefresh: force }),
-      executeQuery(activeConn, totalQuery, {}, { ttlSeconds: 600, forceRefresh: force })
+      executeQuery(activeConn, kpisQuery, { ID: numericHospitalId }, { ttlSeconds: 600, forceRefresh: force, period }),
+      executeQuery(activeConn, detailQuery, { ID: numericHospitalId }, { ttlSeconds: 600, forceRefresh: force, period }),
+      executeQuery(activeConn, top5Query, { ID: numericHospitalId }, { ttlSeconds: 600, forceRefresh: force, period }),
+      executeQuery(activeConn, totalQuery, {}, { ttlSeconds: 600, forceRefresh: force, period })
     ]);
 
     const result = {

@@ -6,6 +6,8 @@ import { FileText, AlertTriangle } from 'lucide-react';
 import { useUI } from '@/context/UIContext';
 import { safeSessionSetItem } from '@/lib/safe-storage';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PeriodSelector } from '@/components/ui/PeriodSelector';
+import { getPeriodCacheKey, type PeriodFilter } from '@/lib/period';
 import { Badge } from '@/components/ui/badge';
 import { DocumentosToolbar } from '@/components/documentos/DocumentosToolbar';
 import { DocumentosTable } from '@/components/documentos/DocumentosTable';
@@ -29,6 +31,8 @@ function DocumentosContent() {
     columnWidths, 
     setColumnWidth, 
     docVersion,
+    periodFilter,
+    setPeriodFilter,
     activeConnInfo,
     setActiveConnInfo,
     getCached,
@@ -88,6 +92,7 @@ function DocumentosContent() {
   // Carregamento inicial de conexões e hospitais sempre atualizado
   useEffect(() => {
     const currentVersion = docVersion || 'V3';
+    const currentPeriod = periodFilter;
     let isCurrent = true;
 
     fetch('/api/connections')
@@ -106,9 +111,9 @@ function DocumentosContent() {
         }
         setActiveHospitals(hospitals);
 
-        // Verifica cache com chave isolada pela conexão ativa
+        // Verifica cache com chave isolada pela conexão ativa e período
         const connId = active?.id || storage.activeConnectionId || 'default';
-        const cacheKey = `oracle_documentos_data_${connId}_${currentVersion}`;
+        const cacheKey = `oracle_documentos_data_v2_${connId}_${currentVersion}_${getPeriodCacheKey(currentPeriod)}`;
         const cached = typeof window !== 'undefined' ? sessionStorage.getItem(cacheKey) : null;
 
         if (cached) {
@@ -128,26 +133,27 @@ function DocumentosContent() {
             }) : rawCached;
             setOracleData(normalized);
           } catch {
-            fetchInitialData(true, currentVersion);
+            fetchInitialData(true, currentVersion, currentPeriod);
           }
         } else {
-          fetchInitialData(false, currentVersion);
+          fetchInitialData(false, currentVersion, currentPeriod);
         }
       })
       .catch(err => {
         console.error('Erro ao carregar conexões:', err);
-        fetchInitialData(false, currentVersion);
+        fetchInitialData(false, currentVersion, currentPeriod);
       });
 
     return () => {
       isCurrent = false;
     };
-  }, [docVersion]);
+  }, [docVersion, periodFilter]);
 
   // Carrega documentos do Oracle
-  async function fetchInitialData(isManual = false, versionOverride?: 'V2' | 'V3') {
-    if (loading) return;
+  async function fetchInitialData(isManual = false, versionOverride?: 'V2' | 'V3', periodOverride?: PeriodFilter) {
+    if (loading && !periodOverride) return;
     const targetVersion = versionOverride || docVersion || 'V3';
+    const targetPeriod = periodOverride || periodFilter;
     setLoading(true);
     setError('');
     
@@ -181,6 +187,7 @@ function DocumentosContent() {
         body: JSON.stringify({ 
           query: 'DOCUMENTOS',
           version: targetVersion,
+          period: targetPeriod,
           forceRefresh: isManual
         })
       });
@@ -205,7 +212,7 @@ function DocumentosContent() {
         });
         setOracleData(rows);
         const connId = active?.id || storage.activeConnectionId || 'default';
-        safeSessionSetItem(`oracle_documentos_data_${connId}_${targetVersion}`, JSON.stringify(rows));
+        safeSessionSetItem(`oracle_documentos_data_v2_${connId}_${targetVersion}_${getPeriodCacheKey(targetPeriod)}`, JSON.stringify(rows));
       }
     } catch (err: any) {
       setError(err.message || 'Erro de conexão com a API.');
@@ -603,6 +610,9 @@ function DocumentosContent() {
             >
               Motor {docVersion || 'V3'}
             </Badge>
+          }
+          action={
+            <PeriodSelector value={periodFilter} onChange={setPeriodFilter} disabled={loading} />
           }
         />
       </div>

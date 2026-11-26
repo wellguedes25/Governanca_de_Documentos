@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ConfirmModal, ConfirmOptions } from '@/components/ui/ConfirmModal';
+import { safeSessionSetItem } from '@/lib/safe-storage';
 
 export type AppTheme = 'dark' | 'light';
 
@@ -103,11 +104,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
     const payload = { value, timestamp: Date.now() };
     memoryCache.set(scopedKey, payload);
     if (typeof window !== 'undefined') {
-      try {
-        sessionStorage.setItem(`sylva_cache_${scopedKey}`, JSON.stringify(payload));
-      } catch {
-        // Storage pode estar cheio
-      }
+      safeSessionSetItem(`sylva_cache_${scopedKey}`, JSON.stringify(payload));
     }
   }, [memoryCache, activeConnInfo?.id]);
 

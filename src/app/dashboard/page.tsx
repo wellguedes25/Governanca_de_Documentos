@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUI } from '@/context/UIContext';
+import { safeSessionSetItem } from '@/lib/safe-storage';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDatabaseError } from '@/lib/error-formatter';
@@ -153,7 +154,7 @@ export default function Dashboard() {
       setQuality(resQuality);
 
       if (typeof window !== 'undefined') {
-        sessionStorage.setItem(
+        safeSessionSetItem(
           cacheKey,
           JSON.stringify({
             stats: resStats,

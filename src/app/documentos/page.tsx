@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'rea
 import { useSearchParams } from 'next/navigation';
 import { FileText, AlertTriangle } from 'lucide-react';
 import { useUI } from '@/context/UIContext';
+import { safeSessionSetItem } from '@/lib/safe-storage';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { DocumentosToolbar } from '@/components/documentos/DocumentosToolbar';
@@ -204,7 +205,7 @@ function DocumentosContent() {
         });
         setOracleData(rows);
         const connId = active?.id || storage.activeConnectionId || 'default';
-        sessionStorage.setItem(`oracle_documentos_data_${connId}_${targetVersion}`, JSON.stringify(rows));
+        safeSessionSetItem(`oracle_documentos_data_${connId}_${targetVersion}`, JSON.stringify(rows));
       }
     } catch (err: any) {
       setError(err.message || 'Erro de conexão com a API.');

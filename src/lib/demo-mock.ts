@@ -344,7 +344,7 @@ const DEMO_DOCS: DemoDocDef[] = [
         dsAlerta: 'Auditoria automática de completude dos blocos clínicos ao salvar.',
         condicao: 'SINTESE_ACOMP <> ""',
         camposAfetados: 'RESUMO_ADMISSAO, SINTESE_ACOMP, ACHADOS_DIAG, ORIENTACAO_SAIDA',
-        script: `SELECT 'COMPLETO' FROM DUAL WHERE :ORIENTACAO_SAIDA IS NOT NULL`,
+        script: `SELECT 1 FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO WHERE PDC.CD_ATENDIMENTO = :CD_ATENDIMENTO AND PEC.CD_DOCUMENTO = 9001 AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO')`,
       },
     ],
     actions: [
@@ -513,6 +513,17 @@ const DEMO_DOCS: DemoDocDef[] = [
         condicao: 'REGISTRO_CLINICO = ""',
         camposAfetados: 'REGISTRO_CLINICO',
         script: `SELECT DBMS_LOB.SUBSTR(LO_VALOR, 4000, 1) FROM DBAMV.EDITOR_REGISTRO_CAMPO WHERE CD_CAMPO = 900204`,
+      },
+      {
+        cdRegra: 91073,
+        numOrdem: 3,
+        dsRegra: 'SBX_REG_EXIGE_CHECKLIST_V2',
+        ativa: 1,
+        tipoRegra: 'VALIDATE',
+        dsAlerta: 'Exige confirmação do protocolo pré-procedimento (Doc V2 9009) antes da movimentação.',
+        condicao: 'VIT_SAIDA <> ""',
+        camposAfetados: 'VIT_SAIDA',
+        script: `SELECT 1 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM DBAMV.PW_DOCUMENTO_CLINICO PDC JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC ON ERC.CD_REGISTRO = PEC.CD_EDITOR_REGISTRO JOIN DBAMV.EDITOR_CAMPO EC ON EC.CD_CAMPO = ERC.CD_CAMPO WHERE PDC.CD_ATENDIMENTO = :CD_ATENDIMENTO AND PEC.CD_DOCUMENTO = 9009 AND EC.DS_IDENTIFICADOR = 'CONFERENCIA_SEGURA' AND DBMS_LOB.SUBSTR(ERC.LO_VALOR, 10, 1) = 'S')`,
       },
     ],
     actions: [
@@ -977,8 +988,9 @@ export function executeDemoQuery(
   }
 
   // 3. Document Rules (checked BEFORE Lineage queries so erpv_sub.cd_propriedade IN (4, 36) never collides,
-  //    and excluding METADATA queries that count editor_regra via subquery)
+  //    excluding METADATA queries and Lineage Rule queries that select TARGET_DOC_ID)
   if (
+    !upperSql.includes('TARGET_DOC_ID') &&
     !upperSql.includes('VALOR_VERSAO') &&
     !upperSql.includes('QUANTIDADE_CAMPOS') &&
     ((upperSql.includes('TIPO_REGRA') && upperSql.includes('CAMPOS_AFETADOS')) ||
@@ -1039,10 +1051,41 @@ export function executeDemoQuery(
     return rows;
   }
 
-  // 4. Lineage Graph Query 1: Action scripts reading external docs
-  if (upperSql.includes('TARGET_DOC_ID') && upperSql.includes('SCRIPT_P1')) {
+  // 4A. Lineage Graph Query 1B: Document Rules with SQL referencing CD_DOCUMENTO
+  if (upperSql.includes('TARGET_DOC_ID') && upperSql.includes('RULE_NAME')) {
+    const isV2 = upperSql.includes('DBAMV.EDITOR_DOCUMENTO') && !upperSql.includes('EDITOR.EDITOR_DOCUMENTO');
+    const targetEngine = isV2 ? 'V2' : 'V3';
     const rows: Record<string, unknown>[] = [];
-    DEMO_DOCS.forEach((doc) => {
+    DEMO_DOCS.filter((doc) => doc.engines.includes(targetEngine)).forEach((doc) => {
+      doc.rules.forEach((rule) => {
+        if (!rule.script || !/CD_DOCUMENTO/i.test(rule.script)) return;
+        const firstTag = rule.camposAfetados.split(',')[0]?.trim() || rule.dsRegra;
+        const field = doc.fields.find((f) => f.tag === firstTag);
+        rows.push({
+          TARGET_DOC_ID: doc.id,
+          TARGET_DOC_NAME: doc.name,
+          TARGET_VERSION: doc.version,
+          TARGET_TP_VERSAO: 'PUBLISHED',
+          RULE_NAME: rule.dsRegra,
+          RULE_TYPE: rule.tipoRegra,
+          TARGET_FIELD_ID: field?.cdCampo ?? null,
+          TARGET_FIELD_TAG: field?.tag ?? rule.dsRegra,
+          TARGET_FIELD_NAME: field?.name ?? rule.dsRegra,
+          SCRIPT_P1: rule.script,
+          SCRIPT_P2: null,
+          SCRIPT_P3: null,
+        });
+      });
+    });
+    return rows;
+  }
+
+  // 4B. Lineage Graph Query 1A: Action scripts reading external docs
+  if (upperSql.includes('TARGET_DOC_ID') && upperSql.includes('SCRIPT_P1')) {
+    const isV2 = upperSql.includes('DBAMV.EDITOR_DOCUMENTO') && !upperSql.includes('EDITOR.EDITOR_DOCUMENTO');
+    const targetEngine = isV2 ? 'V2' : 'V3';
+    const rows: Record<string, unknown>[] = [];
+    DEMO_DOCS.filter((doc) => doc.engines.includes(targetEngine)).forEach((doc) => {
       doc.actions.forEach((act) => {
         const f = doc.fields.find((item) => item.cdCampo === act.cdCampo);
         rows.push({
@@ -1063,16 +1106,30 @@ export function executeDemoQuery(
     return rows;
   }
 
-  // 5. Lineage Graph Query 2: Involved Document Field Details (V3 or V2)
-  if (upperSql.includes('DS_IDENTIFICADOR') && upperSql.includes('CD_CAMPO') && upperSql.includes('ED.CD_DOCUMENTO IN (')) {
+  // 5. Lineage Graph Query 2: Involved Document Field Details (V3 or V2) with collision-free aliases
+  if (
+    (upperSql.includes('FIELD_TAG') || upperSql.includes('DS_IDENTIFICADOR')) &&
+    (upperSql.includes('FIELD_ID') || upperSql.includes('CD_CAMPO')) &&
+    upperSql.includes('ED.CD_DOCUMENTO IN (')
+  ) {
     const requestedIds = new Set(parseInIds(sql));
     const isV2Only = upperSql.includes('DBAMV.EDITOR_DOCUMENTO') && !upperSql.includes('EDITOR.EDITOR_DOCUMENTO');
+    const targetEngine = isV2Only ? 'V2' : 'V3';
     const rows: Record<string, unknown>[] = [];
 
-    DEMO_DOCS.filter((d) => requestedIds.size === 0 || requestedIds.has(d.id)).forEach((d) => {
-      if (isV2Only && !d.engines.includes('V2')) return;
+    DEMO_DOCS.filter(
+      (d) => (requestedIds.size === 0 || requestedIds.has(d.id)) && d.engines.includes(targetEngine)
+    ).forEach((d) => {
       d.fields.forEach((f) => {
         rows.push({
+          DOC_ID: d.id,
+          DOC_NAME: d.name,
+          DOC_VERSION: d.version,
+          DOC_TP_VERSAO: isV2Only ? 'LEGACY_V2' : 'PUBLISHED',
+          FIELD_ID: f.cdCampo,
+          FIELD_METADATA_ID: f.cdMetadado,
+          FIELD_TAG: f.tag,
+          FIELD_NAME: f.name,
           CD_DOCUMENTO: d.id,
           DS_DOCUMENTO: d.name,
           VL_VERSAO: d.version,
@@ -1087,10 +1144,19 @@ export function executeDemoQuery(
     return rows;
   }
 
-  // 6. Lineage Graph Query 3: V2 Header fallback
-  if (upperSql.includes('FROM DBAMV.EDITOR_DOCUMENTO') && upperSql.includes('ED.CD_DOCUMENTO IN (')) {
+  // 6. Lineage Graph Query 3: V3 / V2 Header fallback
+  if (
+    (upperSql.includes('FROM DBAMV.EDITOR_DOCUMENTO') || upperSql.includes('FROM EDITOR.EDITOR_DOCUMENTO')) &&
+    upperSql.includes('CD_DOCUMENTO IN (')
+  ) {
     const requestedIds = new Set(parseInIds(sql));
-    return DEMO_DOCS.filter((d) => requestedIds.size === 0 || requestedIds.has(d.id)).map((d) => ({
+    const isV2Only = upperSql.includes('DBAMV.EDITOR_DOCUMENTO') && !upperSql.includes('EDITOR.EDITOR_DOCUMENTO');
+    const targetEngine = isV2Only ? 'V2' : 'V3';
+    return DEMO_DOCS.filter(
+      (d) => (requestedIds.size === 0 || requestedIds.has(d.id)) && d.engines.includes(targetEngine)
+    ).map((d) => ({
+      DOC_ID: d.id,
+      DOC_NAME: d.name,
       CD_DOCUMENTO: d.id,
       DS_DOCUMENTO: d.name,
     }));

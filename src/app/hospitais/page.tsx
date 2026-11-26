@@ -137,7 +137,13 @@ export default function HospitaisPage() {
       const cachedRules = getCached<any[]>(rulesKey);
       const cachedFields = getCached<any[]>(fieldsKey);
       const cachedProfiles = getCached<any[]>(profileKey);
-      const isValidMetaCache = Array.isArray(cachedMeta) && (cachedMeta.length === 0 || ('SN_PUBLICADO' in cachedMeta[0] && 'TP_VERSAO' in cachedMeta[0]));
+      const isValidMetaCache =
+        Array.isArray(cachedMeta) &&
+        (cachedMeta.length === 0 ||
+          ('SN_PUBLICADO' in cachedMeta[0] &&
+            'TP_VERSAO' in cachedMeta[0] &&
+            'VALOR_VERSAO' in cachedMeta[0] &&
+            'QUANTIDADE_CAMPOS' in cachedMeta[0]));
 
       if (isValidMetaCache && cachedActions && cachedRules && cachedFields && cachedProfiles) {
         setMetadata(cachedMeta);

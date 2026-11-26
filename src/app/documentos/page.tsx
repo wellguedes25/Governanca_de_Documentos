@@ -303,7 +303,13 @@ function DocumentosContent() {
     const cacheKey = `meta_v2_${docId}_${activeVersion}`;
     if (!force) {
       const cached = getCached<any[]>(cacheKey);
-      const isValidCache = Array.isArray(cached) && (cached.length === 0 || ('SN_PUBLICADO' in cached[0] && 'TP_VERSAO' in cached[0]));
+      const isValidCache =
+        Array.isArray(cached) &&
+        (cached.length === 0 ||
+          ('SN_PUBLICADO' in cached[0] &&
+            'TP_VERSAO' in cached[0] &&
+            'VALOR_VERSAO' in cached[0] &&
+            'QUANTIDADE_CAMPOS' in cached[0]));
       if (isValidCache) {
         setMetadata(cached);
         setMetadataError(null);

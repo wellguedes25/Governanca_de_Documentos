@@ -976,8 +976,14 @@ export function executeDemoQuery(
     return filtered.map(({ TEXTO_ATUAL: _ta, TEXTO_ANTERIOR: _tp, ...row }) => row);
   }
 
-  // 3. Document Rules (checked BEFORE Lineage queries so erpv_sub.cd_propriedade IN (4, 36) never collides)
-  if ((upperSql.includes('TIPO_REGRA') && upperSql.includes('CAMPOS_AFETADOS')) || upperSql.includes('EDITOR_REGRA ER')) {
+  // 3. Document Rules (checked BEFORE Lineage queries so erpv_sub.cd_propriedade IN (4, 36) never collides,
+  //    and excluding METADATA queries that count editor_regra via subquery)
+  if (
+    !upperSql.includes('VALOR_VERSAO') &&
+    !upperSql.includes('QUANTIDADE_CAMPOS') &&
+    ((upperSql.includes('TIPO_REGRA') && upperSql.includes('CAMPOS_AFETADOS')) ||
+      upperSql.includes('EDITOR_REGRA ER'))
+  ) {
     const cdDoc = Number(getBindValue(binds, 'CD_DOCUMENTO')) || 9002;
     const doc = DEMO_DOCS.find((d) => d.id === cdDoc);
     if (!doc || doc.rules.length === 0) return [];

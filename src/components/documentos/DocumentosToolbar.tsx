@@ -9,8 +9,6 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface DocumentosToolbarProps {
-  activeTab: 'documentos' | 'perfis';
-  setActiveTab: (tab: 'documentos' | 'perfis') => void;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
   viewMode?: 'table' | 'cards';
@@ -29,8 +27,6 @@ interface DocumentosToolbarProps {
 }
 
 export function DocumentosToolbar({
-  activeTab,
-  setActiveTab,
   searchTerm,
   setSearchTerm,
   viewMode = 'table',
@@ -51,44 +47,17 @@ export function DocumentosToolbar({
 
   return (
     <div className="flex flex-col gap-3.5 mb-1 sylva-glass p-4 rounded-[22px]">
-      {/* Top Row: Segmented Controls estilo Sylva + Quick Actions */}
+      {/* Top Row: Indicador de Catálogo estilo Sylva + Quick Actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-        {/* Segmented Tabs */}
-        <div className="inline-flex items-center gap-1 p-1 bg-[var(--card-subtle)] rounded-full border border-[var(--border)] self-start">
-          <button
-            type="button"
-            onClick={() => setActiveTab('documentos')}
-            className={cn(
-              "px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer",
-              activeTab === 'documentos'
-                ? "bg-[var(--glass-pill-active)] text-[var(--glass-pill-active-ink)] shadow-xs font-bold"
-                : "text-[var(--foreground-secondary)] hover:text-[var(--foreground)]"
-            )}
-          >
-            <span>Documentos Clínicos</span>
-            {totalDocs > 0 && (
-              <span className={cn(
-                "px-1.5 py-0.5 rounded-full text-[10px] tabular-nums font-bold",
-                activeTab === 'documentos'
-                  ? "bg-[var(--lime)] text-[var(--lime-ink)]"
-                  : "bg-[var(--card-hover)] text-[var(--foreground-secondary)]"
-              )}>
-                {totalFiltered}
-              </span>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('perfis')}
-            className={cn(
-              "px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer",
-              activeTab === 'perfis'
-                ? "bg-[var(--glass-pill-active)] text-[var(--glass-pill-active-ink)] shadow-xs font-bold"
-                : "text-[var(--foreground-secondary)] hover:text-[var(--foreground)]"
-            )}
-          >
-            <span>Perfis Vinculados</span>
-          </button>
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-[var(--card-subtle)] rounded-full border border-[var(--border)] self-start">
+          <span className="text-xs font-bold text-[var(--foreground)]">
+            Documentos Clínicos
+          </span>
+          {totalDocs > 0 && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] tabular-nums font-bold bg-[var(--lime)] text-[var(--lime-ink)] font-mono">
+              {totalFiltered !== totalDocs ? `${totalFiltered} / ${totalDocs}` : totalFiltered}
+            </span>
+          )}
         </div>
 
         {/* Action Controls */}
@@ -126,7 +95,7 @@ export function DocumentosToolbar({
           </div>
 
           {/* Hospital Filter Pill Toggle */}
-          {activeHospitals.length > 0 && activeTab === 'documentos' && (
+          {activeHospitals.length > 0 && (
             <button
               type="button"
               onClick={() => setShowHospitalPills(!showHospitalPills)}
@@ -202,7 +171,7 @@ export function DocumentosToolbar({
       </div>
 
       {/* Hospital Filter Pills Expandable Panel */}
-      {showHospitalPills && activeTab === 'documentos' && (
+      {showHospitalPills && (
         <div className="pt-2.5 border-t border-[var(--border-subtle)] flex flex-wrap items-center gap-1.5">
           <span className="text-[11px] font-semibold text-[var(--muted)] mr-1 flex items-center gap-1">
             <Filter size={11} /> Unidades:

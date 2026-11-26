@@ -664,3 +664,11 @@ body {
   color: #be123c !important;
 }
 
+/* Native select dropdown contrast fix (Windows Chromium dark/light themes) */
+select option,
+select optgroup {
+  background-color: var(--card-solid);
+  color: var(--foreground);
+}
+
+

@@ -894,7 +894,7 @@ export function executeDemoQuery(
   const now = Date.now();
 
   // 0. Companies List (/api/empresas)
-  if (upperSql.includes('MULTI_EMPRESAS') || upperSql.includes('NM_FANTASIA')) {
+  if ((upperSql.includes('MULTI_EMPRESAS') || upperSql.includes('NM_FANTASIA')) && !upperSql.includes('PERFIL_AMBULATORIAL')) {
     return effectiveHospitals.map((h) => ({
       CD_MULTI_EMPRESA: h.id,
       NM_FANTASIA: h.nome,
@@ -1098,30 +1098,239 @@ export function executeDemoQuery(
 
   // 6. Ambulatory Profile Details
   if (upperSql.includes('COD_PERFIL_MODULO') || upperSql.includes('CD_PERFIL_AMBULATORIAL = :CD_PERFIL')) {
-    const cdPerfil = Number(getBindValue(binds, 'CD_PERFIL')) || 1;
-    const docsSlice = DEMO_DOCS.slice(0, 4);
-    return docsSlice.map((d, i) => ({
-      COD_PERFIL_MODULO: 5000 + cdPerfil * 10 + i,
-      MODULO: 'PEP_SANDBOX_DOC',
-      COD_PERFIL_MODULO_PAI: 5000,
-      TITULO: d.name,
-      AGRUPADOR: 'DOCUMENTOS FICTÍCIOS',
-      COD_MOD_PARAMETRO: 8000 + i,
-      MODULO_PARAMETRO: 'PEP_SANDBOX_DOC',
-      PARAMETRO: 'CD_DOCUMENTO',
-      COD_PERFIL_MOD_ORIGEM: 5000 + cdPerfil * 10 + i,
-      VALOR_PARAMETRO: `${d.id} - ${d.name}`,
-      DESC_VALOR_PARAMETRO: 'Documento fictício habilitado no perfil',
-    }));
+    const cdPerfil = Number(getBindValue(binds, 'CD_PERFIL')) || 91;
+    const base = 5000 + cdPerfil * 100;
+    const docsSlice = DEMO_DOCS.slice(0, 3);
+    const rows: Record<string, unknown>[] = [
+      // Subsegmento raiz (0 parâmetros próprios, agrupa módulos filhos)
+      {
+        COD_PERFIL_MODULO: base,
+        MODULO: 'MVPEP_SUBSEGMENTO',
+        COD_PERFIL_MODULO_PAI: null,
+        ORDEM: 0,
+        TITULO: 'Registro Clínico Assistencial',
+        AGRUPADOR: null,
+        COD_MOD_PARAMETRO: null,
+        MODULO_PARAMETRO: null,
+        PARAMETRO: null,
+        COD_PERFIL_MOD_ORIGEM: null,
+        VALOR_PARAMETRO: null,
+        DESC_VALOR_PARAMETRO: null,
+      },
+      // Filho 1: Sinais Vitais
+      {
+        COD_PERFIL_MODULO: base + 1,
+        MODULO: 'MVPEP_TEMA_AFERICAO',
+        COD_PERFIL_MODULO_PAI: base,
+        ORDEM: 10,
+        TITULO: 'Sinais Vitais',
+        AGRUPADOR: null,
+        COD_MOD_PARAMETRO: base * 10 + 1,
+        MODULO_PARAMETRO: 'MVPEP_TEMA_AFERICAO',
+        PARAMETRO: 'CD_OBJETO',
+        COD_PERFIL_MOD_ORIGEM: base + 1,
+        VALOR_PARAMETRO: '357 - AFERIÇÃO (SANDBOX)',
+        DESC_VALOR_PARAMETRO: 'Objeto de coleta de sinais vitais',
+      },
+      {
+        COD_PERFIL_MODULO: base + 1,
+        MODULO: 'MVPEP_TEMA_AFERICAO',
+        COD_PERFIL_MODULO_PAI: base,
+        ORDEM: 10,
+        TITULO: 'Sinais Vitais',
+        AGRUPADOR: null,
+        COD_MOD_PARAMETRO: base * 10 + 2,
+        MODULO_PARAMETRO: 'MVPEP_TEMA_AFERICAO',
+        PARAMETRO: 'SN_HISTORICO',
+        COD_PERFIL_MOD_ORIGEM: base + 1,
+        VALOR_PARAMETRO: 'S',
+        DESC_VALOR_PARAMETRO: 'Exibir histórico de aferições',
+      },
+    ];
+
+    // Filhos 2..4: Documentos eletrônicos do subsegmento
+    docsSlice.forEach((d, i) => {
+      const modId = base + 10 + i;
+      const ordem = (i + 2) * 10;
+      rows.push(
+        {
+          COD_PERFIL_MODULO: modId,
+          MODULO: 'MVPEP_TEMA_DOC_ELETRONICO',
+          COD_PERFIL_MODULO_PAI: base,
+          ORDEM: ordem,
+          TITULO: d.name,
+          AGRUPADOR: null,
+          COD_MOD_PARAMETRO: modId * 10 + 1,
+          MODULO_PARAMETRO: 'MVPEP_TEMA_DOC_ELETRONICO',
+          PARAMETRO: 'CD_DOCUMENTO_EDITOR_3',
+          COD_PERFIL_MOD_ORIGEM: modId,
+          VALOR_PARAMETRO: `${d.id} - ${d.name}`,
+          DESC_VALOR_PARAMETRO: 'Documento clínico V3 vinculado ao tema',
+        },
+        {
+          COD_PERFIL_MODULO: modId,
+          MODULO: 'MVPEP_TEMA_DOC_ELETRONICO',
+          COD_PERFIL_MODULO_PAI: base,
+          ORDEM: ordem,
+          TITULO: d.name,
+          AGRUPADOR: null,
+          COD_MOD_PARAMETRO: modId * 10 + 2,
+          MODULO_PARAMETRO: 'MVPEP_TEMA_DOC_ELETRONICO',
+          PARAMETRO: 'SN_PERMITE_IMPRIMIR',
+          COD_PERFIL_MOD_ORIGEM: modId,
+          VALOR_PARAMETRO: 'S',
+          DESC_VALOR_PARAMETRO: 'Permite impressão direta no PEP',
+        }
+      );
+    });
+
+    // Módulo raiz híbrido (parâmetros próprios + submódulo filho)
+    const allergyId = base + 50;
+    const allergyChildId = base + 51;
+    rows.push(
+      {
+        COD_PERFIL_MODULO: allergyId,
+        MODULO: 'MVPEP_ALERGIAS_EVENTOS',
+        COD_PERFIL_MODULO_PAI: null,
+        ORDEM: 30,
+        TITULO: 'Alergia do Paciente',
+        AGRUPADOR: null,
+        COD_MOD_PARAMETRO: allergyId * 10 + 1,
+        MODULO_PARAMETRO: 'MVPEP_ALERGIAS_EVENTOS',
+        PARAMETRO: 'CD_OBJETO',
+        COD_PERFIL_MOD_ORIGEM: allergyId,
+        VALOR_PARAMETRO: '410 - REGISTRO DE ALERGIAS (SANDBOX)',
+        DESC_VALOR_PARAMETRO: null,
+      },
+      {
+        COD_PERFIL_MODULO: allergyId,
+        MODULO: 'MVPEP_ALERGIAS_EVENTOS',
+        COD_PERFIL_MODULO_PAI: null,
+        ORDEM: 30,
+        TITULO: 'Alergia do Paciente',
+        AGRUPADOR: null,
+        COD_MOD_PARAMETRO: allergyId * 10 + 2,
+        MODULO_PARAMETRO: 'MVPEP_ALERGIAS_EVENTOS',
+        PARAMETRO: 'SN_HISTORICO',
+        COD_PERFIL_MOD_ORIGEM: allergyId,
+        VALOR_PARAMETRO: 'S',
+        DESC_VALOR_PARAMETRO: null,
+      },
+      {
+        COD_PERFIL_MODULO: allergyChildId,
+        MODULO: 'MVPEP_ALERGIAS_EVENTOS',
+        COD_PERFIL_MODULO_PAI: allergyId,
+        ORDEM: 10,
+        TITULO: 'Alergia Medicamentosa',
+        AGRUPADOR: null,
+        COD_MOD_PARAMETRO: allergyChildId * 10 + 1,
+        MODULO_PARAMETRO: 'MVPEP_ALERGIAS_EVENTOS',
+        PARAMETRO: 'CD_OBJETO',
+        COD_PERFIL_MOD_ORIGEM: allergyChildId,
+        VALOR_PARAMETRO: '411 - ALERGIA MEDICAMENTOSA (SANDBOX)',
+        DESC_VALOR_PARAMETRO: null,
+      },
+      {
+        COD_PERFIL_MODULO: allergyChildId,
+        MODULO: 'MVPEP_ALERGIAS_EVENTOS',
+        COD_PERFIL_MODULO_PAI: allergyId,
+        ORDEM: 10,
+        TITULO: 'Alergia Medicamentosa',
+        AGRUPADOR: null,
+        COD_MOD_PARAMETRO: allergyChildId * 10 + 2,
+        MODULO_PARAMETRO: 'MVPEP_ALERGIAS_EVENTOS',
+        PARAMETRO: 'SN_EXIGE_JUSTIFICATIVA',
+        COD_PERFIL_MOD_ORIGEM: allergyChildId,
+        VALOR_PARAMETRO: 'S',
+        DESC_VALOR_PARAMETRO: null,
+      },
+      // Módulo raiz simples
+      {
+        COD_PERFIL_MODULO: base + 60,
+        MODULO: 'MVPEP_EVOLUCAO_MEDICA',
+        COD_PERFIL_MODULO_PAI: null,
+        ORDEM: 50,
+        TITULO: 'Evoluções Anteriores',
+        AGRUPADOR: null,
+        COD_MOD_PARAMETRO: (base + 60) * 10 + 1,
+        MODULO_PARAMETRO: 'MVPEP_EVOLUCAO_MEDICA',
+        PARAMETRO: 'QT_DIAS_HISTORICO',
+        COD_PERFIL_MOD_ORIGEM: base + 60,
+        VALOR_PARAMETRO: '90',
+        DESC_VALOR_PARAMETRO: 'Dias exibidos na linha do tempo',
+      }
+    );
+
+    return rows;
   }
 
   // 7. Ambulatory Profiles List
   if (upperSql.includes('COD_PERFIL') && upperSql.includes('NOME_PERFIL')) {
     return [
-      { COD_PERFIL: 91, NOME_PERFIL: 'INTERNAÇÃO CLÍNICA AURORA (DEMO)', COD_ESPECIALIDADE: 10, ESPECIALIDADE: 'CLÍNICA MÉDICA', SISTEMA: 'PEP', PORTA_ENTRADA: 'I', TIPO_ATENDIMENTO: 'I', COD_TIPO_PRESTADOR: 1, NOME_TIPO_PRESTADOR: 'MÉDICO', COD_SETOR: 911, NOME_SETOR: 'ALA AURORA SUL', EMPRESA_FIXA: 901 },
-      { COD_PERFIL: 92, NOME_PERFIL: 'TERAPIA INTENSIVA VALE DA AURORA (DEMO)', COD_ESPECIALIDADE: 22, ESPECIALIDADE: 'MEDICINA INTENSIVA', SISTEMA: 'PEP', PORTA_ENTRADA: 'I', TIPO_ATENDIMENTO: 'I', COD_TIPO_PRESTADOR: 1, NOME_TIPO_PRESTADOR: 'MÉDICO', COD_SETOR: 912, NOME_SETOR: 'UTI AURORA', EMPRESA_FIXA: 901 },
-      { COD_PERFIL: 93, NOME_PERFIL: 'ENFERMAGEM SERRA DO MAR (DEMO)', COD_ESPECIALIDADE: null, ESPECIALIDADE: 'MULTIDISCIPLINAR', SISTEMA: 'PEP', PORTA_ENTRADA: 'I', TIPO_ATENDIMENTO: 'I', COD_TIPO_PRESTADOR: 2, NOME_TIPO_PRESTADOR: 'ENFERMEIRO', COD_SETOR: 921, NOME_SETOR: 'UNIDADE SERRA B', EMPRESA_FIXA: 902 },
-      { COD_PERFIL: 94, NOME_PERFIL: 'PRONTO ATENDIMENTO SERRA DO MAR (DEMO)', COD_ESPECIALIDADE: 14, ESPECIALIDADE: 'URGÊNCIA', SISTEMA: 'PEP', PORTA_ENTRADA: 'U', TIPO_ATENDIMENTO: 'U', COD_TIPO_PRESTADOR: 1, NOME_TIPO_PRESTADOR: 'MÉDICO', COD_SETOR: 922, NOME_SETOR: 'PA SERRA', EMPRESA_FIXA: 902 },
+      {
+        COD_PERFIL: 91,
+        NOME_PERFIL: 'INTERNAÇÃO CLÍNICA AURORA (DEMO)',
+        COD_ESPECIALIDADE: 10,
+        ESPECIALIDADE: 'CLÍNICA MÉDICA',
+        SISTEMA: 'PEP',
+        PORTA_ENTRADA: 'I',
+        TIPO_ATENDIMENTO: 'I',
+        COD_TIPO_PRESTADOR: 1,
+        NOME_TIPO_PRESTADOR: 'MÉDICO',
+        COD_SETOR: 911,
+        NOME_SETOR: 'ALA AURORA SUL',
+        EMPRESA_FIXA: 901,
+        EMPRESAS_VINCULADAS: '901::HOSPITAL VALE DA AURORA (SANDBOX)',
+        TIPOS_PRESTADOR: '1::MÉDICO',
+      },
+      {
+        COD_PERFIL: 92,
+        NOME_PERFIL: 'TERAPIA INTENSIVA VALE DA AURORA (DEMO)',
+        COD_ESPECIALIDADE: 22,
+        ESPECIALIDADE: 'MEDICINA INTENSIVA',
+        SISTEMA: 'PEP',
+        PORTA_ENTRADA: 'I',
+        TIPO_ATENDIMENTO: 'I',
+        COD_TIPO_PRESTADOR: 1,
+        NOME_TIPO_PRESTADOR: 'MÉDICO',
+        COD_SETOR: 912,
+        NOME_SETOR: 'UTI AURORA',
+        EMPRESA_FIXA: 901,
+        EMPRESAS_VINCULADAS: '901::HOSPITAL VALE DA AURORA (SANDBOX)|902::HOSPITAL SERRA DO MAR (SANDBOX)',
+        TIPOS_PRESTADOR: '1::MÉDICO|3::INTENSIVISTA',
+      },
+      {
+        COD_PERFIL: 93,
+        NOME_PERFIL: 'ENFERMAGEM SERRA DO MAR (DEMO)',
+        COD_ESPECIALIDADE: null,
+        ESPECIALIDADE: 'MULTIDISCIPLINAR',
+        SISTEMA: 'PEP',
+        PORTA_ENTRADA: 'I',
+        TIPO_ATENDIMENTO: 'I',
+        COD_TIPO_PRESTADOR: 2,
+        NOME_TIPO_PRESTADOR: 'ENFERMEIRO',
+        COD_SETOR: 921,
+        NOME_SETOR: 'UNIDADE SERRA B',
+        EMPRESA_FIXA: 902,
+        EMPRESAS_VINCULADAS: '902::HOSPITAL SERRA DO MAR (SANDBOX)',
+        TIPOS_PRESTADOR: '2::ENFERMEIRO',
+      },
+      {
+        COD_PERFIL: 94,
+        NOME_PERFIL: 'PRONTO ATENDIMENTO SERRA DO MAR (DEMO)',
+        COD_ESPECIALIDADE: 14,
+        ESPECIALIDADE: 'URGÊNCIA',
+        SISTEMA: 'PEP',
+        PORTA_ENTRADA: 'U',
+        TIPO_ATENDIMENTO: 'U',
+        COD_TIPO_PRESTADOR: 1,
+        NOME_TIPO_PRESTADOR: 'MÉDICO',
+        COD_SETOR: 922,
+        NOME_SETOR: 'PA SERRA',
+        EMPRESA_FIXA: 902,
+        EMPRESAS_VINCULADAS: '902::HOSPITAL SERRA DO MAR (SANDBOX)',
+        TIPOS_PRESTADOR: '1::MÉDICO|4::PLANTONISTA',
+      },
     ];
   }
 

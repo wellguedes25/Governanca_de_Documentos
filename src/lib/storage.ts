@@ -126,8 +126,89 @@ export const INITIAL_DATA: StorageData = {
   activeQueryV3: 'SELECT CD_DOCUMENTO AS "CÓDIGO", NM_TITULO AS "NOME", COUNT(1) AS "TOTAL", MAX(DH_CRIACAO) AS "ÚLTIMO USO", /* DYNAMIC_HOSPITALS_PIVOT */ FROM (SELECT DISTINCT ED.CD_DOCUMENTO, UPPER(ED.DS_DOCUMENTO) AS NM_TITULO, A.CD_MULTI_EMPRESA, PDC.DH_CRIACAO FROM DBAMV.PW_EDITOR_CLINICO PEC JOIN EDITOR.EDITOR_DOCUMENTO ED ON ED.CD_DOCUMENTO = PEC.CD_DOCUMENTO JOIN DBAMV.PW_DOCUMENTO_CLINICO PDC ON PDC.CD_DOCUMENTO_CLINICO = PEC.CD_DOCUMENTO_CLINICO JOIN DBAMV.ATENDIME A ON A.CD_ATENDIMENTO = PDC.CD_ATENDIMENTO WHERE ED.CD_TIPO_ITEM = 13 AND PDC.DH_CRIACAO >= TRUNC(SYSDATE) - 90) GROUP BY CD_DOCUMENTO, NM_TITULO ORDER BY NM_TITULO',
   profileQuery: 'SELECT DISTINCT CD_DOCUMENTO, NM_TITULO, DS_PERFIL_AMBULATORIAL, EMPRESA FROM (SELECT PMP.NM_VALOR AS CD_DOCUMENTO, PM.NM_TITULO, PA.DS_PERFIL_AMBULATORIAL, /* DYNAMIC_HOSPITALS_DECODE */ FROM DBAMV.PERFIL_AMBULATORIAL PA JOIN DBAMV.PW_PERFIL_MODULO PM ON PA.CD_PERFIL_AMBULATORIAL = PM.CD_PERFIL_AMBULATORIAL JOIN DBAMV.PW_PERFIL_MODULO_PARAMETRO PMP ON PM.CD_PERFIL_MODULO = PMP.CD_PERFIL_MODULO LEFT JOIN DBAMV.PERFIL_AMBULATORIAL_EMPRESA PAE ON PA.CD_PERFIL_AMBULATORIAL = PAE.CD_PERFIL_AMBULATORIAL WHERE PMP.CD_PARAMETRO = \'CD_DOCUMENTO\' AND PA.SN_ATIVO = \'S\' AND PA.TP_PERFIL = \'SIS\' AND PMP.NM_VALOR = :CD_DOCUMENTO UNION ALL SELECT TB_OBJETO.CD_DOCUMENTO, PM.NM_TITULO, PA.DS_PERFIL_AMBULATORIAL, /* DYNAMIC_HOSPITALS_DECODE */ FROM DBAMV.PERFIL_AMBULATORIAL PA JOIN DBAMV.PW_PERFIL_MODULO PM ON PA.CD_PERFIL_AMBULATORIAL = PM.CD_PERFIL_AMBULATORIAL JOIN DBAMV.PW_PERFIL_MODULO_PARAMETRO PMP ON PM.CD_PERFIL_MODULO = PMP.CD_PERFIL_MODULO LEFT JOIN DBAMV.PERFIL_AMBULATORIAL_EMPRESA PAE ON PA.CD_PERFIL_AMBULATORIAL = PAE.CD_PERFIL_AMBULATORIAL JOIN (SELECT NM_VALOR AS CD_DOCUMENTO, TO_CHAR(PTDC.CD_OBJETO) AS CD_OBJETO FROM DBAMV.PW_TIPO_DOCUMENTO_CONSULTA PTDC JOIN DBAMV.PW_TIPO_DOCUMENTO_MODULO PTDM ON PTDC.CD_TIPO_DOCUMENTO_CONSULTA = PTDM.CD_TIPO_DOCUMENTO_CONSULTA JOIN DBAMV.PW_TIPO_DOCUMENTO_MODULO_PARAM PTDMP ON PTDM.CD_TIPO_DOCUMENTO_MODULO = PTDMP.CD_TIPO_DOCUMENTO_MODULO WHERE PTDMP.CD_PARAMETRO = \'CD_DOCUMENTO\' AND NM_VALOR = :CD_DOCUMENTO) TB_OBJETO ON PMP.NM_VALOR = TB_OBJETO.CD_OBJETO WHERE PA.SN_ATIVO = \'S\' AND PA.TP_PERFIL = \'SIS\')',
   profileQueryV3: 'SELECT DISTINCT CD_DOCUMENTO, NM_TITULO, DS_PERFIL_AMBULATORIAL, EMPRESA FROM (SELECT PMP.NM_VALOR AS CD_DOCUMENTO, PM.NM_TITULO, PA.DS_PERFIL_AMBULATORIAL, /* DYNAMIC_HOSPITALS_DECODE */ FROM DBAMV.PERFIL_AMBULATORIAL PA JOIN DBAMV.PW_PERFIL_MODULO PM ON PA.CD_PERFIL_AMBULATORIAL = PM.CD_PERFIL_AMBULATORIAL JOIN DBAMV.PW_PERFIL_MODULO_PARAMETRO PMP ON PM.CD_PERFIL_MODULO = PMP.CD_PERFIL_MODULO LEFT JOIN DBAMV.PERFIL_AMBULATORIAL_EMPRESA PAE ON PA.CD_PERFIL_AMBULATORIAL = PAE.CD_PERFIL_AMBULATORIAL WHERE PMP.CD_PARAMETRO IN (\'CD_DOCUMENTO_EDITOR_3\', \'CD_DOCUMENTO\') AND PA.SN_ATIVO = \'S\' AND PA.TP_PERFIL = \'SIS\' AND PMP.NM_VALOR = :CD_DOCUMENTO UNION ALL SELECT TB_OBJETO.CD_DOCUMENTO, PM.NM_TITULO, PA.DS_PERFIL_AMBULATORIAL, /* DYNAMIC_HOSPITALS_DECODE */ FROM DBAMV.PERFIL_AMBULATORIAL PA JOIN DBAMV.PW_PERFIL_MODULO PM ON PA.CD_PERFIL_AMBULATORIAL = PM.CD_PERFIL_AMBULATORIAL JOIN DBAMV.PW_PERFIL_MODULO_PARAMETRO PMP ON PM.CD_PERFIL_MODULO = PMP.CD_PERFIL_MODULO LEFT JOIN DBAMV.PERFIL_AMBULATORIAL_EMPRESA PAE ON PA.CD_PERFIL_AMBULATORIAL = PAE.CD_PERFIL_AMBULATORIAL JOIN (SELECT NM_VALOR AS CD_DOCUMENTO, TO_CHAR(PTDC.CD_OBJETO) AS CD_OBJETO FROM DBAMV.PW_TIPO_DOCUMENTO_CONSULTA PTDC JOIN DBAMV.PW_TIPO_DOCUMENTO_MODULO PTDM ON PTDC.CD_TIPO_DOCUMENTO_CONSULTA = PTDM.CD_TIPO_DOCUMENTO_CONSULTA JOIN DBAMV.PW_TIPO_DOCUMENTO_MODULO_PARAM PTDMP ON PTDM.CD_TIPO_DOCUMENTO_MODULO = PTDMP.CD_TIPO_DOCUMENTO_MODULO WHERE PTDMP.CD_PARAMETRO IN (\'CD_DOCUMENTO_EDITOR_3\', \'CD_DOCUMENTO\') AND NM_VALOR = :CD_DOCUMENTO) TB_OBJETO ON PMP.NM_VALOR = TB_OBJETO.CD_OBJETO WHERE PA.SN_ATIVO = \'S\' AND PA.TP_PERFIL = \'SIS\')',
-  ambulatoryProfilesQuery: `SELECT pa.cd_perfil_ambulatorial AS Cod_Perfil, pa.ds_perfil_ambulatorial AS Nome_Perfil, pa.cd_especialidade AS Cod_Especialidade, esp.ds_especialid AS Especialidade, pa.cd_sistema AS Sistema, pa.tp_porta_entrada AS Porta_Entrada, pa.tp_atendimento AS Tipo_Atendimento, pa.cd_tip_presta AS Cod_Tipo_Prestador, tp.nm_tip_presta AS Nome_Tipo_Prestador, pa.cd_setor AS Cod_Setor, seto.nm_setor AS Nome_Setor, pa.cd_multi_empresa AS Empresa_Fixa FROM dbamv.perfil_ambulatorial pa LEFT JOIN dbamv.especialid esp ON esp.cd_especialid = pa.cd_especialidade LEFT JOIN dbamv.tip_presta tp ON tp.cd_tip_presta = pa.cd_tip_presta LEFT JOIN dbamv.setor seto ON seto.cd_setor = pa.cd_setor WHERE pa.sn_ativo = 'S' AND pa.tp_perfil = 'SIS'`,
-  ambulatoryProfileDetailsQuery: `SELECT pm.cd_perfil_modulo AS Cod_Perfil_Modulo, pm.cd_modulo AS Modulo, pm.cd_perfil_modulo_pai AS Cod_Perfil_Modulo_Pai, pm.nm_titulo AS Titulo, pm.cd_perfil_modulo_agrupador AS Agrupador, pmp.cd_perfil_modulo_parametro AS Cod_Mod_Parametro, pmp.cd_modulo AS Modulo_Parametro, pmp.cd_parametro AS Parametro, pmp.cd_perfil_modulo AS Cod_Perfil_Mod_Origem, CASE WHEN pmp.cd_parametro = 'CD_OBJETO' AND po.nm_objeto IS NOT NULL THEN pmp.nm_valor || ' - ' || po.nm_objeto WHEN pmp.cd_parametro = 'CD_DOCUMENTO' AND ed.ds_documento IS NOT NULL THEN pmp.nm_valor || ' - ' || ed.ds_documento ELSE pmp.nm_valor END AS Valor_Parametro, pmp.ds_valor AS Desc_Valor_Parametro FROM dbamv.perfil_ambulatorial pa INNER JOIN dbamv.pw_perfil_modulo pm ON pa.cd_perfil_ambulatorial = pm.cd_perfil_ambulatorial INNER JOIN dbamv.pw_perfil_modulo_parametro pmp ON pm.cd_perfil_modulo = pmp.cd_perfil_modulo LEFT JOIN dbamv.pagu_objeto po ON pmp.cd_parametro = 'CD_OBJETO' AND TO_CHAR(po.cd_objeto) = pmp.nm_valor LEFT JOIN dbamv.editor_documento ed ON pmp.cd_parametro = 'CD_DOCUMENTO' AND TO_CHAR(ed.cd_documento) = pmp.nm_valor WHERE pa.sn_ativo = 'S' AND pa.tp_perfil = 'SIS' AND pa.cd_perfil_ambulatorial = :CD_PERFIL`,
+  ambulatoryProfilesQuery: `SELECT pa.cd_perfil_ambulatorial AS Cod_Perfil,
+       pa.ds_perfil_ambulatorial AS Nome_Perfil,
+       pa.cd_especialidade       AS Cod_Especialidade,
+       esp.ds_especialid         AS Especialidade,
+       pa.cd_sistema             AS Sistema,
+       pa.tp_porta_entrada       AS Porta_Entrada,
+       pa.tp_atendimento         AS Tipo_Atendimento,
+       pa.cd_tip_presta          AS Cod_Tipo_Prestador,
+       tp.nm_tip_presta          AS Nome_Tipo_Prestador,
+       pa.cd_setor               AS Cod_Setor,
+       seto.nm_setor             AS Nome_Setor,
+       pa.cd_multi_empresa       AS Empresa_Fixa,
+       (
+         SELECT LISTAGG(e.emp_id || '::' || TRIM(NVL(me.ds_multi_empresa, 'Empresa ' || e.emp_id)), '|')
+                WITHIN GROUP (ORDER BY e.emp_id)
+           FROM (
+             SELECT pa.cd_multi_empresa AS emp_id FROM dual WHERE pa.cd_multi_empresa IS NOT NULL
+             UNION
+             SELECT pae.cd_multi_empresa AS emp_id
+               FROM dbamv.perfil_ambulatorial_empresa pae
+              WHERE pae.cd_perfil_ambulatorial = pa.cd_perfil_ambulatorial
+                AND pae.cd_multi_empresa IS NOT NULL
+           ) e
+           LEFT JOIN dbamv.multi_empresas me ON me.cd_multi_empresa = e.emp_id
+       )                         AS Empresas_Vinculadas,
+       (
+         SELECT LISTAGG(t.cd_tip_presta || '::' || TRIM(tp2.nm_tip_presta), '|')
+                WITHIN GROUP (ORDER BY TRIM(tp2.nm_tip_presta))
+           FROM (
+             SELECT pa.cd_tip_presta AS cd_tip_presta FROM dual WHERE pa.cd_tip_presta IS NOT NULL
+             UNION
+             SELECT pat.cd_tip_presta AS cd_tip_presta
+               FROM dbamv.perfil_ambulatorial_tip_prest pat
+              WHERE pat.cd_perfil_ambulatorial = pa.cd_perfil_ambulatorial
+                AND pat.cd_tip_presta IS NOT NULL
+           ) t
+           JOIN dbamv.tip_presta tp2 ON tp2.cd_tip_presta = t.cd_tip_presta
+       )                         AS Tipos_Prestador
+  FROM dbamv.perfil_ambulatorial pa
+  LEFT JOIN dbamv.especialid esp ON esp.cd_especialid = pa.cd_especialidade
+  LEFT JOIN dbamv.tip_presta tp  ON tp.cd_tip_presta = pa.cd_tip_presta
+  LEFT JOIN dbamv.setor seto     ON seto.cd_setor = pa.cd_setor
+ WHERE pa.sn_ativo = 'S'
+   AND pa.tp_perfil = 'SIS'
+ ORDER BY pa.ds_perfil_ambulatorial`,
+  ambulatoryProfileDetailsQuery: `SELECT pm.cd_perfil_modulo            AS Cod_Perfil_Modulo,
+       pm.cd_modulo                   AS Modulo,
+       pm.cd_perfil_modulo_pai        AS Cod_Perfil_Modulo_Pai,
+       pm.nr_ordem                    AS Ordem,
+       pm.nm_titulo                   AS Titulo,
+       pm.cd_perfil_modulo_agrupador  AS Agrupador,
+       pmp.cd_perfil_modulo_parametro AS Cod_Mod_Parametro,
+       pmp.cd_modulo                  AS Modulo_Parametro,
+       pmp.cd_parametro               AS Parametro,
+       pmp.cd_perfil_modulo           AS Cod_Perfil_Mod_Origem,
+       CASE
+         WHEN pmp.cd_parametro IN ('CD_OBJETO', 'CD_OBJETO_COLETA_SINAL_VITAL', 'CD_OBJETO_DIAGNOSTICO_ENFERMAGEM', 'CD_OBJETO_PRESC') AND po.nm_objeto IS NOT NULL
+           THEN pmp.nm_valor || ' - ' || po.nm_objeto
+         WHEN pmp.cd_parametro IN ('CD_DOCUMENTO', 'CD_DOCUMENTO_OBRIG_TELA') AND ed.ds_documento IS NOT NULL
+           THEN pmp.nm_valor || ' - ' || ed.ds_documento
+         WHEN pmp.cd_parametro = 'CD_DOCUMENTO_EDITOR_3' AND ed3.ds_documento IS NOT NULL
+           THEN pmp.nm_valor || ' - ' || ed3.ds_documento
+         ELSE pmp.nm_valor
+       END                            AS Valor_Parametro,
+       pmp.ds_valor                   AS Desc_Valor_Parametro
+  FROM dbamv.perfil_ambulatorial pa
+ INNER JOIN dbamv.pw_perfil_modulo pm
+    ON pa.cd_perfil_ambulatorial = pm.cd_perfil_ambulatorial
+  LEFT JOIN dbamv.pw_perfil_modulo_parametro pmp
+    ON pm.cd_perfil_modulo = pmp.cd_perfil_modulo
+  LEFT JOIN dbamv.pagu_objeto po
+    ON pmp.cd_parametro IN ('CD_OBJETO', 'CD_OBJETO_COLETA_SINAL_VITAL', 'CD_OBJETO_DIAGNOSTICO_ENFERMAGEM', 'CD_OBJETO_PRESC')
+   AND TO_CHAR(po.cd_objeto) = pmp.nm_valor
+  LEFT JOIN dbamv.editor_documento ed
+    ON pmp.cd_parametro IN ('CD_DOCUMENTO', 'CD_DOCUMENTO_OBRIG_TELA')
+   AND TO_CHAR(ed.cd_documento) = pmp.nm_valor
+  LEFT JOIN editor.editor_documento ed3
+    ON pmp.cd_parametro = 'CD_DOCUMENTO_EDITOR_3'
+   AND TO_CHAR(ed3.cd_documento) = pmp.nm_valor
+ WHERE pa.sn_ativo = 'S'
+   AND pa.tp_perfil = 'SIS'
+   AND pa.cd_perfil_ambulatorial = :CD_PERFIL
+ ORDER BY NVL(pm.nr_ordem, 999999), pm.cd_perfil_modulo, pmp.cd_parametro`,
   oracleClientPath: 'C:\\orant\\Client\\instantclient_23_0',
   hospitalsMapping: [],
   kpiQueries: {
@@ -736,6 +817,18 @@ export async function getData(): Promise<StorageData> {
       !savedV2Meta ||
       (savedV2Meta.includes('ORDER BY Codigo_Documento') && !savedV2Meta.toLowerCase().includes('sn_publicado'));
 
+    const savedProfileDetails = typeof data.ambulatoryProfileDetailsQuery === 'string' ? data.ambulatoryProfileDetailsQuery : '';
+    const isLegacyProfileDetails =
+      !savedProfileDetails ||
+      /INNER\s+JOIN\s+dbamv\.pw_perfil_modulo_parametro/i.test(savedProfileDetails) ||
+      !savedProfileDetails.toLowerCase().includes('nr_ordem');
+
+    const savedProfilesList = typeof data.ambulatoryProfilesQuery === 'string' ? data.ambulatoryProfilesQuery : '';
+    const isLegacyProfilesList =
+      !savedProfilesList ||
+      !savedProfilesList.toLowerCase().includes('empresas_vinculadas') ||
+      !savedProfilesList.toLowerCase().includes('tipos_prestador');
+
     return withDemoInjected({
       ...INITIAL_DATA,
       ...data,
@@ -753,7 +846,8 @@ export async function getData(): Promise<StorageData> {
       analyticQueriesV3: mergeNonEmptyQueries(data.analyticQueriesV3, INITIAL_DATA.analyticQueriesV3!),
       hospitalQueries: mergeNonEmptyQueries(data.hospitalQueries, INITIAL_DATA.hospitalQueries!),
       hospitalQueriesV3: mergeNonEmptyQueries(data.hospitalQueriesV3, INITIAL_DATA.hospitalQueriesV3!),
-      ambulatoryProfilesQuery: data.ambulatoryProfilesQuery || INITIAL_DATA.ambulatoryProfilesQuery,
+      ambulatoryProfilesQuery: isLegacyProfilesList ? INITIAL_DATA.ambulatoryProfilesQuery : savedProfilesList,
+      ambulatoryProfileDetailsQuery: isLegacyProfileDetails ? INITIAL_DATA.ambulatoryProfileDetailsQuery : savedProfileDetails,
       enabledQueries: {
         ...INITIAL_DATA.enabledQueries,
         ...(data.enabledQueries || {})

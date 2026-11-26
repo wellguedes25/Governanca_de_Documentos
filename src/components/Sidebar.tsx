@@ -20,7 +20,8 @@ import {
   Sparkles,
   Layers,
   BarChart3,
-  Users
+  Users,
+  Stethoscope
 } from 'lucide-react';
 import { useUI } from '@/context/UIContext';
 import { cn } from '@/lib/utils';
@@ -34,6 +35,7 @@ interface SidebarProps {
 const mainMenuItems = [
   { href: '/dashboard', label: 'Visão Geral', icon: LayoutGrid },
   { href: '/documentos', label: 'Catálogo', icon: FileText },
+  { href: '/perfis-clinicos', label: 'Perfis Clínicos', icon: Stethoscope },
   { href: '/migracao', label: 'Migração', icon: ArrowLeftRight },
   { href: '/linhagem', label: 'Linhagem', icon: GitFork },
   { href: '/hospitais', label: 'Unidades', icon: Building2 },

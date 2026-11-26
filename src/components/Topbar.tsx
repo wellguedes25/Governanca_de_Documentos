@@ -26,6 +26,7 @@ type OracleStatus = 'unknown' | 'active' | 'inactive' | 'error';
 const ROUTE_LABELS: Record<string, string> = {
   '/dashboard': 'Visão Geral',
   '/documentos': 'Catálogo de Documentos',
+  '/perfis-clinicos': 'Perfis Clínicos',
   '/migracao': 'Governança de Migração',
   '/linhagem': 'Linhagem Global',
   '/hospitais': 'Hospitais & Unidades',

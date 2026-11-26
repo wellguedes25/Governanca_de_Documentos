@@ -1035,15 +1035,20 @@ export function DocumentDetailsModal({
                         {ver.layouts.length > 0 ? (
                           ver.layouts.map((lay, lIdx) => {
                             const hasCounts = lay.fieldsCount > 0 || lay.rulesCount > 0;
+                            const fieldsLabel = `${lay.fieldsCount} ${lay.fieldsCount === 1 ? 'campo' : 'campos'}`;
+                            const rulesLabel = `${lay.rulesCount} ${lay.rulesCount === 1 ? 'regra' : 'regras'}`;
+                            const countsText =
+                              lay.rulesCount > 0 ? `${fieldsLabel} • ${rulesLabel}` : fieldsLabel;
                             return (
                               <span
                                 key={`${ver.versionKey}_lay_${lIdx}`}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-[var(--card-solid)]/80 border border-[var(--border)] text-[var(--foreground-secondary)]"
+                                title={`Layout ${lay.layoutName}: ${fieldsLabel} e ${rulesLabel} vinculados`}
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-[var(--card-solid)]/80 border border-[var(--border)] text-[var(--foreground-secondary)]"
                               >
                                 <span>{lay.layoutName}</span>
                                 {hasCounts && (
                                   <span className="font-mono text-[10px] text-[var(--muted)]">
-                                    • {lay.fieldsCount}c / {lay.rulesCount}r
+                                    • {countsText}
                                   </span>
                                 )}
                               </span>

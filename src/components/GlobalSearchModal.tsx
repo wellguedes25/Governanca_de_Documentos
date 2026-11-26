@@ -14,7 +14,8 @@ import {
   Database,
   Settings,
   ArrowRight,
-  CornerDownLeft
+  CornerDownLeft,
+  Stethoscope
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -48,6 +49,14 @@ const MODULE_ITEMS: SearchAction[] = [
     href: '/documentos',
     category: 'Módulo',
     icon: FileText,
+  },
+  {
+    id: 'mod-perfis-clinicos',
+    label: 'Perfis Clínicos',
+    description: 'Perfis assistenciais do ambiente, módulos e parâmetros',
+    href: '/perfis-clinicos',
+    category: 'Módulo',
+    icon: Stethoscope,
   },
   {
     id: 'mod-migracao',

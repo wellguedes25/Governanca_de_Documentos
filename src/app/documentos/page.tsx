@@ -10,7 +10,6 @@ import { DocumentosToolbar } from '@/components/documentos/DocumentosToolbar';
 import { DocumentosTable } from '@/components/documentos/DocumentosTable';
 import { DocumentosCardsGrid } from '@/components/documentos/DocumentosCardsGrid';
 import { DocumentDetailsModal, DocumentDetailsTab } from '@/components/documentos/DocumentDetailsModal';
-import { AmbulatoryProfilesView } from '@/components/documentos/AmbulatoryProfilesView';
 
 export default function DocumentosPage() {
   return (
@@ -55,9 +54,6 @@ function DocumentosContent() {
   });
   const [pageSize, setPageSize] = useState<number>(25);
 
-  // Estados de Abas
-  const [activeMainTab, setActiveMainTab] = useState<'documentos' | 'perfis'>('documentos');
-
   // Estados para Modal Unificado de Detalhes e Perfis do Documento
   const [modalDoc, setModalDoc] = useState<{ id: string; name?: string; initialTab: DocumentDetailsTab } | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -84,14 +80,6 @@ function DocumentosContent() {
     setModalDoc({ id: code, name: name || `Documento #${code}`, initialTab });
     setModalOpen(true);
   };
-
-  // Estados para Perfis Ambulatoriais
-  const [ambulatoryProfilesData, setAmbulatoryProfilesData] = useState<any[]>([]);
-  const [ambulatoryProfilesLoading, setAmbulatoryProfilesLoading] = useState(false);
-  const [ambulatoryProfilesError, setAmbulatoryProfilesError] = useState('');
-  const [selectedPerfilId, setSelectedPerfilId] = useState<string | null>(null);
-  const [profileDetailsCache, setProfileDetailsCache] = useState<Record<string, any>>({});
-  const [profileDetailsLoading, setProfileDetailsLoading] = useState(false);
 
   // Controle de redimensionamento de colunas
   const resizingCol = useRef<{ name: string; startX: number; startWidth: number } | null>(null);
@@ -463,99 +451,6 @@ function DocumentosContent() {
     }
   }
 
-  // Perfis Ambulatoriais (Aba Secundária)
-  const fetchAmbulatoryProfiles = async (force = false) => {
-    const cacheKey = 'ambulatory_profiles_all';
-    if (!force) {
-      const cached = getCached<any[]>(cacheKey);
-      if (cached) {
-        setAmbulatoryProfilesData(cached);
-        return;
-      }
-    }
-    if (ambulatoryProfilesData.length > 0 && !force) return;
-    setAmbulatoryProfilesLoading(true);
-    setAmbulatoryProfilesError('');
-    try {
-      const res = await fetch('/api/oracle/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: 'AMBULATORY_PROFILES', forceRefresh: force })
-      });
-      const result = await res.json();
-      if (res.ok) {
-        const rows = result.rows || [];
-        setAmbulatoryProfilesData(rows);
-        setCached(cacheKey, rows);
-      } else {
-        setAmbulatoryProfilesError(result.error || 'Erro ao carregar perfis');
-      }
-    } catch (err: any) {
-      setAmbulatoryProfilesError('Erro de conexão ao buscar perfis');
-    } finally {
-      setAmbulatoryProfilesLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (activeMainTab === 'perfis') {
-      fetchAmbulatoryProfiles();
-    }
-  }, [activeMainTab]);
-
-  // Detalhes do Perfil Ambulatorial Selecionado
-  useEffect(() => {
-    if (!selectedPerfilId || profileDetailsCache[selectedPerfilId]) return;
-
-    const fetchDetails = async () => {
-      setProfileDetailsLoading(true);
-      try {
-        const res = await fetch('/api/oracle/execute', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            query: 'AMBULATORY_PROFILE_DETAILS',
-            params: { CD_PERFIL: selectedPerfilId }
-          })
-        });
-        const result = await res.json();
-        
-        const modulos: Record<string, any> = {};
-        if (result.rows) {
-          result.rows.forEach((row: any) => {
-            const codPerfilModulo = String(row.COD_PERFIL_MODULO || row.Cod_Perfil_Modulo || '');
-            const moduloName = String(row.MODULO || row.Modulo || '');
-            const tituloModulo = String(row.TITULO || row.Titulo || '');
-            const parametro = String(row.PARAMETRO || row.Parametro || '');
-            const valor = String(row.VALOR_PARAMETRO || row.Valor_Parametro || '');
-            const descValor = String(row.DESC_VALOR_PARAMETRO || row.Desc_Valor_Parametro || '');
-
-            if (!codPerfilModulo) return;
-            if (!modulos[codPerfilModulo]) {
-              modulos[codPerfilModulo] = { Titulo: tituloModulo, ModuloId: moduloName, Parametros: [] };
-            }
-            if (parametro) {
-              modulos[codPerfilModulo].Parametros.push({
-                Parametro: parametro, Valor: valor, Descricao: descValor
-              });
-            }
-          });
-        }
-        
-        setProfileDetailsCache(prev => ({
-          ...prev,
-          [selectedPerfilId]: modulos
-        }));
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setProfileDetailsLoading(false);
-      }
-    };
-    
-    fetchDetails();
-  }, [selectedPerfilId, profileDetailsCache]);
-
   // --- Filtros e Ordenação ---
   const filteredData = useMemo(() => {
     let data = [...(oracleData || [])];
@@ -691,41 +586,6 @@ function DocumentosContent() {
     URL.revokeObjectURL(url);
   };
 
-  // Exportação de Perfis para CSV
-  const handleExportPerfilCSV = () => {
-    if (!selectedPerfilId || !profileDetailsCache[selectedPerfilId]) return;
-    const modulos = profileDetailsCache[selectedPerfilId];
-    const rows = [
-      ['ID Perfil', selectedPerfilId],
-      [],
-      ['Módulo ID', 'Módulo', 'Parâmetro', 'Valor Atribuído', 'Descrição']
-    ];
-
-    Object.entries(modulos).forEach(([modId, modData]: [string, any]) => {
-      const displayModId = modData.ModuloId || modId;
-      if (!modData.Parametros || modData.Parametros.length === 0) {
-        rows.push([displayModId, modData.Titulo || `Módulo ${displayModId}`, 'Sem parâmetros', '', '']);
-      } else {
-        modData.Parametros.forEach((param: any) => {
-          rows.push([
-            displayModId,
-            modData.Titulo || `Módulo ${displayModId}`,
-            param.Parametro,
-            param.Valor || 'Não definido',
-            param.Descricao || ''
-          ]);
-        });
-      }
-    });
-
-    const csvContent = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\r\n');
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `Perfil_${selectedPerfilId}.csv`;
-    link.click();
-  };
-
   return (
     <div className="flex flex-col space-y-5">
       {/* 1. Header Padronizado */}
@@ -747,7 +607,7 @@ function DocumentosContent() {
       </div>
 
       {/* Error Alert */}
-      {error && activeMainTab === 'documentos' && (
+      {error && (
         <div className="mb-4 p-3.5 tone-danger border rounded-2xl flex items-center gap-3 text-xs font-medium">
           <AlertTriangle size={16} className="shrink-0" />
           <span>{error}</span>
@@ -756,8 +616,6 @@ function DocumentosContent() {
 
       {/* Main Toolbar */}
       <DocumentosToolbar
-        activeTab={activeMainTab}
-        setActiveTab={setActiveMainTab}
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
         viewMode={viewMode}
@@ -775,51 +633,38 @@ function DocumentosContent() {
         totalDocs={oracleData?.length || 0}
       />
 
-      {/* Main Content: Documentos Table / Cards Grid or Ambulatory Profiles */}
-      {activeMainTab === 'documentos' ? (
-        viewMode === 'table' ? (
-          <DocumentosTable
-            columns={columns}
-            data={paginatedData}
-            loading={loading}
-            sortConfig={sortConfig}
-            onSort={handleSort}
-            onOpenModal={handleOpenDocumentModal}
-            activeHospitals={activeHospitals}
-            selectedHospitals={selectedHospitals}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-            pageSize={pageSize}
-            onPageSizeChange={setPageSize}
-            totalFiltered={filteredData.length}
-            columnWidths={columnWidths}
-            onResizeStart={handleResizeStart}
-          />
-        ) : (
-          <DocumentosCardsGrid
-            data={paginatedData}
-            loading={loading}
-            onOpenModal={handleOpenDocumentModal}
-            activeHospitals={activeHospitals}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-            pageSize={pageSize}
-            onPageSizeChange={setPageSize}
-            totalFiltered={filteredData.length}
-          />
-        )
+      {/* Main Content: Documentos Table / Cards Grid */}
+      {viewMode === 'table' ? (
+        <DocumentosTable
+          columns={columns}
+          data={paginatedData}
+          loading={loading}
+          sortConfig={sortConfig}
+          onSort={handleSort}
+          onOpenModal={handleOpenDocumentModal}
+          activeHospitals={activeHospitals}
+          selectedHospitals={selectedHospitals}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={pageSize}
+          onPageSizeChange={setPageSize}
+          totalFiltered={filteredData.length}
+          columnWidths={columnWidths}
+          onResizeStart={handleResizeStart}
+        />
       ) : (
-        <AmbulatoryProfilesView
-          data={ambulatoryProfilesData}
-          loading={ambulatoryProfilesLoading}
-          error={ambulatoryProfilesError}
-          selectedPerfilId={selectedPerfilId}
-          setSelectedPerfilId={setSelectedPerfilId}
-          profileDetailsCache={profileDetailsCache}
-          profileDetailsLoading={profileDetailsLoading}
-          onExportCSV={handleExportPerfilCSV}
+        <DocumentosCardsGrid
+          data={paginatedData}
+          loading={loading}
+          onOpenModal={handleOpenDocumentModal}
+          activeHospitals={activeHospitals}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={pageSize}
+          onPageSizeChange={setPageSize}
+          totalFiltered={filteredData.length}
         />
       )}
 

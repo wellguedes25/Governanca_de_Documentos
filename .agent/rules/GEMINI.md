@@ -120,6 +120,17 @@ When user's prompt is NOT in English:
 2. Identify dependent files
 3. Update ALL affected files together
 
+### 📚 Continuous Documentation Protocol (MANDATORY)
+
+Whenever any feature, page, route, SQL macro, integration, environment variable, or administrative configuration is added or modified:
+
+1. **Always update the documentation in the same task**:
+   - `README.md` (when modules, deploy instructions, or high-level behavior change)
+   - `docs/ESPECIFICACAO_TECNICA.md` (stacks, APIs, macros, Oracle tables, security, cache/architecture changes)
+   - `docs/CATALOGO_FUNCIONALIDADES_E_GOVERNANCA.md` (user-facing workflows, indicators, and governance impact)
+   - `docs/GUIA_IMPLANTACAO_HOSPITALAR.md` and `SQL/00_grants_minimos_governanca_mv.sql` (if new env vars, Oracle tables, or deploy steps are introduced)
+2. Keep documentation aligned strictly with real implemented file paths, routes, and behavior.
+
 ### 🗺️ System Map Read
 
 > 🔴 **MANDATORY:** Read `ARCHITECTURE.md` at session start to understand Agents, Skills, and Scripts.

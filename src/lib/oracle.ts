@@ -1,11 +1,20 @@
+import util from 'util';
 import { getData, saveData, DbConnection, HospitalMapping } from './storage';
 import { decrypt } from './encryption';
 import { queryCache, generateCacheKey } from './cache';
 import { isDemoConnection, executeDemoQuery } from './demo-mock';
 import { applyPeriodMacro, DEFAULT_PERIOD_DAYS, type PeriodFilter } from './period';
 
+function ensureNodeUtilCompatForOracle(): void {
+  const utilCompat = util as typeof util & { isDate?: (value: unknown) => value is Date };
+  if (typeof utilCompat.isDate !== 'function') {
+    utilCompat.isDate = (value: unknown): value is Date => util.types.isDate(value);
+  }
+}
+
 let cachedOracleDb: any = null;
 export async function loadOracleDb(): Promise<any> {
+  ensureNodeUtilCompatForOracle();
   if (!cachedOracleDb) {
     // Carrega driver nativo sob demanda para evitar erro em ambientes sem Oracle ou no Modo Demonstração
     // @ts-expect-error - oracledb types may not be fully resolved in build env

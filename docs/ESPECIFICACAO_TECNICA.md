@@ -120,7 +120,10 @@ Todas as consultas padrão residem em [`src/lib/default-queries.ts`](../src/lib/
 ## 5. Cache Multinível e Resiliência
 
 - **Backend (`src/lib/cache.ts`)**: `NodeCache` compartilhado (`stdTTL: 600s`). `generateCacheKey()` aplica **SHA-256 sobre a query SQL completa** + `connectionId` + `binds`, eliminando colisões entre períodos com a mesma contagem de caracteres (`30d`/`60d`/`90d` ou `180d`/`365d`). Ao salvar alterações em queries ou empresas, `clearQueryCache()` limpa tanto `queryCache` quanto `dashboardCache`.
-- **Frontend (`src/lib/safe-storage.ts` e `UIContext`)**: `safeSessionSetItem()` realiza evicção automática de chaves antigas caso o `sessionStorage` do navegador atinja a cota de ~5 MB em catálogos muito grandes (> 600 documentos com dezenas de empresas), evitando exceções `QuotaExceededError`.
+- **Frontend (`src/lib/safe-storage.ts`, `src/context/UIContext.tsx` e `src/app/similaridade/page.tsx`)**:
+  - `safeSessionSetItem()` realiza evicção automática de chaves antigas caso o `sessionStorage` do navegador atinja a cota de ~5 MB em catálogos muito grandes (> 600 documentos com dezenas de empresas), evitando exceções `QuotaExceededError`.
+  - `setCached()` no `UIContext` mantém o cache em memória viva (`memoryCache`, TTL de 30 min com escopo por conexão ativa) e limita a persistência em `sessionStorage` a payloads de até **1,5 MB**, evitando que consultas extensas derrubem caches de outras telas.
+  - A página `/similaridade` preserva resultados, filtros, busca instantânea, paginação, seleções de unidades/prestadores, aba ativa e comparações textuais (`SIMILARITY_COMPARE`) entre trocas de menu, invalidando o cache automaticamente ao concluir uma nova execução do motor NLP.
 
 ---
 

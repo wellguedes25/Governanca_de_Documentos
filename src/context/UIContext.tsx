@@ -41,7 +41,7 @@ interface UIContextType {
   activeConnInfo: ActiveConnInfo | null;
   setActiveConnInfo: (info: ActiveConnInfo | null) => void;
   getCached: <T>(key: string) => T | null;
-  setCached: <T>(key: string, value: T) => void;
+  setCached: <T>(key: string, value: T, options?: { persistToSession?: boolean }) => void;
   clearCache: (prefix?: string) => void;
   confirmAction: (options: ConfirmOptions) => Promise<boolean>;
 }
@@ -111,13 +111,25 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
     return null;
   }, [memoryCache, activeConnInfo?.id]);
 
-  // Cache helper: salva na memória e no sessionStorage com escopo da conexão ativa
-  const setCached = useCallback(<T,>(key: string, value: T): void => {
+  // Cache helper: salva na memória e opcionalmente no sessionStorage com escopo da conexão ativa
+  const setCached = useCallback(<T,>(
+    key: string,
+    value: T,
+    options?: { persistToSession?: boolean }
+  ): void => {
     const scopedKey = activeConnInfo?.id ? `${activeConnInfo.id}_${key}` : key;
     const payload = { value, timestamp: Date.now() };
     memoryCache.set(scopedKey, payload);
-    if (typeof window !== 'undefined') {
-      safeSessionSetItem(`sylva_cache_${scopedKey}`, JSON.stringify(payload));
+    if (typeof window !== 'undefined' && options?.persistToSession !== false) {
+      try {
+        const serialized = JSON.stringify(payload);
+        // Evita estourar a cota de ~5 MB do sessionStorage (e evictar caches de outras telas) em datasets extensos
+        if (serialized.length <= 1_500_000) {
+          safeSessionSetItem(`sylva_cache_${scopedKey}`, serialized);
+        }
+      } catch {
+        // Ignore serialization errors; memoryCache continua válido durante a sessão
+      }
     }
   }, [memoryCache, activeConnInfo?.id]);
 

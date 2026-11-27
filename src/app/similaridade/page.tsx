@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Search,
   RefreshCw,
@@ -65,10 +65,58 @@ import { Badge } from '@/components/ui/badge';
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+type SimilarityRow = Record<string, unknown>;
+
+interface SimilarityFiltersState {
+  documento: string;
+  campo: string;
+  prestador: string;
+  empresa: string;
+  dataInicio: string;
+  dataFim: string;
+  minScore: number;
+}
+
+interface SimilarityCachedState {
+  similarityData: SimilarityRow[];
+  hasSearched: boolean;
+  filters: SimilarityFiltersState;
+  searchTerm: string;
+  filterAtendimento: string;
+  selectedUnidades: string[];
+  selectedPrestadores: string[];
+  currentPage: number;
+  activeTab: 'consulta' | 'mapeamentos';
+  cachedAt: number;
+}
+
+interface ComparisonTextsState {
+  atual: string;
+  anterior: string;
+  dataAtual?: string;
+  dataAnterior?: string;
+  cdAtual?: string | number;
+  cdAnterior?: string | number;
+  regAtual?: string | number;
+  regAnterior?: string | number;
+}
+
+function createDefaultFilters(): SimilarityFiltersState {
+  return {
+    documento: '',
+    campo: '',
+    prestador: '',
+    empresa: '',
+    dataInicio: get30DaysAgo(),
+    dataFim: getToday(),
+    minScore: 0,
+  };
+}
+
 export default function SimilaridadePage() {
-  const { docVersion } = useUI();
+  const { docVersion, activeConnInfo, setActiveConnInfo, getCached, setCached, clearCache } = useUI();
   const router = useRouter();
-  const [similarityData, setSimilarityData] = useState<any[]>([]);
+  const [similarityData, setSimilarityData] = useState<SimilarityRow[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Proteção de rota
@@ -80,10 +128,16 @@ export default function SimilaridadePage() {
   }, [docVersion, router]);
 
   const activeEngine: 'V2' | 'V3' = docVersion === 'V2' ? 'V2' : 'V3';
+  const stateCacheKey = `similaridade_state_${activeEngine}`;
+  const filtersCacheKey = `similaridade_filters_${activeEngine}`;
+  const scopeKey = `${activeConnInfo?.id || 'default'}_${activeEngine}`;
+  const restoredScopeRef = useRef<string | null>(null);
+
   const [auditSchemaOwner, setAuditSchemaOwner] = useState('DBAMV');
   const [ddlModalOpen, setDdlModalOpen] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [cachedAt, setCachedAt] = useState<number | null>(null);
   const [docMappings, setDocMappings] = useState<DocMapping[]>([]);
   const [activeTab, setActiveTab] = useState<'consulta' | 'mapeamentos'>('consulta');
   const [reportUrl, setReportUrl] = useState('http://dev3-mvh5.acsc.org.br:84/mveditor/report?regId=');
@@ -92,23 +146,15 @@ export default function SimilaridadePage() {
   const [hospitals, setHospitals] = useState<{id: number, sigla: string, nome: string}[]>([]);
 
   // Filtros
-  const [filters, setFilters] = useState({
-    documento: '',
-    campo: '',
-    prestador: '',
-    empresa: '' as string,
-    dataInicio: get30DaysAgo(),
-    dataFim: getToday(),
-    minScore: 0
-  });
+  const [filters, setFilters] = useState<SimilarityFiltersState>(createDefaultFilters);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 15;
 
   // Estado para Modal de Comparação
-  const [comparingDoc, setComparingDoc] = useState<any | null>(null);
-  const [comparisonTexts, setComparisonTexts] = useState<any | null>(null);
+  const [comparingDoc, setComparingDoc] = useState<SimilarityRow | null>(null);
+  const [comparisonTexts, setComparisonTexts] = useState<ComparisonTextsState | null>(null);
   const [compLoading, setCompLoading] = useState(false);
 
   // Efeito interativo do gráfico e filtros avançados
@@ -132,7 +178,83 @@ export default function SimilaridadePage() {
 
   useEffect(() => {
     checkConnection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Restaura resultados, filtros e seleções em cache ao voltar para a página ou alternar motor/conexão
+  useEffect(() => {
+    const raf = window.requestAnimationFrame(() => {
+      const cachedState = getCached<SimilarityCachedState>(stateCacheKey);
+      if (cachedState) {
+        setSimilarityData(Array.isArray(cachedState.similarityData) ? cachedState.similarityData : []);
+        setHasSearched(Boolean(cachedState.hasSearched));
+        setFilters(cachedState.filters || createDefaultFilters());
+        setSearchTerm(cachedState.searchTerm || '');
+        setFilterAtendimento(cachedState.filterAtendimento || '');
+        setSelectedUnidades(Array.isArray(cachedState.selectedUnidades) ? cachedState.selectedUnidades : []);
+        setSelectedPrestadores(Array.isArray(cachedState.selectedPrestadores) ? cachedState.selectedPrestadores : []);
+        setCurrentPage(Number(cachedState.currentPage) || 1);
+        setActiveTab(cachedState.activeTab === 'mapeamentos' ? 'mapeamentos' : 'consulta');
+        setCachedAt(cachedState.cachedAt || null);
+        setSearchError(null);
+      } else {
+        const cachedFilters = getCached<SimilarityFiltersState>(filtersCacheKey);
+        setSimilarityData([]);
+        setHasSearched(false);
+        setFilters(cachedFilters || createDefaultFilters());
+        setSearchTerm('');
+        setFilterAtendimento('');
+        setSelectedUnidades([]);
+        setSelectedPrestadores([]);
+        setCurrentPage(1);
+        setCachedAt(null);
+        setSearchError(null);
+      }
+      restoredScopeRef.current = scopeKey;
+    });
+
+    return () => window.cancelAnimationFrame(raf);
+  }, [scopeKey, stateCacheKey, filtersCacheKey, getCached]);
+
+  // Persiste continuamente estado e filtros enquanto o usuário navega/filtra na tabela
+  useEffect(() => {
+    if (restoredScopeRef.current !== scopeKey || loading) return;
+
+    if (hasSearched) {
+      setCached<SimilarityCachedState>(stateCacheKey, {
+        similarityData,
+        hasSearched,
+        filters,
+        searchTerm,
+        filterAtendimento,
+        selectedUnidades,
+        selectedPrestadores,
+        currentPage,
+        activeTab,
+        cachedAt: cachedAt ?? Date.now(),
+      });
+    }
+
+    if (filters.documento || filters.campo || filters.empresa) {
+      setCached<SimilarityFiltersState>(filtersCacheKey, filters);
+    }
+  }, [
+    scopeKey,
+    loading,
+    hasSearched,
+    similarityData,
+    filters,
+    searchTerm,
+    filterAtendimento,
+    selectedUnidades,
+    selectedPrestadores,
+    currentPage,
+    activeTab,
+    cachedAt,
+    stateCacheKey,
+    filtersCacheKey,
+    setCached,
+  ]);
 
   async function checkConnection() {
     try {
@@ -141,11 +263,29 @@ export default function SimilaridadePage() {
       setAuditSchemaOwner(sanitizeAuditOwner(storage.auditSchemaOwner));
       if (storage.docMappings) setDocMappings(storage.docMappings);
       if (storage.reportBaseUrl) setReportUrl(storage.reportBaseUrl);
-      if (storage.hospitalsMapping) {
-        const activeHospitals = storage.hospitalsMapping
-          .filter((h: any) => h.ativo)
-          .map((h: any) => ({ id: h.id, sigla: h.sigla, nome: h.nome || h.sigla }));
-        setHospitals(activeHospitals);
+
+      const activeHospitals = Array.isArray(storage.hospitalsMapping)
+        ? storage.hospitalsMapping
+            .filter((h: { ativo?: boolean }) => h.ativo)
+            .map((h: { id: number; sigla: string; nome?: string }) => ({
+              id: h.id,
+              sigla: h.sigla,
+              nome: h.nome || h.sigla,
+            }))
+        : [];
+      setHospitals(activeHospitals);
+
+      if (!activeConnInfo && storage.activeConnectionId && Array.isArray(storage.connections)) {
+        const activeConn = storage.connections.find(
+          (c: { id: string; name?: string }) => c.id === storage.activeConnectionId
+        );
+        if (activeConn) {
+          setActiveConnInfo({
+            id: activeConn.id,
+            name: activeConn.name || activeConn.id,
+            activeHospitals,
+          });
+        }
       }
     } catch (err) {
       console.error('[Similaridade] Falha ao verificar conexão:', err);
@@ -253,6 +393,8 @@ export default function SimilaridadePage() {
         processStreamLines([lineBuffer]);
       }
 
+      clearCache('similaridade_state_');
+      clearCache('similaridade_compare_');
       toast.success('Auditoria de similaridade concluída!');
     } catch (e: any) {
       setScriptLogs(prev => [...prev, `[ERRO] ${e.message}`]);
@@ -283,7 +425,7 @@ export default function SimilaridadePage() {
     }
   }
 
-  async function handleSearch(overrideFilters?: Partial<typeof filters>) {
+  async function handleSearch(overrideFilters?: Partial<SimilarityFiltersState>, forceRefresh = false) {
     const effectiveFilters = overrideFilters ? { ...filters, ...overrideFilters } : filters;
 
     // Validação de Campos Obrigatórios
@@ -327,13 +469,30 @@ export default function SimilaridadePage() {
         body: JSON.stringify({
           query: 'SIMILARIDADE',
           version: docVersion || 'V3',
+          forceRefresh,
           params
         }),
       });
 
       const result = await execRes.json();
       if (execRes.ok) {
-        setSimilarityData(result.rows || []);
+        const rows = (result.rows || []) as SimilarityRow[];
+        const now = Date.now();
+        setSimilarityData(rows);
+        setCachedAt(now);
+        setCached<SimilarityCachedState>(stateCacheKey, {
+          similarityData: rows,
+          hasSearched: true,
+          filters: effectiveFilters,
+          searchTerm: '',
+          filterAtendimento: '',
+          selectedUnidades: [],
+          selectedPrestadores: [],
+          currentPage: 1,
+          activeTab,
+          cachedAt: now,
+        });
+        setCached<SimilarityFiltersState>(filtersCacheKey, effectiveFilters);
       } else {
         const msg = result.error || 'Erro ao consultar similaridade.';
         setSearchError(msg);
@@ -348,7 +507,7 @@ export default function SimilaridadePage() {
     }
   }
 
-  async function fetchComparison(doc: any) {
+  async function fetchComparison(doc: SimilarityRow) {
     setCompLoading(true);
     setComparisonTexts(null);
     try {
@@ -364,6 +523,14 @@ export default function SimilaridadePage() {
           const pad = (n: number) => n.toString().padStart(2, '0');
           dataHoraIso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
         }
+      }
+
+      const compareKey = `similaridade_compare_${activeEngine}_${cdAtendimento}_${docId}_${fieldId}_${dataHoraIso || ''}`;
+      const cachedComparison = getCached<ComparisonTextsState>(compareKey);
+      if (cachedComparison) {
+        setComparisonTexts(cachedComparison);
+        setCompLoading(false);
+        return;
       }
 
       const res = await fetch('/api/oracle/execute', {
@@ -387,7 +554,7 @@ export default function SimilaridadePage() {
         return;
       }
       if (result.rows && result.rows.length > 0) {
-        setComparisonTexts({
+        const payload: ComparisonTextsState = {
           atual: getVal(result.rows[0], 'TEXTO_ATUAL') || '',
           anterior: getVal(result.rows[0], 'TEXTO_ANTERIOR') || 'Sem registro anterior para comparação.',
           dataAtual: getVal(result.rows[0], 'DATA_HORA_ATUAL'),
@@ -396,7 +563,9 @@ export default function SimilaridadePage() {
           cdAnterior: getVal(result.rows[0], 'CD_DOCUMENTO_ANTERIOR'),
           regAtual: getVal(result.rows[0], 'CD_REGISTRO_ATUAL'),
           regAnterior: getVal(result.rows[0], 'CD_REGISTRO_ANTERIOR')
-        });
+        };
+        setComparisonTexts(payload);
+        setCached(compareKey, payload);
       }
     } catch (err) {
       console.error('Erro ao buscar comparação:', err);
@@ -761,7 +930,7 @@ export default function SimilaridadePage() {
 
             {/* Botão de Busca */}
             <Button
-              onClick={() => handleSearch()}
+              onClick={() => handleSearch(undefined, true)}
               disabled={loading}
               className="h-9 px-5 bg-[var(--lime)] text-[var(--lime-ink)] hover:brightness-105 rounded-xl text-xs font-bold gap-2 shadow-[0_4px_14px_rgba(204,243,82,0.25)] cursor-pointer disabled:opacity-50"
             >
@@ -769,6 +938,35 @@ export default function SimilaridadePage() {
               <span>Consultar</span>
             </Button>
           </div>
+
+          {hasSearched && !loading && cachedAt && (
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[var(--border-subtle)]/60 text-[11px] text-[var(--muted)]">
+              <div className="inline-flex flex-wrap items-center gap-2">
+                <span className="sylva-pill inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-[var(--foreground-secondary)]">
+                  <RefreshCw size={10} className="text-[var(--lime-dark)] dark:text-[var(--lime)]" />
+                  <span>
+                    Em cache •{' '}
+                    {new Date(cachedAt).toLocaleTimeString('pt-BR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                </span>
+                <span>
+                  {similarityData.length.toLocaleString('pt-BR')} registro(s) preservado(s) durante a navegação
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleSearch(undefined, true)}
+                title="Reconsultar no Oracle"
+                className="inline-flex cursor-pointer items-center gap-1 font-semibold text-[var(--lime-dark)] dark:text-[var(--lime)] hover:underline"
+              >
+                <RefreshCw size={11} />
+                <span>Atualizar do Oracle</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Erro explícito de consulta Oracle (ex.: ORA-00942 Tabela/View ausente) */}
@@ -1379,8 +1577,8 @@ export default function SimilaridadePage() {
                     ) : (
                       <div className="whitespace-pre-wrap">
                         <DiffText
-                          oldText={comparisonTexts?.anterior}
-                          newText={comparisonTexts?.atual}
+                          oldText={comparisonTexts?.anterior ?? ''}
+                          newText={comparisonTexts?.atual ?? ''}
                           type="previous"
                           score={Number(getVal(comparingDoc, 'SCORE')) || 0}
                         />
@@ -1427,8 +1625,8 @@ export default function SimilaridadePage() {
                     ) : (
                       <div className="whitespace-pre-wrap">
                         <DiffText
-                          oldText={comparisonTexts?.anterior}
-                          newText={comparisonTexts?.atual}
+                          oldText={comparisonTexts?.anterior ?? ''}
+                          newText={comparisonTexts?.atual ?? ''}
                           type="current"
                           score={Number(getVal(comparingDoc, 'SCORE')) || 0}
                         />
@@ -1583,7 +1781,7 @@ export default function SimilaridadePage() {
                 onClick={() => {
                   setScriptModalOpen(false);
                   if (!isRunningScript && filters.documento && filters.campo) {
-                    handleSearch();
+                    handleSearch(undefined, true);
                   }
                 }}
                 className="px-4 py-2 bg-[var(--lime)] text-[var(--lime-ink)] font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer hover:brightness-105"

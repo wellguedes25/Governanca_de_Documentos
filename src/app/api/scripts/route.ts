@@ -63,6 +63,21 @@ interface StreamStats {
   critical: number;
 }
 
+function truncateUtf8Bytes(value: unknown, maxBytes: number): string | null {
+  if (value === null || value === undefined) return null;
+  const str = String(value);
+  if (Buffer.byteLength(str, 'utf8') <= maxBytes) return str;
+  let result = '';
+  let byteCount = 0;
+  for (const ch of str) {
+    const chBytes = Buffer.byteLength(ch, 'utf8');
+    if (byteCount + chBytes > maxBytes) break;
+    result += ch;
+    byteCount += chBytes;
+  }
+  return result;
+}
+
 function normalizeMappings(
   mappings: DocMapping[],
   fallbackAuditDocId?: string | number
@@ -617,6 +632,17 @@ export async function POST(req: NextRequest) {
           let criticalCount = 0;
           let insertedCount = 0;
           const CHUNK_SIZE = 200;
+          const insertBindDefs = {
+            CD_ATENDIMENTO: { type: oracledb.NUMBER },
+            CD_DOCUMENTO: { type: oracledb.NUMBER },
+            DS_DOCUMENTO: { type: oracledb.STRING, maxSize: 150 },
+            IDENTIFICADOR_FILTRO: { type: oracledb.STRING, maxSize: 150 },
+            DH_FECHAMENTO: { type: oracledb.DATE },
+            CD_PRESTADOR: { type: oracledb.NUMBER },
+            LEITO: { type: oracledb.STRING, maxSize: 60 },
+            UNIDADE: { type: oracledb.STRING, maxSize: 120 },
+            GRAU_SIMILARIDADE: { type: oracledb.NUMBER },
+          };
 
           try {
             await oracleConn.execute(
@@ -634,25 +660,29 @@ export async function POST(req: NextRequest) {
                   String(row.TEXTO_ANTERIOR ?? '')
                 );
                 if (score >= 80) criticalCount++;
+                const rawDate = row.DH_FECHAMENTO;
+                const dhFechamento =
+                  rawDate instanceof Date ? rawDate : rawDate ? new Date(rawDate) : null;
                 return {
                   CD_ATENDIMENTO: Number(row.CD_ATENDIMENTO),
                   CD_DOCUMENTO: Number(row.CD_DOCUMENTO),
-                  DS_DOCUMENTO: row.DS_DOCUMENTO ? String(row.DS_DOCUMENTO).slice(0, 150) : null,
-                  IDENTIFICADOR_FILTRO: row.IDENTIFICADOR_FILTRO
-                    ? String(row.IDENTIFICADOR_FILTRO).slice(0, 150)
-                    : null,
-                  DH_FECHAMENTO: row.DH_FECHAMENTO,
+                  DS_DOCUMENTO: truncateUtf8Bytes(row.DS_DOCUMENTO, 150),
+                  IDENTIFICADOR_FILTRO: truncateUtf8Bytes(row.IDENTIFICADOR_FILTRO, 150),
+                  DH_FECHAMENTO: dhFechamento,
                   CD_PRESTADOR:
                     row.CD_PRESTADOR !== null && row.CD_PRESTADOR !== undefined
                       ? Number(row.CD_PRESTADOR)
                       : null,
-                  LEITO: row.LEITO ? String(row.LEITO).slice(0, 60) : null,
-                  UNIDADE: row.UNIDADE ? String(row.UNIDADE).slice(0, 120) : null,
+                  LEITO: truncateUtf8Bytes(row.LEITO, 60),
+                  UNIDADE: truncateUtf8Bytes(row.UNIDADE, 120),
                   GRAU_SIMILARIDADE: score,
                 };
               });
 
-              await oracleConn.executeMany(insertSql, scoredSlice, { autoCommit: false });
+              await oracleConn.executeMany(insertSql, scoredSlice, {
+                autoCommit: false,
+                bindDefs: insertBindDefs,
+              });
               insertedCount += scoredSlice.length;
               const pct = Math.round((insertedCount / totalPairs) * 100);
 

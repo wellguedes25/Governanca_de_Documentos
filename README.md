@@ -2,7 +2,7 @@
 
 Plataforma corporativa de **Governança, Auditoria e Observabilidade de Documentos Clínicos** para hospitais que operam os prontuários eletrônicos **MV Editor 2.0 (Flex / `DBAMV`)** e **MV Editor 3.0 (HTML5 / `EDITOR`)**.
 
-Projetada com execução **100% Read-Only** no banco Oracle do hospital, criptografia **AES-256** para credenciais e instalação simplificada em 1 comando via **Docker** (já com Oracle Instant Client embutido) ou Node.js.
+Projetada com execução **100% Read-Only** nas tabelas clínicas do MV (com gravação opcional e restrita a `ADMIN` apenas na tabela auxiliar `<OWNER>.TB_AUDITORIA_SIMILARIDADE` quando o módulo de Similaridade é ativado), criptografia **AES-256** para credenciais e instalação simplificada em 1 comando via **Docker** (já com Oracle Instant Client embutido) ou Node.js.
 
 ---
 
@@ -37,7 +37,7 @@ Após subir, acesse **`http://localhost:3000`**, autentique-se com `admin` (senh
 - **Migração Flex → HTML5 (`/migracao`)**: Quadro Kanban, backlog priorizado por uso real e comparador estrutural V2 × V3.
 - **Grafo de Linhagem & Dependências (`/linhagem`)**: Visão híbrida (**Fluxo em Colunas** + **Mapa em Rede Cytoscape/ELK**) rastreando dependências SQL e alertas de vínculos quebrados antes de alterações em produção.
 - **Unidades Hospitalares (`/hospitais`)**: Indicadores, SLA de assinatura e detalhamento por `CD_MULTI_EMPRESA`.
-- **Auditoria de Similaridade (`/similaridade`)**: Análise comparativa (*diff*) de cópia e cola em evoluções clínicas.
+- **Auditoria de Similaridade (`/similaridade`)**: Motor nativo Node.js (Gestalt / Ratcliff-Obershelp) com telemetria em tempo real, mapeamentos Oracle por motor (`V3`/`V2`), gerador de Script DDL com schema configurável e comparação lado a lado (*diff*) de cópia e cola em evoluções clínicas.
 - **Dependências BI & Indicadores (`/dependencias-bi`)**: Inventário de impacto em Power BI, relatórios e views corporativas com exportação/importação Excel.
 - **Central de Configurações (`/configuracoes`)**: Hub unificado (exclusivo `ADMIN`) para **Conexões Oracle**, **Motores SQL (Editor 3.0 & 2.0 com IA)**, **Instituições (MV)**, **Parâmetros & Report Web** e **Usuários & Acesso (RBAC)**.
 

@@ -64,5 +64,14 @@ GRANT SELECT ON EDITOR.EDITOR_REGRA_OPERADOR       TO GOVERDOC_RO;
 GRANT SELECT ON EDITOR.EDITOR_REGRA_CAMPO          TO GOVERDOC_RO;
 GRANT SELECT ON EDITOR.EDITOR_REGRA_PROP_VAL       TO GOVERDOC_RO;
 
--- 4. Tabela opcional de Auditoria de Similaridade (se habilitada no hospital)
--- GRANT SELECT ON DBAMV.TB_AUDITORIA_SIMILARIDADE TO GOVERDOC_RO;
+-- 4. Módulo Opcional de Auditoria de Similaridade (se habilitado no hospital)
+-- Leitura de registros clínicos, tipos de documento e localização de leito/unidade:
+-- GRANT SELECT ON DBAMV.EDITOR_REGISTRO_CAMPO      TO GOVERDOC_RO; -- Editor 2.0 (V2)
+-- GRANT SELECT ON EDITOR.EDITOR_REGISTRO_CAMPO     TO GOVERDOC_RO; -- Editor 3.0 (V3)
+-- GRANT SELECT ON DBAMV.PW_TIPO_DOCUMENTO          TO GOVERDOC_RO;
+-- GRANT SELECT ON DBAMV.LEITO                      TO GOVERDOC_RO;
+-- GRANT SELECT ON DBAMV.UNID_INT                   TO GOVERDOC_RO;
+--
+-- Objetos de auditoria no schema configurado (<OWNER>, padrão DBAMV):
+-- GRANT SELECT, INSERT, DELETE ON DBAMV.TB_AUDITORIA_SIMILARIDADE TO GOVERDOC_RO;
+-- GRANT SELECT ON DBAMV.V_AUDITORIA_COPIA_COLA                    TO GOVERDOC_RO;

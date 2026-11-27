@@ -33,7 +33,8 @@ export async function middleware(request: NextRequest) {
     }
     if (
       pathname.startsWith('/api/users') ||
-      (pathname.startsWith('/api/connections') && request.method !== 'GET')
+      (pathname.startsWith('/api/connections') && request.method !== 'GET') ||
+      (pathname.startsWith('/api/scripts') && request.method !== 'GET')
     ) {
       return NextResponse.json(
         { error: 'Acesso restrito a administradores.' },

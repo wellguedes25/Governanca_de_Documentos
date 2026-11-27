@@ -5,7 +5,7 @@ import { isDemoConnection, executeDemoQuery } from './demo-mock';
 import { applyPeriodMacro, DEFAULT_PERIOD_DAYS, type PeriodFilter } from './period';
 
 let cachedOracleDb: any = null;
-async function loadOracleDb(): Promise<any> {
+export async function loadOracleDb(): Promise<any> {
   if (!cachedOracleDb) {
     // Carrega driver nativo sob demanda para evitar erro em ambientes sem Oracle ou no Modo Demonstração
     // @ts-expect-error - oracledb types may not be fully resolved in build env

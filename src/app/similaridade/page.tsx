@@ -57,6 +57,8 @@ import { getToday, get30DaysAgo, getVal } from '@/lib/utils';
 import { DiffText } from '@/components/similaridade/DiffText';
 import { EnhancedMultiSelect } from '@/components/similaridade/EnhancedMultiSelect';
 import { MapeamentosTab } from '@/components/similaridade/MapeamentosTab';
+import { SimilarityDdlModal } from '@/components/similaridade/SimilarityDdlModal';
+import { sanitizeAuditOwner } from '@/lib/similarity';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -77,8 +79,10 @@ export default function SimilaridadePage() {
     }
   }, [docVersion, router]);
 
-  const [activeConnName, setActiveConnName] = useState('');
-  const [similarityQuery, setSimilarityQuery] = useState('');
+  const activeEngine: 'V2' | 'V3' = docVersion === 'V2' ? 'V2' : 'V3';
+  const [auditSchemaOwner, setAuditSchemaOwner] = useState('DBAMV');
+  const [ddlModalOpen, setDdlModalOpen] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [docMappings, setDocMappings] = useState<DocMapping[]>([]);
   const [activeTab, setActiveTab] = useState<'consulta' | 'mapeamentos'>('consulta');
@@ -112,10 +116,19 @@ export default function SimilaridadePage() {
   const [selectedUnidades, setSelectedUnidades] = useState<string[]>([]);
   const [selectedPrestadores, setSelectedPrestadores] = useState<string[]>([]);
 
-  // Estado para execução do motor Python em background
+  // Estado para execução do motor Nativo Node.js em background
   const [isRunningScript, setIsRunningScript] = useState(false);
   const [scriptLogs, setScriptLogs] = useState<string[]>([]);
   const [scriptModalOpen, setScriptModalOpen] = useState(false);
+  const [scriptStats, setScriptStats] = useState<{
+    stage: 'COUNT' | 'EXTRACT' | 'LOAD' | 'DONE';
+    totalRaw: number;
+    loaded: number;
+    scored: number;
+    inserted: number;
+    totalPairs: number;
+    critical: number;
+  } | null>(null);
 
   useEffect(() => {
     checkConnection();
@@ -125,9 +138,7 @@ export default function SimilaridadePage() {
     try {
       const resConn = await fetch('/api/connections');
       const storage = await resConn.json();
-      const active = storage.connections.find((c: any) => c.id === storage.activeConnectionId);
-      if (active) setActiveConnName(active.name);
-      if (storage.similarityQuery) setSimilarityQuery(storage.similarityQuery);
+      setAuditSchemaOwner(sanitizeAuditOwner(storage.auditSchemaOwner));
       if (storage.docMappings) setDocMappings(storage.docMappings);
       if (storage.reportBaseUrl) setReportUrl(storage.reportBaseUrl);
       if (storage.hospitalsMapping) {
@@ -184,6 +195,7 @@ export default function SimilaridadePage() {
   const handleRunAuditScript = async () => {
     if (isRunningScript) return;
     setIsRunningScript(true);
+    setScriptStats(null);
     setScriptLogs(['[INFO] Conectando ao serviço de execução de scripts...']);
     setScriptModalOpen(true);
 
@@ -191,12 +203,12 @@ export default function SimilaridadePage() {
       const res = await fetch('/api/scripts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ script: 'similaridade' })
+        body: JSON.stringify({ script: 'similaridade', version: docVersion === 'V2' ? 'V2' : 'V3' })
       });
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Falha ao acionar motor Python.');
+        throw new Error(err.error || 'Falha ao acionar motor de auditoria.');
       }
 
       if (!res.body) throw new Error('Fluxo de dados indisponível.');
@@ -204,15 +216,41 @@ export default function SimilaridadePage() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let done = false;
+      let lineBuffer = '';
+
+      const processStreamLines = (rawLines: string[]) => {
+        const visibleLines: string[] = [];
+        for (const rawLine of rawLines) {
+          const trimmed = rawLine.trim();
+          if (!trimmed) continue;
+          if (trimmed.startsWith('[STATS] ')) {
+            try {
+              const parsed = JSON.parse(trimmed.slice(8));
+              setScriptStats(parsed);
+            } catch {
+              // ignore malformed stats chunk
+            }
+          } else {
+            visibleLines.push(rawLine);
+          }
+        }
+        if (visibleLines.length > 0) {
+          setScriptLogs(prev => [...prev.slice(-300), ...visibleLines]);
+        }
+      };
 
       while (!done) {
         const { value, done: readerDone } = await reader.read();
         done = readerDone;
         if (value) {
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n').filter(Boolean);
-          setScriptLogs(prev => [...prev.slice(-300), ...lines]);
+          lineBuffer += decoder.decode(value, { stream: true });
+          const parts = lineBuffer.split('\n');
+          lineBuffer = parts.pop() || '';
+          processStreamLines(parts);
         }
+      }
+      if (lineBuffer.trim()) {
+        processStreamLines([lineBuffer]);
       }
 
       toast.success('Auditoria de similaridade concluída!');
@@ -245,21 +283,24 @@ export default function SimilaridadePage() {
     }
   }
 
-  async function handleSearch() {
+  async function handleSearch(overrideFilters?: Partial<typeof filters>) {
+    const effectiveFilters = overrideFilters ? { ...filters, ...overrideFilters } : filters;
+
     // Validação de Campos Obrigatórios
-    if (!filters.documento || !filters.campo || !filters.dataInicio || !filters.dataFim) {
+    if (!effectiveFilters.documento || !effectiveFilters.campo || !effectiveFilters.dataInicio || !effectiveFilters.dataFim) {
       toast.error('Por favor, preencha o Cód. Documento, Identificador Campo e o período para consultar.');
       return;
     }
 
     // Validação de Lógica de Datas
-    if (filters.dataFim < filters.dataInicio) {
+    if (effectiveFilters.dataFim < effectiveFilters.dataInicio) {
       toast.error('A Data Fim não pode ser anterior à Data Início.');
       return;
     }
 
     setLoading(true);
     setHasSearched(true);
+    setSearchError(null);
     setSimilarityData([]);
     setCurrentPage(1);
     
@@ -270,57 +311,22 @@ export default function SimilaridadePage() {
     setSelectedPrestadores([]);
 
     try {
-      const empresaClause = filters.empresa
-        ? 'AND ATE.CD_MULTI_EMPRESA = :CD_EMPRESA'
-        : '';
-
-      const query = similarityQuery || `
-        SELECT 
-            A.CD_ATENDIMENTO as ATENDIMENTO,
-            A.CD_DOCUMENTO as DOCUMENTO,
-            A.DS_DOCUMENTO as NOME_DOCUMENTO,
-            A.IDENTIFICADOR_FILTRO as IDENTIFICADOR,
-            TO_CHAR(A.DH_FECHAMENTO, 'YYYY-MM-DD HH24:MI:SS') as DATA_HORA_ISO,
-            A.DH_FECHAMENTO as DATA_HORA,
-            A.CD_PRESTADOR as PRESTADOR,
-            P.NM_PRESTADOR as NOME_PRESTADOR,
-            A.LEITO,
-            A.UNIDADE,
-            A.GRAU_SIMILARIDADE as SCORE,
-            ATE.CD_MULTI_EMPRESA as CD_EMPRESA,
-            ME.DS_MULTI_EMPRESA as NOME_EMPRESA
-        FROM 
-            DBAMV.TB_AUDITORIA_SIMILARIDADE A
-        LEFT JOIN
-            DBAMV.PRESTADOR P ON P.CD_PRESTADOR = A.CD_PRESTADOR
-        JOIN
-            DBAMV.ATENDIME ATE ON ATE.CD_ATENDIMENTO = A.CD_ATENDIMENTO
-        LEFT JOIN
-            DBAMV.MULTI_EMPRESA ME ON ME.CD_MULTI_EMPRESA = ATE.CD_MULTI_EMPRESA
-        WHERE 
-            A.CD_DOCUMENTO = :CD_DOCUMENTO
-            AND A.IDENTIFICADOR_FILTRO = :IDENTIFICADOR
-            AND A.DH_FECHAMENTO BETWEEN TO_DATE(:DATA_INI, 'YYYY-MM-DD') AND TO_DATE(:DATA_FIM, 'YYYY-MM-DD') + 1
-            ${empresaClause}
-        ORDER BY 
-            A.CD_ATENDIMENTO DESC, A.DH_FECHAMENTO DESC
-      `;
-
       const params: Record<string, string> = {
-        CD_DOCUMENTO: filters.documento,
-        IDENTIFICADOR: filters.campo,
-        DATA_INI: filters.dataInicio,
-        DATA_FIM: filters.dataFim
+        CD_DOCUMENTO: effectiveFilters.documento,
+        IDENTIFICADOR: effectiveFilters.campo,
+        DATA_INI: effectiveFilters.dataInicio,
+        DATA_FIM: effectiveFilters.dataFim
       };
-      if (filters.empresa) {
-        params.CD_EMPRESA = filters.empresa;
+      if (effectiveFilters.empresa) {
+        params.CD_EMPRESA = effectiveFilters.empresa;
       }
 
       const execRes = await fetch('/api/oracle/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          query,
+          query: 'SIMILARIDADE',
+          version: docVersion || 'V3',
           params
         }),
       });
@@ -329,10 +335,13 @@ export default function SimilaridadePage() {
       if (execRes.ok) {
         setSimilarityData(result.rows || []);
       } else {
-        toast.error(result.error || 'Erro ao consultar similaridade.');
+        const msg = result.error || 'Erro ao consultar similaridade.';
+        setSearchError(msg);
+        toast.error(msg);
       }
     } catch (err) {
       console.error('Erro de rede:', err);
+      setSearchError('Erro de comunicação com o servidor.');
       toast.error('Erro de comunicação com o servidor.');
     } finally {
       setLoading(false);
@@ -343,95 +352,6 @@ export default function SimilaridadePage() {
     setCompLoading(true);
     setComparisonTexts(null);
     try {
-      const query = `
-        WITH BaseDoc AS (
-            SELECT 
-                ATE.CD_PACIENTE,
-                ECA.CD_CAMPO,
-                PDC.DH_FECHAMENTO,
-                PDC.CD_DOCUMENTO_CLINICO as CD_DOC_CLINICO,
-                PEC.CD_EDITOR_REGISTRO as CD_REG_ATUAL,
-                DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1) as TEXTO_ATUAL
-            FROM DBAMV.PW_DOCUMENTO_CLINICO PDC
-            JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO
-            JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC ON ERC.CD_REGISTRO = PEC.CD_EDITOR_REGISTRO
-            JOIN DBAMV.EDITOR_CAMPO ECA ON ECA.CD_CAMPO = ERC.CD_CAMPO
-            JOIN DBAMV.ATENDIME ATE ON ATE.CD_ATENDIMENTO = PDC.CD_ATENDIMENTO
-            WHERE PDC.CD_ATENDIMENTO = :CD_ATENDIMENTO
-              AND PEC.CD_DOCUMENTO = :CD_DOCUMENTO
-              AND ECA.DS_IDENTIFICADOR = :IDENTIFICADOR
-              AND PDC.DH_FECHAMENTO = TO_DATE(:DATA_HORA, 'YYYY-MM-DD HH24:MI:SS')
-              AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO')
-              AND ROWNUM = 1
-        )
-        SELECT 
-            B.TEXTO_ATUAL,
-            TO_CHAR(B.DH_FECHAMENTO, 'DD/MM/YYYY HH24:MI:SS') as DATA_HORA_ATUAL,
-            B.CD_DOC_CLINICO as CD_DOCUMENTO_ATUAL,
-            B.CD_REG_ATUAL as CD_REGISTRO_ATUAL,
-            (
-                SELECT TEXTO_PREV FROM (
-                    SELECT DBMS_LOB.SUBSTR(ERC2.LO_VALOR, 4000, 1) as TEXTO_PREV
-                    FROM DBAMV.PW_DOCUMENTO_CLINICO PDC2
-                    JOIN DBAMV.PW_EDITOR_CLINICO PEC2 ON PEC2.CD_DOCUMENTO_CLINICO = PDC2.CD_DOCUMENTO_CLINICO
-                    JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC2 ON ERC2.CD_REGISTRO = PEC2.CD_EDITOR_REGISTRO
-                    JOIN DBAMV.ATENDIME ATE2 ON ATE2.CD_ATENDIMENTO = PDC2.CD_ATENDIMENTO
-                    WHERE ATE2.CD_PACIENTE = B.CD_PACIENTE
-                      AND PEC2.CD_DOCUMENTO = :CD_DOCUMENTO
-                      AND ERC2.CD_CAMPO = B.CD_CAMPO
-                      AND PDC2.DH_FECHAMENTO < B.DH_FECHAMENTO
-                      AND PDC2.TP_STATUS IN ('FECHADO', 'ASSINADO')
-                    ORDER BY PDC2.DH_FECHAMENTO DESC
-                ) WHERE ROWNUM = 1
-            ) as TEXTO_ANTERIOR,
-            (
-                SELECT TO_CHAR(DH_PREV, 'DD/MM/YYYY HH24:MI:SS') FROM (
-                    SELECT PDC2.DH_FECHAMENTO as DH_PREV
-                    FROM DBAMV.PW_DOCUMENTO_CLINICO PDC2
-                    JOIN DBAMV.PW_EDITOR_CLINICO PEC2 ON PEC2.CD_DOCUMENTO_CLINICO = PDC2.CD_DOCUMENTO_CLINICO
-                    JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC2 ON ERC2.CD_REGISTRO = PEC2.CD_EDITOR_REGISTRO
-                    JOIN DBAMV.ATENDIME ATE2 ON ATE2.CD_ATENDIMENTO = PDC2.CD_ATENDIMENTO
-                    WHERE ATE2.CD_PACIENTE = B.CD_PACIENTE
-                      AND PEC2.CD_DOCUMENTO = :CD_DOCUMENTO
-                      AND ERC2.CD_CAMPO = B.CD_CAMPO
-                      AND PDC2.DH_FECHAMENTO < B.DH_FECHAMENTO
-                      AND PDC2.TP_STATUS IN ('FECHADO', 'ASSINADO')
-                    ORDER BY PDC2.DH_FECHAMENTO DESC
-                ) WHERE ROWNUM = 1
-            ) as DATA_HORA_ANTERIOR,
-            (
-                SELECT CD_PREV FROM (
-                    SELECT PDC2.CD_DOCUMENTO_CLINICO as CD_PREV
-                    FROM DBAMV.PW_DOCUMENTO_CLINICO PDC2
-                    JOIN DBAMV.PW_EDITOR_CLINICO PEC2 ON PEC2.CD_DOCUMENTO_CLINICO = PDC2.CD_DOCUMENTO_CLINICO
-                    JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC2 ON ERC2.CD_REGISTRO = PEC2.CD_EDITOR_REGISTRO
-                    JOIN DBAMV.ATENDIME ATE2 ON ATE2.CD_ATENDIMENTO = PDC2.CD_ATENDIMENTO
-                    WHERE ATE2.CD_PACIENTE = B.CD_PACIENTE
-                      AND PEC2.CD_DOCUMENTO = :CD_DOCUMENTO
-                      AND ERC2.CD_CAMPO = B.CD_CAMPO
-                      AND PDC2.DH_FECHAMENTO < B.DH_FECHAMENTO
-                      AND PDC2.TP_STATUS IN ('FECHADO', 'ASSINADO')
-                    ORDER BY PDC2.DH_FECHAMENTO DESC
-                ) WHERE ROWNUM = 1
-            ) as CD_DOCUMENTO_ANTERIOR,
-            (
-                SELECT CD_REG_PREV FROM (
-                    SELECT PEC2.CD_EDITOR_REGISTRO as CD_REG_PREV
-                    FROM DBAMV.PW_DOCUMENTO_CLINICO PDC2
-                    JOIN DBAMV.PW_EDITOR_CLINICO PEC2 ON PEC2.CD_DOCUMENTO_CLINICO = PDC2.CD_DOCUMENTO_CLINICO
-                    JOIN DBAMV.EDITOR_REGISTRO_CAMPO ERC2 ON ERC2.CD_REGISTRO = PEC2.CD_EDITOR_REGISTRO
-                    JOIN DBAMV.ATENDIME ATE2 ON ATE2.CD_ATENDIMENTO = PDC2.CD_ATENDIMENTO
-                    WHERE ATE2.CD_PACIENTE = B.CD_PACIENTE
-                      AND PEC2.CD_DOCUMENTO = :CD_DOCUMENTO
-                      AND ERC2.CD_CAMPO = B.CD_CAMPO
-                      AND PDC2.DH_FECHAMENTO < B.DH_FECHAMENTO
-                      AND PDC2.TP_STATUS IN ('FECHADO', 'ASSINADO')
-                    ORDER BY PDC2.DH_FECHAMENTO DESC
-                ) WHERE ROWNUM = 1
-            ) as CD_REGISTRO_ANTERIOR
-        FROM BaseDoc B
-      `;
-
       const cdAtendimento = getVal(doc, 'ATENDIMENTO');
       const docId = getVal(doc, 'DOCUMENTO');
       const fieldId = getVal(doc, 'IDENTIFICADOR');
@@ -450,7 +370,8 @@ export default function SimilaridadePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          query,
+          query: 'SIMILARITY_COMPARE',
+          version: docVersion || 'V3',
           params: {
             CD_ATENDIMENTO: cdAtendimento,
             CD_DOCUMENTO: docId,
@@ -461,6 +382,10 @@ export default function SimilaridadePage() {
       });
 
       const result = await res.json();
+      if (!res.ok) {
+        toast.error(result.error || 'Falha ao carregar comparação textual.');
+        return;
+      }
       if (result.rows && result.rows.length > 0) {
         setComparisonTexts({
           atual: getVal(result.rows[0], 'TEXTO_ATUAL') || '',
@@ -480,11 +405,16 @@ export default function SimilaridadePage() {
     }
   }
 
+  const filteredDocMappings = useMemo(
+    () => docMappings.filter((m) => !m.engine || m.engine === activeEngine),
+    [docMappings, activeEngine]
+  );
+
   const fieldOptions = useMemo(() => {
     if (!filters.documento) return [];
-    const mapping = docMappings.find(m => m.id === filters.documento);
+    const mapping = filteredDocMappings.find(m => m.id === filters.documento);
     return mapping ? mapping.fields : [];
-  }, [filters.documento, docMappings]);
+  }, [filters.documento, filteredDocMappings]);
 
   // 1. Base Filtered Data
   const baseFilteredData = useMemo(() => {
@@ -618,7 +548,7 @@ export default function SimilaridadePage() {
       <div className="pb-3 border-b border-[var(--border-subtle)]">
         <PageHeader 
           title="Auditoria de Similaridade NLP"
-          subtitle="Detecção de cópia e cola textual, plágio e redundância clínica em prontuários eletrônicos (DBAMV)"
+          subtitle={`Detecção de cópia e cola textual, plágio e redundância clínica em prontuários eletrônicos (${auditSchemaOwner})`}
           icon={ScanEye}
           badge={
             <Badge 
@@ -626,7 +556,7 @@ export default function SimilaridadePage() {
               suppressHydrationWarning
               className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border-[var(--lime)]/30 bg-[var(--lime)]/15 text-[var(--lime-dark)] dark:text-[var(--lime)]"
             >
-              Motor {docVersion || 'V3'}
+              Motor {docVersion || 'V3'} • Schema {auditSchemaOwner}
             </Badge>
           }
           action={
@@ -642,6 +572,16 @@ export default function SimilaridadePage() {
                   disabled={!hasSearched || loading}
                 />
               </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDdlModalOpen(true)}
+                className="gap-2 text-xs font-semibold rounded-full sylva-pill text-[var(--foreground)] hover:text-[var(--lime-dark)] dark:hover:text-[var(--lime)] shadow-xs cursor-pointer h-9 px-4"
+              >
+                <Database className="w-3.5 h-3.5 text-[var(--lime-dark)] dark:text-[var(--lime)]" />
+                <span>Script DDL</span>
+              </Button>
 
               <Button
                 variant="outline"
@@ -741,8 +681,8 @@ export default function SimilaridadePage() {
                 }}
               >
                 <option value="">Selecione o Documento Clínico...</option>
-                {docMappings.map(m => (
-                  <option key={m.id} value={m.id}>{m.id} - {m.name}</option>
+                {filteredDocMappings.map(m => (
+                  <option key={`${m.engine || 'V3'}-${m.id}`} value={m.id}>{m.id} - {m.name}</option>
                 ))}
               </select>
             </div>
@@ -821,7 +761,7 @@ export default function SimilaridadePage() {
 
             {/* Botão de Busca */}
             <Button
-              onClick={handleSearch}
+              onClick={() => handleSearch()}
               disabled={loading}
               className="h-9 px-5 bg-[var(--lime)] text-[var(--lime-ink)] hover:brightness-105 rounded-xl text-xs font-bold gap-2 shadow-[0_4px_14px_rgba(204,243,82,0.25)] cursor-pointer disabled:opacity-50"
             >
@@ -830,6 +770,27 @@ export default function SimilaridadePage() {
             </Button>
           </div>
         </div>
+
+        {/* Erro explícito de consulta Oracle (ex.: ORA-00942 Tabela/View ausente) */}
+        {searchError && (
+          <div className="tone-warning flex flex-col justify-between gap-3 rounded-2xl border px-5 py-4 text-xs sm:flex-row sm:items-center">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <p className="font-bold">Falha ao consultar tabela de resultados ({auditSchemaOwner}.TB_AUDITORIA_SIMILARIDADE)</p>
+                <p className="mt-0.5 opacity-90">{searchError}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDdlModalOpen(true)}
+              className="sylva-lime-btn inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold"
+            >
+              <Database size={14} />
+              <span>Abrir Script DDL ({auditSchemaOwner})</span>
+            </button>
+          </div>
+        )}
 
         {/* Estado Inicial ou Carregando */}
         {!hasSearched ? (
@@ -876,8 +837,9 @@ export default function SimilaridadePage() {
             </p>
             <button 
               onClick={() => {
-                setFilters(f => ({ ...f, dataInicio: '2026-01-01', dataFim: getToday() }));
-                setTimeout(handleSearch, 100);
+                const expanded = { dataInicio: '2026-01-01', dataFim: getToday() };
+                setFilters(f => ({ ...f, ...expanded }));
+                handleSearch(expanded);
               }}
               className="mt-6 px-6 py-2.5 bg-[var(--lime)] text-[var(--lime-ink)] font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer hover:brightness-105"
             >
@@ -1509,8 +1471,8 @@ export default function SimilaridadePage() {
                   <Play size={18} className={isRunningScript ? "animate-spin" : ""} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-[var(--foreground)]">Motor de Auditoria NLP (Python)</h3>
-                  <p className="text-xs text-[var(--muted)]">Processamento assíncrono de similaridade e cópia/cola</p>
+                  <h3 className="text-sm font-semibold text-[var(--foreground)]">Motor Nativo de Auditoria NLP (Node.js)</h3>
+                  <p className="text-xs text-[var(--muted)]">Schema {auditSchemaOwner} — Processamento assíncrono de similaridade e cópia/cola</p>
                 </div>
               </div>
               <button
@@ -1521,9 +1483,87 @@ export default function SimilaridadePage() {
               </button>
             </header>
 
+            {/* Painel de Telemetria em Tempo Real */}
+            {scriptStats && (
+              <div className="border-b border-[var(--border-subtle)] bg-[var(--card-subtle)] px-6 py-4 space-y-3">
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                  <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                      Registros no Período
+                    </p>
+                    <p className="mt-0.5 font-mono text-base font-bold text-[var(--foreground)]">
+                      {scriptStats.totalRaw.toLocaleString('pt-BR')}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                      Pares c/ Histórico (LAG)
+                    </p>
+                    <p className="mt-0.5 font-mono text-base font-bold text-[var(--foreground)]">
+                      {(scriptStats.totalPairs || scriptStats.loaded).toLocaleString('pt-BR')}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                      Gravados no Oracle
+                    </p>
+                    <p className="mt-0.5 font-mono text-base font-bold text-[var(--lime-dark)] dark:text-[var(--lime)]">
+                      {scriptStats.inserted.toLocaleString('pt-BR')}
+                      {scriptStats.totalPairs > 0 ? ` / ${scriptStats.totalPairs.toLocaleString('pt-BR')}` : ''}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                      Críticos (&ge; 80%)
+                    </p>
+                    <p className="mt-0.5 font-mono text-base font-bold text-rose-500">
+                      {scriptStats.critical.toLocaleString('pt-BR')}
+                    </p>
+                  </div>
+                </div>
+
+                {(() => {
+                  const pct =
+                    scriptStats.stage === 'DONE'
+                      ? 100
+                      : scriptStats.totalPairs > 0
+                        ? Math.max(40, Math.round((scriptStats.inserted / scriptStats.totalPairs) * 100))
+                        : scriptStats.totalRaw > 0
+                          ? Math.min(40, Math.round((scriptStats.loaded / scriptStats.totalRaw) * 40))
+                          : scriptStats.loaded > 0
+                            ? 30
+                            : 8;
+                  const stageLabel =
+                    scriptStats.stage === 'COUNT'
+                      ? 'Volumetria identificada — iniciando extração de textos...'
+                      : scriptStats.stage === 'EXTRACT'
+                        ? 'Extraindo evoluções e pareando texto anterior no Oracle...'
+                        : scriptStats.stage === 'LOAD'
+                          ? 'Calculando NLP (Ratcliff/Obershelp) e gravando lotes...'
+                          : 'Processamento finalizado';
+                  return (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-semibold text-[var(--foreground-secondary)]">{stageLabel}</span>
+                        <span className="font-mono font-bold text-[var(--lime-dark)] dark:text-[var(--lime)]">
+                          {pct}%
+                        </span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--border-subtle)]">
+                        <div
+                          className="h-full rounded-full bg-[var(--lime)] transition-all duration-300"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
             <div className="p-6 bg-black/60 font-mono text-xs text-[var(--foreground)] overflow-y-auto flex-1 space-y-1 scrollbar-thin">
               {scriptLogs.map((log, i) => (
-                <div key={i} className={log.includes('[ERRO]') || log.includes('[ERROR]') ? 'text-rose-400' : log.includes('[SUCESSO]') || log.includes('[FINISH]') ? 'text-[var(--lime)] font-bold' : log.includes('[PROGRESS]') ? 'text-emerald-300 font-bold' : 'text-slate-300'}>
+                <div key={i} className={log.includes('[ERRO') || log.includes('[ERROR]') ? 'text-rose-400' : log.includes('[SUCCESS]') || log.includes('[SUCESSO]') || log.includes('[FINISH]') ? 'text-[var(--lime)] font-bold' : log.includes('[VOLUME]') ? 'text-sky-300 font-semibold' : log.includes('[PROGRESS]') ? 'text-emerald-300' : log.includes('[AVISO]') || log.includes('[DICA]') ? 'text-amber-300' : 'text-slate-300'}>
                   {log}
                 </div>
               ))}
@@ -1542,7 +1582,7 @@ export default function SimilaridadePage() {
               <button
                 onClick={() => {
                   setScriptModalOpen(false);
-                  if (!isRunningScript) {
+                  if (!isRunningScript && filters.documento && filters.campo) {
                     handleSearch();
                   }
                 }}
@@ -1557,8 +1597,22 @@ export default function SimilaridadePage() {
 
       {/* Aba de Mapeamentos */}
       <div className={activeTab === 'mapeamentos' ? 'mt-4 animate-in fade-in duration-300' : 'hidden'}>
-        <MapeamentosTab docMappings={docMappings} onSave={handleSaveMappings} />
+        <MapeamentosTab
+          docMappings={docMappings}
+          onSave={handleSaveMappings}
+          docVersion={docVersion || 'V3'}
+          schemaOwner={auditSchemaOwner}
+          onOpenDdlModal={() => setDdlModalOpen(true)}
+        />
       </div>
+
+      {/* Modal DDL Tabela + View */}
+      <SimilarityDdlModal
+        isOpen={ddlModalOpen}
+        onClose={() => setDdlModalOpen(false)}
+        schemaOwner={auditSchemaOwner}
+        docVersion={docVersion || 'V3'}
+      />
     </div>
   );
 }

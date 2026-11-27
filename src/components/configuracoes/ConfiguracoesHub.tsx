@@ -38,6 +38,8 @@ import {
 } from '@/components/configuracoes/SqlQueryEditorModal';
 import { OracleConnectionsTab } from '@/components/configuracoes/OracleConnectionsTab';
 import { UsersAccessTab } from '@/components/configuracoes/UsersAccessTab';
+import { SimilarityDdlModal } from '@/components/similaridade/SimilarityDdlModal';
+import { sanitizeAuditOwner } from '@/lib/similarity';
 
 export type SettingsTab =
   | 'conexoes'
@@ -644,6 +646,7 @@ interface StorageApiResponse {
   reportBaseUrl?: string;
   auditDays?: number;
   auditDocId?: string | number;
+  auditSchemaOwner?: string;
   hospitalsMapping?: HospitalMappingItem[];
   connections?: Array<{ id: string; name: string }>;
   activeConnectionId?: string | null;
@@ -716,6 +719,8 @@ export function ConfiguracoesHub() {
   const [reportBaseUrl, setReportBaseUrl] = useState('');
   const [auditDays, setAuditDays] = useState(15);
   const [auditDocId, setAuditDocId] = useState<string>('0');
+  const [auditSchemaOwner, setAuditSchemaOwner] = useState('DBAMV');
+  const [ddlModalOpen, setDdlModalOpen] = useState(false);
 
   // Hospitais / Empresas
   const [hospitalsMapping, setHospitalsMapping] = useState<HospitalMappingItem[]>([]);
@@ -748,6 +753,7 @@ export function ConfiguracoesHub() {
       );
       setAuditDays(storage.auditDays || 15);
       setAuditDocId(storage.auditDocId !== undefined ? String(storage.auditDocId) : '0');
+      setAuditSchemaOwner(sanitizeAuditOwner(storage.auditSchemaOwner));
       setHospitalsMapping(storage.hospitalsMapping || []);
 
       const conn = storage.connections?.find((c) => c.id === storage.activeConnectionId);
@@ -924,9 +930,14 @@ export function ConfiguracoesHub() {
           url: type === 'SAVE_REPORT_URL' ? reportBaseUrl : undefined,
           auditDays: type === 'SAVE_AUDIT_PARAMS' ? auditDays : undefined,
           auditDocId: type === 'SAVE_AUDIT_PARAMS' ? auditDocId : undefined,
+          auditSchemaOwner:
+            type === 'SAVE_AUDIT_PARAMS' ? sanitizeAuditOwner(auditSchemaOwner) : undefined,
         }),
       });
       if (!res.ok) throw new Error('Falha ao salvar parâmetros');
+      if (type === 'SAVE_AUDIT_PARAMS') {
+        setAuditSchemaOwner((prev) => sanitizeAuditOwner(prev));
+      }
       notify('Parâmetro salvo com sucesso!');
     } catch {
       notify('Erro ao salvar parâmetro.', 'error');
@@ -1504,7 +1515,7 @@ export function ConfiguracoesHub() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">
                   Dias de Auditoria
@@ -1530,9 +1541,35 @@ export function ConfiguracoesHub() {
                   className="w-full bg-[var(--card-subtle)] border border-[var(--border)] focus:border-[var(--lime)] rounded-xl px-3.5 py-2.5 text-xs font-mono text-[var(--foreground)] focus:outline-none"
                 />
               </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                  Schema / Owner de Auditoria
+                </label>
+                <input
+                  type="text"
+                  value={auditSchemaOwner}
+                  onChange={(e) => setAuditSchemaOwner(e.target.value.toUpperCase())}
+                  placeholder="DBAMV"
+                  className="w-full bg-[var(--card-subtle)] border border-[var(--border)] focus:border-[var(--lime)] rounded-xl px-3.5 py-2.5 text-xs font-mono text-[var(--foreground)] focus:outline-none"
+                />
+              </div>
             </div>
 
-            <div className="flex justify-end pt-2 border-t border-[var(--border-subtle)]">
+            <p className="text-[11px] text-[var(--muted)]">
+              Schema ativo: <code className="font-mono text-[var(--foreground)]">{sanitizeAuditOwner(auditSchemaOwner)}</code>. Altere caso o hospital exija criar <code className="font-mono">TB_AUDITORIA_SIMILARIDADE</code> e <code className="font-mono">V_AUDITORIA_COPIA_COLA</code> em um schema próprio (fora do <code className="font-mono">DBAMV</code>).
+            </p>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[var(--border-subtle)]">
+              <button
+                type="button"
+                onClick={() => setDdlModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full sylva-pill text-xs font-semibold text-[var(--foreground)] hover:border-[var(--lime)] cursor-pointer"
+              >
+                <Database size={14} className="text-[var(--lime-dark)] dark:text-[var(--lime)]" />
+                <span>Ver Script DDL (Tabela + View)</span>
+              </button>
+
               <button
                 type="button"
                 disabled={paramsSaving === 'SAVE_AUDIT_PARAMS'}
@@ -1550,6 +1587,13 @@ export function ConfiguracoesHub() {
           </div>
         </div>
       )}
+
+      {/* Modal DDL Auditoria de Similaridade */}
+      <SimilarityDdlModal
+        isOpen={ddlModalOpen}
+        onClose={() => setDdlModalOpen(false)}
+        schemaOwner={auditSchemaOwner}
+      />
 
       {/* Modal SQL Editor */}
       <SqlQueryEditorModal

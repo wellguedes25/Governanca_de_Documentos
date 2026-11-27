@@ -2,6 +2,126 @@ import { NextResponse } from 'next/server';
 import { getData } from '@/lib/storage';
 import { executeQuery, testConnection } from '@/lib/oracle';
 import { normalizePeriodFilter } from '@/lib/period';
+import { sanitizeAuditOwner, type EditorEngineVersion } from '@/lib/similarity';
+
+function buildSimilarityCompareSql(engine: EditorEngineVersion): string {
+  const isV3 = engine !== 'V2';
+  const ercTable = isV3 ? 'EDITOR.EDITOR_REGISTRO_CAMPO' : 'DBAMV.EDITOR_REGISTRO_CAMPO';
+  const ecaTable = isV3 ? 'EDITOR.EDITOR_CAMPO' : 'DBAMV.EDITOR_CAMPO';
+  const lobCol = isV3 ? 'ERC.LO_CONTEUDO' : 'ERC.LO_VALOR';
+  const prevLobCol = isV3 ? 'ERC2.LO_CONTEUDO' : 'ERC2.LO_VALOR';
+
+  return `
+    WITH BaseDoc AS (
+        SELECT * FROM (
+            SELECT
+                ATE.CD_PACIENTE,
+                ECA.CD_CAMPO,
+                ECA.DS_IDENTIFICADOR,
+                NVL(PDC.DH_FECHAMENTO, PDC.DH_CRIACAO) AS DH_REF,
+                PDC.CD_DOCUMENTO_CLINICO AS CD_DOC_CLINICO,
+                PEC.CD_EDITOR_REGISTRO AS CD_REG_ATUAL,
+                DBMS_LOB.SUBSTR(${lobCol}, 4000, 1) AS TEXTO_ATUAL
+            FROM DBAMV.PW_DOCUMENTO_CLINICO PDC
+            JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO
+            JOIN ${ercTable} ERC ON ERC.CD_REGISTRO = PEC.CD_EDITOR_REGISTRO
+            JOIN ${ecaTable} ECA ON ECA.CD_CAMPO = ERC.CD_CAMPO
+            JOIN DBAMV.ATENDIME ATE ON ATE.CD_ATENDIMENTO = PDC.CD_ATENDIMENTO
+            WHERE PDC.CD_ATENDIMENTO = :CD_ATENDIMENTO
+              AND PEC.CD_DOCUMENTO = :CD_DOCUMENTO
+              AND UPPER(ECA.DS_IDENTIFICADOR) = UPPER(:IDENTIFICADOR)
+              AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO')
+              AND ${lobCol} IS NOT NULL
+              AND (
+                :DATA_HORA IS NULL
+                OR ABS(NVL(PDC.DH_FECHAMENTO, PDC.DH_CRIACAO) - TO_DATE(:DATA_HORA, 'YYYY-MM-DD HH24:MI:SS')) <= (5 / 86400)
+              )
+            ORDER BY
+              CASE
+                WHEN :DATA_HORA IS NULL THEN 0
+                ELSE ABS(NVL(PDC.DH_FECHAMENTO, PDC.DH_CRIACAO) - TO_DATE(:DATA_HORA, 'YYYY-MM-DD HH24:MI:SS'))
+              END ASC,
+              NVL(PDC.DH_FECHAMENTO, PDC.DH_CRIACAO) DESC,
+              PDC.CD_DOCUMENTO_CLINICO DESC
+        )
+        WHERE ROWNUM = 1
+    )
+    SELECT
+        B.TEXTO_ATUAL,
+        TO_CHAR(B.DH_REF, 'DD/MM/YYYY HH24:MI:SS') AS DATA_HORA_ATUAL,
+        B.CD_DOC_CLINICO AS CD_DOCUMENTO_ATUAL,
+        B.CD_REG_ATUAL AS CD_REGISTRO_ATUAL,
+        (
+            SELECT TEXTO_PREV FROM (
+                SELECT DBMS_LOB.SUBSTR(${prevLobCol}, 4000, 1) AS TEXTO_PREV
+                FROM DBAMV.PW_DOCUMENTO_CLINICO PDC2
+                JOIN DBAMV.PW_EDITOR_CLINICO PEC2 ON PEC2.CD_DOCUMENTO_CLINICO = PDC2.CD_DOCUMENTO_CLINICO
+                JOIN ${ercTable} ERC2 ON ERC2.CD_REGISTRO = PEC2.CD_EDITOR_REGISTRO
+                JOIN ${ecaTable} ECA2 ON ECA2.CD_CAMPO = ERC2.CD_CAMPO
+                JOIN DBAMV.ATENDIME ATE2 ON ATE2.CD_ATENDIMENTO = PDC2.CD_ATENDIMENTO
+                WHERE ATE2.CD_PACIENTE = B.CD_PACIENTE
+                  AND PEC2.CD_DOCUMENTO = :CD_DOCUMENTO
+                  AND UPPER(ECA2.DS_IDENTIFICADOR) = UPPER(B.DS_IDENTIFICADOR)
+                  AND NVL(PDC2.DH_FECHAMENTO, PDC2.DH_CRIACAO) < B.DH_REF
+                  AND PDC2.TP_STATUS IN ('FECHADO', 'ASSINADO')
+                  AND ${prevLobCol} IS NOT NULL
+                ORDER BY NVL(PDC2.DH_FECHAMENTO, PDC2.DH_CRIACAO) DESC, PDC2.CD_DOCUMENTO_CLINICO DESC
+            ) WHERE ROWNUM = 1
+        ) AS TEXTO_ANTERIOR,
+        (
+            SELECT TO_CHAR(DH_PREV, 'DD/MM/YYYY HH24:MI:SS') FROM (
+                SELECT NVL(PDC2.DH_FECHAMENTO, PDC2.DH_CRIACAO) AS DH_PREV
+                FROM DBAMV.PW_DOCUMENTO_CLINICO PDC2
+                JOIN DBAMV.PW_EDITOR_CLINICO PEC2 ON PEC2.CD_DOCUMENTO_CLINICO = PDC2.CD_DOCUMENTO_CLINICO
+                JOIN ${ercTable} ERC2 ON ERC2.CD_REGISTRO = PEC2.CD_EDITOR_REGISTRO
+                JOIN ${ecaTable} ECA2 ON ECA2.CD_CAMPO = ERC2.CD_CAMPO
+                JOIN DBAMV.ATENDIME ATE2 ON ATE2.CD_ATENDIMENTO = PDC2.CD_ATENDIMENTO
+                WHERE ATE2.CD_PACIENTE = B.CD_PACIENTE
+                  AND PEC2.CD_DOCUMENTO = :CD_DOCUMENTO
+                  AND UPPER(ECA2.DS_IDENTIFICADOR) = UPPER(B.DS_IDENTIFICADOR)
+                  AND NVL(PDC2.DH_FECHAMENTO, PDC2.DH_CRIACAO) < B.DH_REF
+                  AND PDC2.TP_STATUS IN ('FECHADO', 'ASSINADO')
+                  AND ${prevLobCol} IS NOT NULL
+                ORDER BY NVL(PDC2.DH_FECHAMENTO, PDC2.DH_CRIACAO) DESC, PDC2.CD_DOCUMENTO_CLINICO DESC
+            ) WHERE ROWNUM = 1
+        ) AS DATA_HORA_ANTERIOR,
+        (
+            SELECT CD_PREV FROM (
+                SELECT PDC2.CD_DOCUMENTO_CLINICO AS CD_PREV
+                FROM DBAMV.PW_DOCUMENTO_CLINICO PDC2
+                JOIN DBAMV.PW_EDITOR_CLINICO PEC2 ON PEC2.CD_DOCUMENTO_CLINICO = PDC2.CD_DOCUMENTO_CLINICO
+                JOIN ${ercTable} ERC2 ON ERC2.CD_REGISTRO = PEC2.CD_EDITOR_REGISTRO
+                JOIN ${ecaTable} ECA2 ON ECA2.CD_CAMPO = ERC2.CD_CAMPO
+                JOIN DBAMV.ATENDIME ATE2 ON ATE2.CD_ATENDIMENTO = PDC2.CD_ATENDIMENTO
+                WHERE ATE2.CD_PACIENTE = B.CD_PACIENTE
+                  AND PEC2.CD_DOCUMENTO = :CD_DOCUMENTO
+                  AND UPPER(ECA2.DS_IDENTIFICADOR) = UPPER(B.DS_IDENTIFICADOR)
+                  AND NVL(PDC2.DH_FECHAMENTO, PDC2.DH_CRIACAO) < B.DH_REF
+                  AND PDC2.TP_STATUS IN ('FECHADO', 'ASSINADO')
+                  AND ${prevLobCol} IS NOT NULL
+                ORDER BY NVL(PDC2.DH_FECHAMENTO, PDC2.DH_CRIACAO) DESC, PDC2.CD_DOCUMENTO_CLINICO DESC
+            ) WHERE ROWNUM = 1
+        ) AS CD_DOCUMENTO_ANTERIOR,
+        (
+            SELECT CD_REG_PREV FROM (
+                SELECT PEC2.CD_EDITOR_REGISTRO AS CD_REG_PREV
+                FROM DBAMV.PW_DOCUMENTO_CLINICO PDC2
+                JOIN DBAMV.PW_EDITOR_CLINICO PEC2 ON PEC2.CD_DOCUMENTO_CLINICO = PDC2.CD_DOCUMENTO_CLINICO
+                JOIN ${ercTable} ERC2 ON ERC2.CD_REGISTRO = PEC2.CD_EDITOR_REGISTRO
+                JOIN ${ecaTable} ECA2 ON ECA2.CD_CAMPO = ERC2.CD_CAMPO
+                JOIN DBAMV.ATENDIME ATE2 ON ATE2.CD_ATENDIMENTO = PDC2.CD_ATENDIMENTO
+                WHERE ATE2.CD_PACIENTE = B.CD_PACIENTE
+                  AND PEC2.CD_DOCUMENTO = :CD_DOCUMENTO
+                  AND UPPER(ECA2.DS_IDENTIFICADOR) = UPPER(B.DS_IDENTIFICADOR)
+                  AND NVL(PDC2.DH_FECHAMENTO, PDC2.DH_CRIACAO) < B.DH_REF
+                  AND PDC2.TP_STATUS IN ('FECHADO', 'ASSINADO')
+                  AND ${prevLobCol} IS NOT NULL
+                ORDER BY NVL(PDC2.DH_FECHAMENTO, PDC2.DH_CRIACAO) DESC, PDC2.CD_DOCUMENTO_CLINICO DESC
+            ) WHERE ROWNUM = 1
+        ) AS CD_REGISTRO_ANTERIOR
+    FROM BaseDoc B
+  `;
+}
 
 // Validacao rigorosa de seguranca para queries personalizadas (Cloudflare Security Pattern)
 function validateSafeSqlQuery(sql: string): { safe: boolean; reason?: string } {
@@ -189,15 +309,48 @@ export async function POST(request: Request) {
             JOIN editor.editor_campo ec             ON ec.cd_campo = elc.cd_campo
             LEFT JOIN editor.editor_tipo_visualizacao etv ON etv.cd_tipo_visualizacao = ec.cd_tipo_visualizacao
            WHERE ed.cd_documento = :CD_DOCUMENTO
-           ORDER BY evd.vl_versao DESC, el.cd_tipo_layout, ec.ds_identificador
+           ORDER BY NVL(evd.sn_publicado, 0) DESC, evd.vl_versao DESC, el.cd_tipo_layout, ec.ds_identificador
         `;
       }
     } else if (body.query === 'AMBULATORY_PROFILES') {
       sql = data.ambulatoryProfilesQuery;
     } else if (body.query === 'AMBULATORY_PROFILE_DETAILS') {
       sql = data.ambulatoryProfileDetailsQuery;
-    } else if (body.query === 'SIMILARIDADE') {
-      sql = data.similarityQuery || '';
+    } else if (body.query === 'SIMILARIDADE' || body.query === 'SIMILARITY_SEARCH') {
+      const owner = sanitizeAuditOwner(data.auditSchemaOwner);
+      const hasEmpresaFilter = Boolean(body.params?.CD_EMPRESA);
+      const empresaClause = hasEmpresaFilter ? 'AND ATE.CD_MULTI_EMPRESA = :CD_EMPRESA' : '';
+      sql = `
+        SELECT
+            A.CD_ATENDIMENTO AS ATENDIMENTO,
+            A.CD_DOCUMENTO AS DOCUMENTO,
+            A.DS_DOCUMENTO AS NOME_DOCUMENTO,
+            A.IDENTIFICADOR_FILTRO AS IDENTIFICADOR,
+            TO_CHAR(A.DH_FECHAMENTO, 'YYYY-MM-DD HH24:MI:SS') AS DATA_HORA_ISO,
+            A.DH_FECHAMENTO AS DATA_HORA,
+            A.CD_PRESTADOR AS PRESTADOR,
+            P.NM_PRESTADOR AS NOME_PRESTADOR,
+            A.LEITO,
+            A.UNIDADE,
+            A.GRAU_SIMILARIDADE AS SCORE,
+            ATE.CD_MULTI_EMPRESA AS CD_EMPRESA,
+            ME.DS_MULTI_EMPRESA AS NOME_EMPRESA
+        FROM ${owner}.TB_AUDITORIA_SIMILARIDADE A
+        LEFT JOIN DBAMV.PRESTADOR P
+          ON P.CD_PRESTADOR = A.CD_PRESTADOR
+        LEFT JOIN DBAMV.ATENDIME ATE
+          ON ATE.CD_ATENDIMENTO = A.CD_ATENDIMENTO
+        LEFT JOIN DBAMV.MULTI_EMPRESAS ME
+          ON ME.CD_MULTI_EMPRESA = ATE.CD_MULTI_EMPRESA
+        WHERE A.CD_DOCUMENTO = :CD_DOCUMENTO
+          AND UPPER(A.IDENTIFICADOR_FILTRO) = UPPER(:IDENTIFICADOR)
+          AND A.DH_FECHAMENTO BETWEEN TO_DATE(:DATA_INI, 'YYYY-MM-DD') AND TO_DATE(:DATA_FIM, 'YYYY-MM-DD') + 1
+          ${empresaClause}
+        ORDER BY A.CD_ATENDIMENTO DESC, A.DH_FECHAMENTO DESC
+      `;
+    } else if (body.query === 'SIMILARITY_COMPARE') {
+      const targetEngine: EditorEngineVersion = body.version === 'V2' ? 'V2' : 'V3';
+      sql = buildSimilarityCompareSql(targetEngine);
     } else if (body.query === 'DOCUMENTOS' || body.query === 'V3' || body.query === 'V2') {
       const isV3 = body.version === 'V3' || body.query === 'V3';
       sql = isV3 ? (data.activeQueryV3 || data.activeQuery) : data.activeQuery;
@@ -222,14 +375,63 @@ export async function POST(request: Request) {
     }
 
     // Usa bind variables nomeados do oracledb — elimina SQL Injection.
-    const binds = body.params && typeof body.params === 'object' ? body.params : {};
+    const rawBinds = body.params && typeof body.params === 'object' ? { ...body.params } : {};
+    if (body.query === 'SIMILARIDADE' || body.query === 'SIMILARITY_SEARCH') {
+      if (!rawBinds.CD_EMPRESA) {
+        delete rawBinds.CD_EMPRESA;
+      }
+    }
+    const binds = rawBinds;
     const forceRefresh = body.forceRefresh === true || body.force === true;
     const ttlSeconds = typeof body.ttlSeconds === 'number' ? body.ttlSeconds : 600; // 10 minutos padrão para consultas de leitura
     const period = normalizePeriodFilter(
       body.period ?? { days: body.periodDays, startDate: body.startDate, endDate: body.endDate }
     );
 
-    const rows = await executeQuery(connection, sql, binds, { ttlSeconds, forceRefresh, period });
+    let rows: any[];
+    if (body.query === 'SIMILARITY_COMPARE') {
+      const compareBinds = {
+        CD_ATENDIMENTO: binds.CD_ATENDIMENTO,
+        CD_DOCUMENTO: binds.CD_DOCUMENTO,
+        IDENTIFICADOR: binds.IDENTIFICADOR,
+        DATA_HORA: binds.DATA_HORA || null,
+      };
+      const primaryEngine: EditorEngineVersion = body.version === 'V2' ? 'V2' : 'V3';
+      const fallbackEngine: EditorEngineVersion = primaryEngine === 'V3' ? 'V2' : 'V3';
+
+      try {
+        rows = await executeQuery(connection, sql, compareBinds, { ttlSeconds, forceRefresh, period });
+      } catch (primaryErr) {
+        try {
+          rows = await executeQuery(
+            connection,
+            buildSimilarityCompareSql(fallbackEngine),
+            compareBinds,
+            { ttlSeconds, forceRefresh, period }
+          );
+        } catch {
+          throw primaryErr;
+        }
+      }
+
+      if (rows.length === 0) {
+        try {
+          const fallbackRows = await executeQuery(
+            connection,
+            buildSimilarityCompareSql(fallbackEngine),
+            compareBinds,
+            { ttlSeconds, forceRefresh, period }
+          );
+          if (fallbackRows.length > 0) {
+            rows = fallbackRows;
+          }
+        } catch {
+          // Ignore fallback errors when primary engine succeeded with 0 rows
+        }
+      }
+    } else {
+      rows = await executeQuery(connection, sql, binds, { ttlSeconds, forceRefresh, period });
+    }
     return NextResponse.json({ rows, cached: !forceRefresh });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

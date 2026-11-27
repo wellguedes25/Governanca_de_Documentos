@@ -98,9 +98,10 @@ Este documento descreve todas as funcionalidades operacionais e estratégicas do
 ## 9. Auditoria de Similaridade / Cópia e Cola (`/similaridade`)
 
 - **O que faz**:
-  - Consulta registros de auditoria de textos clínicos com score de similaridade entre atendimentos, com filtros por documento, hospital, intervalo de datas e prestador.
-  - Exibe **Diff lado a lado** destacando trechos idênticos copiados versus trechos alterados, gráfico de incidência e exportação em Excel/impressão.
-  - Inclui aba de **Mapeamentos Amigáveis** para traduzir IDs técnicos de campos em nomes clínicos legíveis nos relatórios de auditoria.
+  - Executa motor nativo Node.js de NLP (Ratcliff/Obershelp) via botão **Rodar Auditoria NLP** diretamente no portal, sem exigir instalação de Python/pandas no servidor, filtrando pela janela configurada (`auditDays`) e pelo escopo selecionado de documentos e campos.
+  - Consulta registros auditados de similaridade com filtros por documento, identificador de campo, hospital/empresa (`CD_MULTI_EMPRESA`), intervalo de datas, score mínimo e prestador, utilizando o schema/owner configurado (`DBAMV` ou schema dedicado do hospital).
+  - Exibe **Diff lado a lado** seguro via rota backend dedicada (`SIMILARITY_COMPARE` para V2 e V3) destacando trechos idênticos copiados versus trechos alterados, gráfico de incidência por médico/unidade e exportação em Excel/impressão.
+  - Inclui aba de **Mapeamentos Oracle** integrada ao catálogo real do banco (`DOCUMENTOS` + `DOC_FIELDS`) para selecionar documentos e campos textuais (`TEXTO` / `TEXTAREA`) em 1 clique, além de **Modal Gerador de Script DDL** para DBA criar `<OWNER>.TB_AUDITORIA_SIMILARIDADE` e `<OWNER>.V_AUDITORIA_COPIA_COLA`.
 - **Importância para a Governança**: Apoia o Núcleo de Qualidade, Auditoria Médica e Comissão de Prontuários no combate ao *"copy & paste"* excessivo de evoluções clínicas — prática que compromete a segurança do paciente e glosa contas hospitalares.
 
 ---
@@ -121,5 +122,5 @@ Restrita a usuários **`ADMIN`**, consolida em 6 abas toda a administração do 
 2. **Editor 3.0 (HTML5)**: catálogo modular das consultas Oracle V3 com edição em modal, inserção de macros por clique, restauração para o padrão e **Otimizador SQL com IA** (via Ollama).
 3. **Editor 2.0 (Flex)**: catálogo completo equivalente das consultas DBAMV legadas.
 4. **Instituições (MV)**: consulta dinâmica em `DBAMV.MULTI_EMPRESAS` para ativar hospitais e definir siglas exibidas nas colunas.
-5. **Parâmetros & Report Web**: URL base de visualização de laudos PDF do MV e parâmetros padrão da auditoria.
+5. **Parâmetros & Report Web**: URL base de visualização de laudos PDF do MV, janela em dias (`auditDays`), documento foco e **Schema / Owner de Auditoria** (`DBAMV` ou schema customizado do hospital) com gerador integrado de Script DDL.
 6. **Usuários & Acesso**: gestão completa de contas (`ADMIN` e `ANALISTA`), senhas e ativação/bloqueio de usuários.

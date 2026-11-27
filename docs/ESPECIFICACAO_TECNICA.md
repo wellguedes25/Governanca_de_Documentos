@@ -152,7 +152,7 @@ Todas as consultas padrão residem em [`src/lib/default-queries.ts`](../src/lib/
 - `DBAMV.PW_PERFIL_MODULO`, `DBAMV.PW_PERFIL_MODULO_PARAMETRO`
 - `DBAMV.PW_TIPO_DOCUMENTO_CONSULTA`, `DBAMV.PW_TIPO_DOCUMENTO_MODULO`, `DBAMV.PW_TIPO_DOCUMENTO_MODULO_PARAM`
 - `DBAMV.PAGU_OBJETO`, `DBAMV.ESPECIALID`, `DBAMV.TIP_PRESTA`, `DBAMV.SETOR`
-- `DBAMV.TB_AUDITORIA_SIMILARIDADE` *(tabela auxiliar opcional caso o hospital utilize o módulo de auditoria NLP de similaridade)*
+- `<OWNER>.TB_AUDITORIA_SIMILARIDADE` e `<OWNER>.V_AUDITORIA_COPIA_COLA` *(objetos opcionais do módulo de auditoria NLP de similaridade; o schema/owner é configurável em `Configurações > Parâmetros`, padrão `DBAMV`, com fallback automático via leitura direta em `DBAMV.PW_DOCUMENTO_CLINICO` + `EDITOR.EDITOR_REGISTRO_CAMPO` no Editor 3.0 V3 ou `DBAMV.EDITOR_REGISTRO_CAMPO` no Editor 2.0 V2 caso a view ainda não exista)*
 
 ### Schema `EDITOR` (Editor 3.0 HTML5)
 - `EDITOR.EDITOR_DOCUMENTO`
@@ -163,6 +163,7 @@ Todas as consultas padrão residem em [`src/lib/default-queries.ts`](../src/lib/
 - `EDITOR.EDITOR_CAMPO`
 - `EDITOR.EDITOR_TIPO_VISUALIZACAO`
 - `EDITOR.EDITOR_CAMPO_PROP_VAL`
+- `EDITOR.EDITOR_REGISTRO_CAMPO` *(leitura de conteúdo clínico para Auditoria de Similaridade V3 e comparação lado a lado)*
 - `EDITOR.EDITOR_REGRA`
 - `EDITOR.EDITOR_TIPO_REGRA`
 - `EDITOR.EDITOR_REGRA_CONDICAO`
@@ -180,7 +181,7 @@ Todas as consultas padrão residem em [`src/lib/default-queries.ts`](../src/lib/
 | `/api/auth/connect`, `/session`, `/disconnect` | `GET`, `POST` | Login RBAC, inspeção de sessão ativa e logout |
 | `/api/connections` | `GET`, `POST` | Gestão de instâncias Oracle, queries V2/V3, hospitais, URL Report Web e parâmetros |
 | `/api/users` | `GET`, `POST`, `PUT`, `DELETE` | CRUD de usuários locais (exclusivo `ADMIN`) |
-| `/api/oracle/execute` | `POST` | Execução Read-Only para Catálogo, Perfis, Metadados, Regras, Campos, Ações, Similaridade e Teste de Conexão |
+| `/api/oracle/execute` | `POST` | Execução Read-Only para Catálogo, Perfis, Metadados, Regras, Campos (`DOC_FIELDS`), Ações, Busca de Similaridade (`SIMILARIDADE`), Comparação Lado a Lado (`SIMILARITY_COMPARE`) e Teste de Conexão |
 | `/api/oracle/health` | `GET` | Healthcheck da conexão Oracle ativa e do pool |
 | `/api/oracle/lineage` | `GET` | Extração e resolução de grafo completo de dependências SQL (Ações + Regras) |
 | `/api/dashboard/stats`, `/analytics`, `/quality`, `/custom` | `GET`, `POST` | KPIs executivos, Curva ABC, ociosidade, turnos, SLA e cards personalizados |
@@ -190,4 +191,4 @@ Todas as consultas padrão residem em [`src/lib/default-queries.ts`](../src/lib/
 | `/api/migracao` | `GET`, `POST`, `PUT`, `DELETE` | Kanban e rastreamento de migração Editor 2.0 → 3.0 |
 | `/api/dependencias-bi` | `GET`, `POST`, `PUT`, `DELETE` | Inventário de impacto de documentos em painéis BI (Power BI, Metabase, Oracle Views, etc.) |
 | `/api/ai/ollama` | `POST` | Integração opcional com Ollama local para sugestão e otimização de SQL Oracle |
-| `/api/scripts` | `GET`, `POST` | Apoio a scripts técnicos configurados |
+| `/api/scripts` | `POST` | Motor nativo Node.js de auditoria NLP de similaridade (Ratcliff/Obershelp) com streaming de logs e gravação em `<OWNER>.TB_AUDITORIA_SIMILARIDADE` |

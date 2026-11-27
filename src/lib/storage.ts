@@ -46,6 +46,7 @@ export interface DocMapping {
   id: string;
   name: string;
   fields: FieldMapping[];
+  engine?: 'V2' | 'V3';
 }
 
 export interface HospitalMapping {
@@ -117,6 +118,7 @@ export interface StorageData {
   reportBaseUrl?: string;
   auditDays?: number;
   auditDocId?: string | number;
+  auditSchemaOwner?: string;
   hospitalsMapping?: HospitalMapping[];
 }
 
@@ -513,33 +515,30 @@ ORDER BY
   },
   cardSettings: {},
   customCards: [],
-  docMappings: [
-    { 
-      id: '916', 
-      name: 'Evolução Médica/Enf', 
-      fields: [
-        { id: 'EVOLUCAO', name: 'Evolução Clínica' }
-      ] 
-    },
-    { 
-      id: '1048', 
-      name: 'Evolução Médica - 1048', 
-      fields: [
-        { id: 'EVOLUCAO', name: 'Evolução Clínica' }
-      ] 
-    },
-    { 
-      id: '772', 
-      name: 'Evolução Médica - 772', 
-      fields: [
-        { id: 'EVOLUCAO', name: 'Evolução Clínica' }
-      ] 
-    }
-  ],
-  reportBaseUrl: 'http://dev3-mvh5.acsc.org.br:84/mveditor/report?regId=',
+  docMappings: [],
+  reportBaseUrl: '',
   auditDays: 15,
-  auditDocId: "916,1048,772"
+  auditDocId: '0',
+  auditSchemaOwner: 'DBAMV'
 };
+
+function isDemoDocMapping(mapping: DocMapping): boolean {
+  const idStr = String(mapping?.id ?? '').trim();
+  const nameStr = String(mapping?.name ?? '');
+  return (
+    DEMO_DOC_MAPPINGS.some((demo) => demo.id === idStr) ||
+    /\(demo\)|sandbox|fict[ií]cio/i.test(nameStr)
+  );
+}
+
+function isDemoHospitalMapping(hospital: HospitalMapping): boolean {
+  const nameStr = String(hospital?.nome ?? '');
+  return (
+    hospital?.id === 901 ||
+    hospital?.id === 902 ||
+    /fict[ií]cio|vale da aurora|serra do mar/i.test(nameStr)
+  );
+}
 
 function ensureDataDir() {
   const { dataDir } = getStoragePaths();
@@ -550,14 +549,12 @@ function ensureDataDir() {
 
 function withDemoInjected(data: StorageData): StorageData {
   const userConnections = (data.connections || []).filter((c) => c.id !== DEMO_CONNECTION_ID);
-  const hasRealConnections = userConnections.length > 0;
-  const connections = [...userConnections, DEMO_CONNECTION];
-  const isDemoActive = data.activeConnectionId === DEMO_CONNECTION_ID || !hasRealConnections;
+  const isDemoActive = data.activeConnectionId === DEMO_CONNECTION_ID;
 
   if (isDemoActive) {
     return {
       ...data,
-      connections,
+      connections: [...userConnections, DEMO_CONNECTION],
       hospitalsMapping: DEFAULT_DEMO_HOSPITALS,
       docMappings: DEMO_DOC_MAPPINGS,
       auditDocId: DEMO_AUDIT_DOC_ID,
@@ -568,8 +565,11 @@ function withDemoInjected(data: StorageData): StorageData {
 
   return {
     ...data,
-    connections,
-    hospitalsMapping: data.hospitalsMapping || [],
+    connections: userConnections,
+    hospitalsMapping: (data.hospitalsMapping || []).filter((h) => !isDemoHospitalMapping(h)),
+    docMappings: (data.docMappings || []).filter((m) => !isDemoDocMapping(m)),
+    auditDocId: data.auditDocId === DEMO_AUDIT_DOC_ID ? '0' : data.auditDocId,
+    reportBaseUrl: data.reportBaseUrl === DEMO_REPORT_BASE_URL ? '' : data.reportBaseUrl,
   };
 }
 
@@ -645,14 +645,22 @@ export async function getData(): Promise<StorageData> {
       },
       cardSettings: data.cardSettings || {},
       customCards: data.customCards || [],
-      docMappings: (data.docMappings || INITIAL_DATA.docMappings).map((m: DocMapping) => ({
-        ...m,
-        fields: m.fields.map((f: FieldMapping | string) => typeof f === 'string' ? { id: f, name: f } : f)
-      })),
-      reportBaseUrl: data.reportBaseUrl || INITIAL_DATA.reportBaseUrl,
+      docMappings: (data.docMappings || INITIAL_DATA.docMappings)
+        .map((m: DocMapping) => ({
+          ...m,
+          fields: m.fields.map((f: FieldMapping | string) => typeof f === 'string' ? { id: f, name: f } : f)
+        }))
+        .filter((m: DocMapping) => !isDemoDocMapping(m)),
+      reportBaseUrl:
+        data.reportBaseUrl && data.reportBaseUrl !== DEMO_REPORT_BASE_URL
+          ? data.reportBaseUrl
+          : INITIAL_DATA.reportBaseUrl,
       similarityQuery: data.similarityQuery || INITIAL_DATA.similarityQuery,
       auditDays: data.auditDays !== undefined ? Number(data.auditDays) : INITIAL_DATA.auditDays,
-      auditDocId: data.auditDocId !== undefined ? data.auditDocId : INITIAL_DATA.auditDocId
+      auditDocId:
+        data.auditDocId !== undefined && data.auditDocId !== DEMO_AUDIT_DOC_ID
+          ? data.auditDocId
+          : INITIAL_DATA.auditDocId
     });
   } catch (e) {
     console.error('[Storage] Erro ao parsear storage.json:', e);
@@ -680,6 +688,24 @@ export async function saveData(data: StorageData) {
     });
   }
 
+  // Never persist demo/mock entities for real administrators or analysts
+  if (Array.isArray(dataToSave.docMappings)) {
+    dataToSave.docMappings = dataToSave.docMappings.filter(
+      (m: DocMapping) => !isDemoDocMapping(m)
+    );
+  }
+  if (Array.isArray(dataToSave.hospitalsMapping)) {
+    dataToSave.hospitalsMapping = dataToSave.hospitalsMapping.filter(
+      (h: HospitalMapping) => !isDemoHospitalMapping(h)
+    );
+  }
+  if (dataToSave.auditDocId === DEMO_AUDIT_DOC_ID) {
+    dataToSave.auditDocId = '0';
+  }
+  if (dataToSave.reportBaseUrl === DEMO_REPORT_BASE_URL) {
+    dataToSave.reportBaseUrl = '';
+  }
+
   // Never overwrite real hospital/doc configurations on disk with virtual sandbox defaults
   if (dataToSave.activeConnectionId === DEMO_CONNECTION_ID && fs.existsSync(storageFile)) {
     try {
@@ -690,8 +716,14 @@ export async function saveData(data: StorageData) {
       if (Array.isArray(existingOnDisk.docMappings)) {
         dataToSave.docMappings = existingOnDisk.docMappings;
       }
+      if (existingOnDisk.auditDays !== undefined) {
+        dataToSave.auditDays = existingOnDisk.auditDays;
+      }
       if (existingOnDisk.auditDocId !== undefined) {
         dataToSave.auditDocId = existingOnDisk.auditDocId;
+      }
+      if (existingOnDisk.auditSchemaOwner !== undefined) {
+        dataToSave.auditSchemaOwner = existingOnDisk.auditSchemaOwner;
       }
       if (existingOnDisk.reportBaseUrl !== undefined) {
         dataToSave.reportBaseUrl = existingOnDisk.reportBaseUrl;

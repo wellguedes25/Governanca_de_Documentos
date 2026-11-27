@@ -2,22 +2,24 @@ import { NextResponse } from 'next/server';
 import { getData, saveData, DbConnection } from '@/lib/storage';
 import { clearQueryCache } from '@/lib/cache';
 import { resetOraclePool } from '@/lib/oracle';
+import { sanitizeAuditOwner } from '@/lib/similarity';
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
-  const data = await getData();
-  
-  // Hide passwords before sending to frontend
+function maskConnectionPasswords(data: Awaited<ReturnType<typeof getData>>) {
   const dataToSend = JSON.parse(JSON.stringify(data));
-  if (dataToSend.connections) {
-    dataToSend.connections.forEach((conn: any) => {
+  if (Array.isArray(dataToSend.connections)) {
+    dataToSend.connections.forEach((conn: { password?: string }) => {
       if (conn.password) {
         conn.password = '********';
       }
     });
   }
-  
-  return NextResponse.json(dataToSend);
+  return dataToSend;
+}
+
+export async function GET() {
+  const data = await getData();
+  return NextResponse.json(maskConnectionPasswords(data));
 }
 
 export async function POST(request: Request) {
@@ -183,12 +185,20 @@ export async function POST(request: Request) {
     data.hospitalQueriesV3.top5 = body.query;
     clearQueryCache();
   } else if (body.type === 'SAVE_DOC_MAPPINGS') {
-    data.docMappings = body.mappings;
+    data.docMappings = Array.isArray(body.mappings) ? body.mappings : [];
+    const mappedIds = data.docMappings
+      .map((m) => String(m.id ?? '').trim())
+      .filter(Boolean);
+    data.auditDocId = mappedIds.length > 0 ? mappedIds.join(',') : '0';
   } else if (body.type === 'SAVE_REPORT_URL') {
     data.reportBaseUrl = body.url;
   } else if (body.type === 'SAVE_AUDIT_PARAMS') {
     if (body.auditDays !== undefined) data.auditDays = Number(body.auditDays);
     if (body.auditDocId !== undefined) data.auditDocId = body.auditDocId;
+    if (body.auditSchemaOwner !== undefined) {
+      data.auditSchemaOwner = sanitizeAuditOwner(body.auditSchemaOwner);
+    }
+    clearQueryCache();
   } else if (body.type === 'SAVE_HOSPITALS_MAPPING') {
     data.hospitalsMapping = body.hospitalsMapping;
     clearQueryCache();
@@ -202,5 +212,5 @@ export async function POST(request: Request) {
   }
 
   await saveData(data);
-  return NextResponse.json(data);
+  return NextResponse.json(maskConnectionPasswords(data));
 }

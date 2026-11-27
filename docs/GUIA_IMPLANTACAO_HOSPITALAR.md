@@ -81,8 +81,10 @@ Após acessar `http://SEU_SERVIDOR:3000`:
      - Clique em **Registrar Conexão**, depois no ícone de frasco (**Testar Conectividade**) e em **Ativar**.
 3. **Ativar Hospitais / Multi-Empresas**:
    - Em **Configurações → aba `Instituições (MV)`**, ative os códigos `CD_MULTI_EMPRESA` que correspondem às unidades assistenciais reais (desativando empresas administrativas/colégios/obras) e defina siglas curtas (ex.: `HOSP1`, `UTI`).
-4. **Configurar URL de Laudos (Opcional)**:
-   - Em **Configurações → aba `Parâmetros & Report Web`**, ajuste a URL base do MV Editor Report para visualização direta de documentos fechados.
+4. **Configurar Parâmetros, URL de Laudos e Auditoria de Similaridade (Opcional)**:
+   - Em **Configurações → aba `Parâmetros & Report Web`**, ajuste a URL base do MV Editor Report para visualização direta de documentos fechados, a janela de dias (`auditDays`) e o **Schema / Owner de Auditoria** (padrão `DBAMV`).
+   - Caso a política de DBA do hospital não permita criar objetos novos dentro do schema `DBAMV`, informe um schema alternativo no campo **Schema / Owner de Auditoria** (ex.: `GOVERDOC_AUDIT`), clique em **Ver Script DDL (Tabela + View)** e solicite ao DBA executar os comandos gerados (`CREATE TABLE <OWNER>.TB_AUDITORIA_SIMILARIDADE` e `CREATE OR REPLACE VIEW <OWNER>.V_AUDITORIA_COPIA_COLA`). Note que a leitura clínica permanece usando as tabelas oficiais do `DBAMV`/`EDITOR`, e se a view ainda não existir o motor Node.js (`/api/scripts`, restrito a `ADMIN`) aplica fallback automático direto sobre `DBAMV.PW_DOCUMENTO_CLINICO` + `EDITOR.EDITOR_REGISTRO_CAMPO` (V3) ou `DBAMV.EDITOR_REGISTRO_CAMPO` (V2).
+   - Em **Auditoria de Similaridade (`/similaridade`) → aba `Mapeamentos Oracle`**, carregue o catálogo do banco e marque exatamente quais documentos e campos textuais (`TEXTO` / `TEXTAREA`) serão auditados.
 
 ---
 
@@ -115,5 +117,5 @@ Os dados em `./data` são preservados intactos durante a reconstrução.
 | :--- | :--- | :--- |
 | `ORA-01017` / `ORA-12154` / Timeout | Credencial incorreta, firewall porta 1521 ou Service Name errado | Testar conectividade de rede do servidor ao SCAN Oracle e revisar usuário/Connect String na aba `Conexões Oracle`. |
 | `NJS-045` / `DPI-1047` (Instant Client não encontrado) | Execução fora do Docker sem Instant Client configurado | No Linux/Docker já vai embutido em `/opt/oracle/instantclient`. No Windows sem Docker, instalar Oracle Instant Client 64-bit e informar o diretório em `Oracle Client Path`. |
-| `ORA-00942` (table or view does not exist) | Usuário Oracle sem grant em alguma tabela `DBAMV` ou `EDITOR` | Reexecutar [`SQL/00_grants_minimos_governanca_mv.sql`](../SQL/00_grants_minimos_governanca_mv.sql) validando se o hospital utiliza Editor 3.0 (schema `EDITOR`). |
+| `ORA-00942` (table or view does not exist) | Usuário Oracle sem grant em alguma tabela `DBAMV`/`EDITOR`, ou `TB_AUDITORIA_SIMILARIDADE` ainda não criada no schema configurado | Reexecutar [`SQL/00_grants_minimos_governanca_mv.sql`](../SQL/00_grants_minimos_governanca_mv.sql) ou abrir **Script DDL** em `/similaridade` / `Configurações > Parâmetros` e executá-lo no schema configurado. |
 | Números iguais ao trocar período ou empresa | Cache antigo de browser após ajuste manual | Pressionar **Sincronizar** no cabeçalho da tela ou atualizar a aba. |

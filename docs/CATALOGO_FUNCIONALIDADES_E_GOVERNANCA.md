@@ -37,17 +37,18 @@ Este documento descreve todas as funcionalidades operacionais e estratégicas do
 
 ---
 
-## 4. Catálogo Mestre de Documentos Clínicos (`/documentos` e `/documentos/[id]/campos`)
+## 4. Catálogo Mestre de Documentos Clínicos (`/documentos`, `/documentos/[id]/campos` e `/documentos/[id]/versoes`)
 
 - **O que faz**:
   - Matriz completa de todos os documentos publicados no Editor 2.0 ou 3.0 com busca instantânea, ordenação e visualização em **Tabela** ou **Grid de Cards**.
   - **Matriz Pivot Multi-Empresa**: mostra exatamente em quais hospitais da rede cada documento teve uso e a data do último preenchimento.
   - **Modal Unificado 360° de Detalhes** ao selecionar qualquer documento:
-    - Histórico de versões (`PUBLISHED`, `EDITABLE`/`TEST`, `HISTORY`), cabeçalho/rodapé vinculados, contagem de campos e regras.
+    - Histórico de versões (`PUBLISHED`, `EDITABLE`/`TEST`, `HISTORY`), cabeçalho/rodapé vinculados, contagem de campos e regras, com atalho direto para comparação de versões V3.
     - **Perfis Ambulatoriais** vinculados (onde o documento aparece no PEP).
     - **Ações SQL / Vínculos** entre documentos.
     - **Regras de Negócio & Alertas Clínicos** (condições, operadores e campos afetados).
   - **Página Dedicada de Inspeção de Campos** (`/documentos/[id]/campos`): detalha todos os identificadores técnicos (`DS_IDENTIFICADOR`), metadados e tipos de visualização dos campos, além de exportação para CSV.
+  - **Comparador de Mudanças entre Versões V3** (`/documentos/[id]/versoes?base=X&target=Y`): compara duas versões do Editor 3.0 lado a lado com pareamento semântico por identificador/layout e diff linha a linha (`diffLines`) para **Campos** (adicionados, removidos, tipo, status, descrição e metadado), **Regras** (condição, tipo, ordem, alerta, campos afetados, script) e **Consultas SQL** (propriedade `4` e documentos referenciados), com URLs compartilháveis.
 - **Importância para a Governança**: É o inventário oficial do prontuário da instituição. Elimina duplicidade de formulários (ex.: três fichas diferentes de anamnese para a mesma especialidade) e acelera o diagnóstico de suporte e engenharia clínica.
 
 ---

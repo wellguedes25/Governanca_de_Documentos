@@ -8,7 +8,8 @@ import {
   Layers, Code2, Unlink, Copy, Check, ChevronDown, ChevronUp, ExternalLink,
   Search, ListFilter, Zap, SlidersHorizontal, TableProperties,
   Download, Sparkles, RefreshCw, Printer, ChevronLeft, ChevronRight,
-  ChevronsLeft, ChevronsRight, Users, CheckCircle2, FlaskConical, History
+  ChevronsLeft, ChevronsRight, Users, CheckCircle2, FlaskConical, History,
+  GitCompareArrows
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -1004,6 +1005,16 @@ export function DocumentDetailsModal({
                   ? historyVersions.filter(v => v.lifecycle === 'inactive')
                   : historyVersions;
 
+              const defaultTargetVer =
+                publishedVersions[0]?.versionNumber ?? groupedVersions[0]?.versionNumber;
+              const defaultBaseVer =
+                (historyVersions.find((v) => v.versionNumber < defaultTargetVer) ??
+                  groupedVersions.find((v) => v.versionNumber !== defaultTargetVer))
+                  ?.versionNumber ?? defaultTargetVer;
+              const canCompareV3 =
+                docVersion === 'V3' && Boolean(docId) && groupedVersions.length >= 2;
+              const publishedVerNum = publishedVersions[0]?.versionNumber;
+
               const renderVersionCard = (ver: GroupedDocumentVersion) => {
                 const meta = getVersionLifecycleMeta(ver.lifecycle, docVersion);
                 const LifecycleIcon =
@@ -1012,6 +1023,10 @@ export function DocumentDetailsModal({
                     : ver.lifecycle === 'test'
                       ? FlaskConical
                       : History;
+                const showDiffVsPublished =
+                  canCompareV3 &&
+                  publishedVerNum !== undefined &&
+                  ver.versionNumber !== publishedVerNum;
 
                 return (
                   <div
@@ -1060,9 +1075,21 @@ export function DocumentDetailsModal({
                           </span>
                         )}
                       </div>
-                      <span className="font-mono text-[11px] text-[var(--muted)] ml-auto">
-                        ID: {ver.versionId}
-                      </span>
+                      <div className="flex items-center gap-2 ml-auto">
+                        {showDiffVsPublished && (
+                          <Link
+                            href={`/documentos/${docId}/versoes?base=${ver.versionNumber}&target=${publishedVerNum}&engine=V3`}
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-[var(--card-solid)] border border-[var(--border)] text-[var(--foreground)] hover:border-[var(--lime)] transition-colors"
+                            title={`Comparar v${ver.versionNumber} com a versão publicada v${publishedVerNum}`}
+                          >
+                            <GitCompareArrows size={11} />
+                            <span>Diff vs. Publicada</span>
+                          </Link>
+                        )}
+                        <span className="font-mono text-[11px] text-[var(--muted)]">
+                          ID: {ver.versionId}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1108,9 +1135,20 @@ export function DocumentDetailsModal({
                       })}
                     </div>
 
-                    <span className="text-[11px] text-[var(--muted)] font-mono px-2">
-                      {groupedVersions.length} {groupedVersions.length === 1 ? 'versão' : 'versões'}
-                    </span>
+                    <div className="flex items-center gap-2 ml-auto">
+                      {canCompareV3 && (
+                        <Link
+                          href={`/documentos/${docId}/versoes?base=${defaultBaseVer}&target=${defaultTargetVer}&engine=V3`}
+                          className="px-3 py-1 rounded-full bg-[var(--lime)] text-[var(--lime-ink)] hover:brightness-105 text-[11px] font-bold inline-flex items-center gap-1.5 transition-all"
+                        >
+                          <GitCompareArrows size={12} />
+                          <span>Comparar Versões</span>
+                        </Link>
+                      )}
+                      <span className="text-[11px] text-[var(--muted)] font-mono px-2">
+                        {groupedVersions.length} {groupedVersions.length === 1 ? 'versão' : 'versões'}
+                      </span>
+                    </div>
                   </div>
 
                   {!hasPublishedVersion && (

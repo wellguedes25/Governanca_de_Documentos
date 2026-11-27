@@ -1,6 +1,15 @@
 import type { DbConnection, DocMapping, HospitalMapping } from './storage';
 import type { BiArtifact, BiCatalogDocOption } from '@/types/bi-dependencies.types';
 import type { DocumentoFlexItem, DocumentoMigracao } from '@/types/migracao.types';
+import type {
+  VersionCompareResponse,
+  VersionFieldSnapshot,
+  VersionRuleSnapshot,
+  VersionSqlActionSnapshot,
+  VersionSummary,
+} from '@/types/version-diff.types';
+import { computeVersionDiff, extractReferencedDocs } from './version-diff';
+import { getVersionLifecycleMeta } from './version-status';
 
 export const DEMO_CONNECTION_ID = 'demo-sandbox';
 
@@ -1799,4 +1808,253 @@ export function executeDemoQuery(
   }
 
   return [];
+}
+
+/**
+ * Generates deterministic V3 version comparison data for Sandbox/Demo mode,
+ * passing synthetic snapshots through the real computeVersionDiff engine.
+ */
+export function buildDemoVersionCompare(
+  docId: string,
+  requestedBase?: number,
+  requestedTarget?: number
+): VersionCompareResponse {
+  const numericId = Number(docId);
+  const doc =
+    DEMO_DOCS.find((d) => d.id === numericId) ||
+    DEMO_DOCS.find((d) => d.id === 9002) ||
+    DEMO_DOCS[0];
+
+  const publishedVer = doc.version;
+  const testVer = doc.version + 1;
+  const historyVer = Math.max(1, doc.version - 1);
+  const olderHistoryVer = doc.version > 2 ? doc.version - 2 : null;
+
+  const baseId = doc.id * 100;
+  const versions: VersionSummary[] = [
+    {
+      versionNumber: testVer,
+      versionId: String(baseId + testVer),
+      lifecycle: 'test',
+      label: getVersionLifecycleMeta('test', 'V3').label,
+      badgeLabel: getVersionLifecycleMeta('test', 'V3').badgeLabel,
+      tpVersao: 'TEST',
+      snPublicado: 0,
+      fieldsCount: doc.fields.length + 1,
+      rulesCount: doc.rules.length + 1,
+      layouts: ['Tela', 'Relatório'],
+    },
+    {
+      versionNumber: publishedVer,
+      versionId: String(baseId + publishedVer),
+      lifecycle: 'published',
+      label: getVersionLifecycleMeta('published', 'V3').label,
+      badgeLabel: getVersionLifecycleMeta('published', 'V3').badgeLabel,
+      tpVersao: 'PUBLISHED',
+      snPublicado: 1,
+      fieldsCount: doc.fields.length,
+      rulesCount: doc.rules.length,
+      layouts: ['Tela', 'Relatório'],
+    },
+    {
+      versionNumber: historyVer,
+      versionId: String(baseId + historyVer),
+      lifecycle: 'history',
+      label: getVersionLifecycleMeta('history', 'V3').label,
+      badgeLabel: getVersionLifecycleMeta('history', 'V3').badgeLabel,
+      tpVersao: 'HISTORY',
+      snPublicado: 0,
+      fieldsCount: Math.max(1, doc.fields.length - 1),
+      rulesCount: Math.max(1, doc.rules.length - 1),
+      layouts: ['Tela', 'Relatório'],
+    },
+  ];
+
+  if (olderHistoryVer !== null && olderHistoryVer !== historyVer) {
+    versions.push({
+      versionNumber: olderHistoryVer,
+      versionId: String(baseId + olderHistoryVer),
+      lifecycle: 'history',
+      label: getVersionLifecycleMeta('history', 'V3').label,
+      badgeLabel: getVersionLifecycleMeta('history', 'V3').badgeLabel,
+      tpVersao: 'HISTORY',
+      snPublicado: 0,
+      fieldsCount: Math.max(1, doc.fields.length - 2),
+      rulesCount: 1,
+      layouts: ['Tela'],
+    });
+  }
+
+  const targetSummary =
+    versions.find((v) => v.versionNumber === requestedTarget) ??
+    versions.find((v) => v.lifecycle === 'published') ??
+    versions[0];
+
+  const baseSummary =
+    versions.find((v) => v.versionNumber === requestedBase) ??
+    versions.find((v) => v.lifecycle === 'history' && v.versionNumber < targetSummary.versionNumber) ??
+    versions.find((v) => v.versionNumber !== targetSummary.versionNumber) ??
+    versions[0];
+
+  const buildSnapshot = (verNum: number): {
+    fields: VersionFieldSnapshot[];
+    rules: VersionRuleSnapshot[];
+    sqlActions: VersionSqlActionSnapshot[];
+  } => {
+    const baseFields: VersionFieldSnapshot[] = doc.fields.map((f, idx) => ({
+      cdCampo: f.cdCampo + verNum * 10,
+      cdMetadado: f.cdMetadado,
+      dsIdentificador: f.tag,
+      dsCampo:
+        verNum < publishedVer && idx === 0
+          ? `${f.name} (Legado)`
+          : f.name,
+      dsTipoVisualizacao:
+        verNum < publishedVer && idx === 1
+          ? 'Caixa de Texto'
+          : f.visualType,
+      snAtivo: verNum === olderHistoryVer && idx === doc.fields.length - 1 ? 0 : 1,
+      cdTipoLayout: 1,
+      dsTipoLayout: 'Tela',
+    }));
+
+    if (verNum === historyVer || verNum === olderHistoryVer) {
+      baseFields.pop();
+      baseFields.push({
+        cdCampo: doc.id * 1000 + 88,
+        cdMetadado: 99888,
+        dsIdentificador: 'CAMPO_OBS_LEGADO',
+        dsCampo: 'Observação Complementar (Descontinuada)',
+        dsTipoVisualizacao: 'Caixa de Texto',
+        snAtivo: 1,
+        cdTipoLayout: 1,
+        dsTipoLayout: 'Tela',
+      });
+    } else if (verNum === testVer) {
+      baseFields.push({
+        cdCampo: doc.id * 1000 + 99,
+        cdMetadado: 99999,
+        dsIdentificador: 'ESCORE_RISCO_SEPSE',
+        dsCampo: 'Escore de Risco Clínico (Novo em Teste)',
+        dsTipoVisualizacao: 'Lista Seleção',
+        snAtivo: 1,
+        cdTipoLayout: 1,
+        dsTipoLayout: 'Tela',
+      });
+    }
+
+    const baseRules: VersionRuleSnapshot[] = doc.rules.map((r, idx) => ({
+      cdRegra: r.cdRegra + verNum * 10,
+      numOrdem: verNum > publishedVer && idx === 0 ? r.numOrdem + 1 : r.numOrdem,
+      dsRegra: r.dsRegra,
+      ativa: verNum < publishedVer && idx === 1 ? 0 : r.ativa,
+      tipoRegra: r.tipoRegra,
+      dsAlerta:
+        verNum < publishedVer && r.dsAlerta
+          ? r.dsAlerta.replace('antes de assinar', 'antes de fechar')
+          : r.dsAlerta,
+      condicao:
+        verNum < publishedVer && idx === 0
+          ? `${r.condicao} AND 1 = 1`
+          : r.condicao,
+      camposAfetados: r.camposAfetados,
+      script:
+        r.script && verNum < publishedVer
+          ? r.script.replace('LENGTH(TRIM(', 'LENGTH(')
+          : r.script,
+      cdTipoLayout: 1,
+      dsTipoLayout: 'Tela',
+    }));
+
+    if (verNum === historyVer || verNum === olderHistoryVer) {
+      baseRules.pop();
+    } else if (verNum === testVer) {
+      baseRules.push({
+        cdRegra: 99901,
+        numOrdem: baseRules.length + 1,
+        dsRegra: 'SBX_REG_ALERTA_SEPSE_TESTE',
+        ativa: 1,
+        tipoRegra: 'VALIDATE',
+        dsAlerta: 'Escore de sepse elevado: acionar protocolo imediato.',
+        condicao: 'ESCORE_RISCO_SEPSE = "ALTO"',
+        camposAfetados: 'ESCORE_RISCO_SEPSE, REGISTRO_CLINICO',
+        script: `SELECT COUNT(1)\n  FROM DBAMV.ATENDIME A\n WHERE A.CD_ATENDIMENTO = :CD_ATENDIMENTO\n   AND A.TP_ATENDIMENTO = 'I'`,
+        cdTipoLayout: 1,
+        dsTipoLayout: 'Tela',
+      });
+    }
+
+    const sourceActions =
+      doc.actions.length > 0
+        ? doc.actions
+        : [
+            {
+              cdCampo: doc.fields[0]?.cdCampo ?? 900101,
+              cdMetadado: doc.fields[0]?.cdMetadado ?? 99011,
+              nomeCampo: doc.fields[0]?.name ?? 'Registro Clínico Principal',
+              identificador: doc.fields[0]?.tag ?? 'REGISTRO_CLINICO',
+              script: `SELECT DBMS_LOB.SUBSTR(ERC.LO_VALOR, 4000, 1)\n  FROM DBAMV.PW_DOCUMENTO_CLINICO PDC\n  JOIN DBAMV.PW_EDITOR_CLINICO PEC ON PEC.CD_DOCUMENTO_CLINICO = PDC.CD_DOCUMENTO_CLINICO\n  JOIN EDITOR.EDITOR_REGISTRO_CAMPO ERC ON ERC.CD_REGISTRO = PEC.CD_EDITOR_REGISTRO\n WHERE PDC.CD_ATENDIMENTO = :CD_ATENDIMENTO\n   AND PEC.CD_DOCUMENTO = 9001`,
+            },
+          ];
+
+    const baseSqlActions: VersionSqlActionSnapshot[] = sourceActions.map((a, idx) => {
+      let script = a.script;
+      if (verNum < publishedVer && idx === 0) {
+        script = `${script}\n   AND PDC.TP_STATUS = 'FECHADO'`;
+      } else if (verNum >= publishedVer && idx === 0) {
+        script = `${script}\n   AND PDC.TP_STATUS IN ('FECHADO', 'ASSINADO')\n   AND ROWNUM = 1`;
+      }
+      return {
+        cdCampo: a.cdCampo + verNum * 10,
+        cdMetadado: a.cdMetadado,
+        dsIdentificador: a.identificador,
+        nomeCampo: a.nomeCampo,
+        cdPropriedade: 4,
+        script,
+        cdTipoLayout: 1,
+        dsTipoLayout: 'Tela',
+        docsRelacionados: extractReferencedDocs(script),
+      };
+    });
+
+    if (verNum === testVer) {
+      const extraSql = `SELECT DS_DIAGNOSTICO\n  FROM DBAMV.CID\n WHERE CD_CID = :CD_CID`;
+      baseSqlActions.push({
+        cdCampo: doc.id * 1000 + 99,
+        cdMetadado: 99999,
+        dsIdentificador: 'ESCORE_RISCO_SEPSE',
+        nomeCampo: 'Escore de Risco Clínico (Novo em Teste)',
+        cdPropriedade: 4,
+        script: extraSql,
+        cdTipoLayout: 1,
+        dsTipoLayout: 'Tela',
+        docsRelacionados: extractReferencedDocs(extraSql),
+      });
+    }
+
+    return { fields: baseFields, rules: baseRules, sqlActions: baseSqlActions };
+  };
+
+  const baseSnap = buildSnapshot(baseSummary.versionNumber);
+  const targetSnap = buildSnapshot(targetSummary.versionNumber);
+  const diffResult = computeVersionDiff({
+    baseFields: baseSnap.fields,
+    targetFields: targetSnap.fields,
+    baseRules: baseSnap.rules,
+    targetRules: targetSnap.rules,
+    baseSqlActions: baseSnap.sqlActions,
+    targetSqlActions: targetSnap.sqlActions,
+  });
+
+  return {
+    docId: String(doc.id),
+    docName: doc.name,
+    docIdentifier: doc.identifier,
+    engine: 'V3',
+    versions,
+    baseVersion: baseSummary,
+    targetVersion: targetSummary,
+    ...diffResult,
+    warnings: [],
+  };
 }

@@ -32,7 +32,7 @@ Após subir, acesse **`http://localhost:3000`**, autentique-se com `admin` (senh
 ## Principais Módulos
 
 - **Visão Geral (`/dashboard`)**: KPIs assistenciais, Produção 24h, Taxa de Assinatura, Curva ABC (Top 10), Adesão por Unidade, Dinâmica de Turnos (Dia/Noite) e Saneamento de Templates Ociosos, com filtro global (`30d | 60d | 90d | 180d | 365d` ou intervalo personalizado até 365 dias).
-- **Catálogo de Documentos & Inspector 360° (`/documentos` e `/documentos/[id]/campos`)**: Matriz multi-empresa de uso, histórico de versões, metadados técnicos, ações SQL, regras clínicas e inspeção completa de campos.
+- **Catálogo de Documentos & Inspector 360° (`/documentos`, `/documentos/[id]/campos` e `/documentos/[id]/versoes`)**: Matriz multi-empresa de uso, histórico de versões, comparador de mudanças entre versões no Editor 3.0 (Campos, Regras e Consultas SQL), metadados técnicos, ações SQL, regras clínicas e inspeção completa de campos.
 - **Perfis Clínicos (`/perfis-clinicos`)**: Mapeamento de perfis ambulatoriais (`SIS`), especialidades, setores e árvore hierárquica de módulos/parâmetros do PEP.
 - **Migração Flex → HTML5 (`/migracao`)**: Quadro Kanban, backlog priorizado por uso real e comparador estrutural V2 × V3.
 - **Grafo de Linhagem & Dependências (`/linhagem`)**: Visão híbrida (**Fluxo em Colunas** + **Mapa em Rede Cytoscape/ELK**) rastreando dependências SQL e alertas de vínculos quebrados antes de alterações em produção.

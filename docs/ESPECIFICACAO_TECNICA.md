@@ -187,7 +187,7 @@ Todas as consultas padrão residem em [`src/lib/default-queries.ts`](../src/lib/
 | `/api/dashboard/stats`, `/analytics`, `/quality`, `/custom` | `GET`, `POST` | KPIs executivos, Curva ABC, ociosidade, turnos, SLA e cards personalizados |
 | `/api/hospitals/stats`, `/quality` | `GET` | Métricas detalhadas, top 5 e SLA segmentados por `CD_MULTI_EMPRESA` |
 | `/api/empresas` | `GET` | Listagem de `DBAMV.MULTI_EMPRESAS` no banco ativo |
-| `/api/documentos/compare` | `GET` | Comparação estrutural de layouts/campos/regras entre versões V2 e V3 |
+| `/api/documentos/compare` | `GET`, `POST` | Comparação estrutural e SQL entre versões de documentos (Editor 3.0 V3: Campos, Regras e Consultas SQL via `src/lib/version-diff.ts` e compatibilidade legada com grafo V2) |
 | `/api/migracao` | `GET`, `POST`, `PUT`, `DELETE` | Kanban e rastreamento de migração Editor 2.0 → 3.0 |
 | `/api/dependencias-bi` | `GET`, `POST`, `PUT`, `DELETE` | Inventário de impacto de documentos em painéis BI (Power BI, Metabase, Oracle Views, etc.) |
 | `/api/ai/ollama` | `POST` | Integração opcional com Ollama local para sugestão e otimização de SQL Oracle |
